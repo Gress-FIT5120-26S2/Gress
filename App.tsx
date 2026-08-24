@@ -2,7 +2,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
 import { BlurTargetView } from 'expo-blur';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, InteractionManager, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { getApiHealth } from './src/api';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
@@ -23,6 +23,15 @@ const screens: Record<AppTab, { eyebrow: string; title: string; description: str
   profile: { eyebrow: 'MY KITCHEN', title: 'Make it yours', description: 'Set your preferences, diets, and cooking goals.' },
 };
 
+const transitionTones: Record<AppTab, string> = {
+  home: '#E6F1EE',
+  ingredients: '#FFF1DC',
+  fridge: '#E1F0EF',
+  recipes: '#F5E9D6',
+  profile: '#E8EEEA',
+};
+const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
+
 export default function App() {
   // Arthur: NarIyirm
   // 中文：开场层会等待厨房首帧完成，再淡出并显示可交互框架。
@@ -33,7 +42,16 @@ export default function App() {
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [status, setStatus] = useState('正在连接后端…');
   const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [isCinematicActive, setIsCinematicActive] = useState(false);
+  const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
+  const transitionInProgressRef = useRef(false);
+  const chromeOpacity = useRef(new Animated.Value(1)).current;
+  const screenOpacity = useRef(new Animated.Value(1)).current;
+  const screenScale = useRef(new Animated.Value(1)).current;
+  const transitionOverlayOpacity = useRef(new Animated.Value(0)).current;
   const finishOpening = useCallback(() => setIsOpening(false), []);
   const completeOpeningSequence = useCallback(() => setIsOpeningSequenceDone(true), []);
   const markKitchenReady = useCallback(() => setCanRevealKitchen(true), []);
@@ -53,6 +71,16 @@ export default function App() {
     getApiHealth()
       .then(() => setStatus('后端与 Supabase 已连接'))
       .catch(() => setStatus('暂未连接后端 — 请检查 .env.local 和 server/.env'));
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   useEffect(() => {
@@ -82,32 +110,135 @@ export default function App() {
     return () => clearTimeout(safetyTimer);
   }, [canMountKitchen, canRevealKitchen]);
 
+  const beginCinematicFocus = useCallback(() => {
+    setIsCinematicActive(true);
+    Animated.timing(chromeOpacity, {
+      toValue: 0,
+      duration: reduceMotion ? 80 : 180,
+      easing: SCREEN_EASE_OUT,
+      useNativeDriver: true,
+    }).start();
+  }, [chromeOpacity, reduceMotion]);
+
+  const handleCinematicNavigate = useCallback((targetTab: AppTab) => {
+    if (transitionInProgressRef.current || targetTab === activeTab) return;
+    transitionInProgressRef.current = true;
+    setIsCinematicActive(true);
+    setIsTransitionOverlayVisible(true);
+    setTransitionTone(transitionTones[targetTab]);
+    transitionOverlayOpacity.setValue(0);
+
+    // Arthur: NarIyirm
+    // 中文：遮罩完全覆盖时才替换页面，再同时淡出遮罩和淡入目标页，避免卸载 3D Canvas 产生视觉断层。
+    // EN: Swap screens only under a fully opaque veil, then reveal the destination while the 3D Canvas unmounts invisibly.
+    requestAnimationFrame(() => {
+      Animated.parallel([
+        Animated.timing(transitionOverlayOpacity, {
+          toValue: 1,
+          duration: reduceMotion ? 90 : 180,
+          easing: SCREEN_EASE_OUT,
+          useNativeDriver: true,
+        }),
+        Animated.timing(chromeOpacity, {
+          toValue: 0,
+          duration: reduceMotion ? 70 : 140,
+          easing: SCREEN_EASE_OUT,
+          useNativeDriver: true,
+        }),
+      ]).start(({ finished }) => {
+        if (!finished) return;
+
+        screenOpacity.setValue(0);
+        screenScale.setValue(reduceMotion ? 1 : 0.985);
+        setActiveTab(targetTab);
+
+        requestAnimationFrame(() => {
+          Animated.parallel([
+            Animated.timing(transitionOverlayOpacity, {
+              toValue: 0,
+              duration: reduceMotion ? 150 : 300,
+              easing: SCREEN_EASE_OUT,
+              useNativeDriver: true,
+            }),
+            Animated.timing(screenOpacity, {
+              toValue: 1,
+              duration: reduceMotion ? 150 : 280,
+              easing: SCREEN_EASE_OUT,
+              useNativeDriver: true,
+            }),
+            Animated.timing(screenScale, {
+              toValue: 1,
+              duration: reduceMotion ? 1 : 340,
+              easing: SCREEN_EASE_OUT,
+              useNativeDriver: true,
+            }),
+            Animated.timing(chromeOpacity, {
+              toValue: 1,
+              duration: reduceMotion ? 130 : 260,
+              easing: SCREEN_EASE_OUT,
+              useNativeDriver: true,
+            }),
+          ]).start(() => {
+            transitionInProgressRef.current = false;
+            setIsCinematicActive(false);
+            setIsTransitionOverlayVisible(false);
+          });
+        });
+      });
+    });
+  }, [activeTab, chromeOpacity, reduceMotion, screenOpacity, screenScale, transitionOverlayOpacity]);
+
   return (
     <View style={styles.container}>
       {/* Arthur: NarIyirm
           中文：内容层是导航栏的模糊目标；导航栏在它之后渲染才能获得真实毛玻璃效果。
           EN: This content layer is the blur target; it renders before the bar for a real glass effect. */}
-      <BlurTargetView ref={blurTargetRef} style={[styles.content, activeTab === 'home' && styles.homeContent]}>
-        {activeTab === 'home' && canMountKitchen ? (
-          <Suspense fallback={<KitchenLoading />}>
-            <Kitchen3DPrototype onNavigate={setActiveTab} onReady={markKitchenReady} />
-          </Suspense>
-        ) : activeTab === 'home' && !isOpening ? (
-          <KitchenLoading />
-        ) : activeTab !== 'home' ? (
-          <>
-            <View style={[styles.glow, activeTab === 'fridge' && styles.glowCool]} />
-            <Text style={styles.greeting}>KITCHMEMO</Text>
-            <View style={styles.screenCopy}>
-              <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
-              <Text style={styles.title}>{screen.title}</Text>
-              <Text style={styles.description}>{screen.description}</Text>
-              <Text style={styles.connection}>{status}</Text>
-            </View>
-          </>
-        ) : null}
+      <BlurTargetView ref={blurTargetRef} style={styles.content}>
+        <Animated.View
+          style={[
+            styles.screenStage,
+            activeTab === 'home' ? styles.homeContent : styles.standardContent,
+            { opacity: screenOpacity, transform: [{ scale: screenScale }] },
+          ]}
+        >
+          {activeTab === 'home' && canMountKitchen ? (
+            <Suspense fallback={<KitchenLoading />}>
+              <Kitchen3DPrototype
+                onInteractionStart={beginCinematicFocus}
+                onNavigate={handleCinematicNavigate}
+                onReady={markKitchenReady}
+              />
+            </Suspense>
+          ) : activeTab === 'home' && !isOpening ? (
+            <KitchenLoading />
+          ) : activeTab !== 'home' ? (
+            <>
+              <View style={[styles.glow, activeTab === 'fridge' && styles.glowCool]} />
+              <Text style={styles.greeting}>KITCHMEMO</Text>
+              <View style={styles.screenCopy}>
+                <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
+                <Text style={styles.title}>{screen.title}</Text>
+                <Text style={styles.description}>{screen.description}</Text>
+                <Text style={styles.connection}>{status}</Text>
+              </View>
+            </>
+          ) : null}
+        </Animated.View>
       </BlurTargetView>
-      {!isOpening && <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />}
+      {!isOpening && (
+        <Animated.View
+          pointerEvents={isCinematicActive ? 'none' : 'box-none'}
+          style={[styles.chromeLayer, { opacity: chromeOpacity }]}
+        >
+          <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />
+        </Animated.View>
+      )}
+      {isTransitionOverlayVisible ? (
+        <Animated.View
+          pointerEvents="auto"
+          style={[styles.transitionOverlay, { backgroundColor: transitionTone, opacity: transitionOverlayOpacity }]}
+        />
+      ) : null}
       <StatusBar style="dark" />
       {isOpening && (
         <OpeningAnimation
@@ -131,8 +262,12 @@ function KitchenLoading() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F4EE' },
-  content: { flex: 1, paddingHorizontal: 24, paddingTop: 82, overflow: 'hidden' },
+  content: { flex: 1, overflow: 'hidden' },
+  screenStage: { flex: 1, overflow: 'hidden' },
   homeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  standardContent: { paddingHorizontal: 24, paddingTop: 82 },
+  chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
+  transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
   glow: { position: 'absolute', top: -120, right: -70, width: 310, height: 310, borderRadius: 180, backgroundColor: '#F6CC83', opacity: 0.5 },
   glowCool: { backgroundColor: '#9FD7D7' },
   greeting: { color: '#6C786F', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },

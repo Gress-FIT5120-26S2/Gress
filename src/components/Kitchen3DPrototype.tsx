@@ -1,40 +1,133 @@
-import { OrbitControls, useGLTF, useProgress } from '@react-three/drei/native';
-import { Canvas, type ThreeEvent, useFrame, useThree } from '@react-three/fiber/native';
-import { Suspense, useLayoutEffect, useRef } from 'react';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
-import type { Object3D } from 'three';
+import { OrbitControls, useAnimations, useGLTF, useProgress } from '@react-three/drei/native';
+import { Canvas, createPortal, type ThreeEvent, useFrame, useThree } from '@react-three/fiber/native';
+import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import {
+  AdditiveBlending,
+  LoopOnce,
+  MathUtils,
+  Spherical,
+  Vector3,
+  type AnimationClip,
+  type Group,
+  type Mesh,
+  type MeshStandardMaterial,
+  type Object3D,
+  type PointLight,
+} from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
 import type { AppTab } from './FloatingTabBar';
+import {
+  KitchenTimeEnvironment,
+  type KitchenLightingState,
+  useKitchenTimeLighting,
+} from './KitchenTimeLighting';
 
 type Kitchen3DPrototypeProps = {
+  onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
   onReady?: () => void;
 };
 
 type FeatureHotspotProps = {
-  hitboxPosition: [number, number, number];
   hitboxSize: [number, number, number];
-  markerPosition: [number, number, number];
+  markerOffset: [number, number, number];
   onPress: () => void;
 };
 
-const MODEL_POSITION: [number, number, number] = [-0.9, 0, -0.81];
-const MODEL_SCALE = 10.5;
-const CAMERA_TARGET: [number, number, number] = [0, 3.02, 0];
-const INITIAL_CAMERA_POSITION: [number, number, number] = [14.6, 12.8, 20.2];
+type KitchenInteraction = 'fridge' | 'stove' | 'recipes' | null;
+type KitchenFeature = Exclude<KitchenInteraction, null>;
+type LoadedKitchen = { scene: Object3D; animations: AnimationClip[] };
+type CameraMotion = {
+  currentOffset: Vector3;
+  currentSpherical: Spherical;
+  currentTarget: Vector3;
+  duration: number;
+  endSpherical: Spherical;
+  endTarget: Vector3;
+  feature: Exclude<KitchenInteraction, null>;
+  hasCuedEffect: boolean;
+  startSpherical: Spherical;
+  startedAt: number | null;
+  startTarget: Vector3;
+  thetaDelta: number;
+};
+type KitchenSceneProps = {
+  activeInteraction: KitchenInteraction;
+  effectInteraction: KitchenInteraction;
+  lighting: KitchenLightingState;
+  onEffectCue: (feature: Exclude<KitchenInteraction, null>) => void;
+  onFocusComplete: (feature: Exclude<KitchenInteraction, null>) => void;
+  onReady?: () => void;
+  onSelectFeature: (feature: KitchenFeature) => void;
+  reduceMotion: boolean;
+};
+
+const CAMERA_TARGET: [number, number, number] = [0, 1.3, 0];
+const INITIAL_CAMERA_POSITION: [number, number, number] = [10.8, 8.8, 16.6];
+const REDUCED_MOTION_DELAY = 180;
+const EFFECT_CUE_PROGRESS = 0.32;
+const CAMERA_FOCUS = {
+  fridge: {
+    anchorName: 'Hotspot_Fridge',
+    cameraOffset: [3.8, 2.15, 5.15] as [number, number, number],
+    targetOffset: [0, 0.08, 0.04] as [number, number, number],
+    duration: 1320,
+  },
+  stove: {
+    anchorName: 'Hotspot_Stove',
+    cameraOffset: [2.75, 1.85, 4.25] as [number, number, number],
+    targetOffset: [0, 0.14, 0.06] as [number, number, number],
+    duration: 1180,
+  },
+  recipes: {
+    anchorName: 'Hotspot_Recipes',
+    cameraOffset: [3.0, 2.2, 4.15] as [number, number, number],
+    targetOffset: [0, -0.12, 0.02] as [number, number, number],
+    duration: 1220,
+  },
+} as const;
+const BURNER_ANCHORS = ['Stove_Burner_Left_Anchor', 'Stove_Burner_Right_Anchor'] as const;
+const FLAME_RING = Array.from({ length: 12 }, (_, index) => {
+  const angle = (index / 12) * Math.PI * 2;
+  return [Math.cos(angle) * 0.15, 0.09, Math.sin(angle) * 0.15] as [number, number, number];
+});
+
+function sampleCubicBezier(time: number, point1: number, point2: number) {
+  const inverse = 1 - time;
+  return 3 * inverse * inverse * time * point1 + 3 * inverse * time * time * point2 + time * time * time;
+}
+
+function sampleCubicBezierDerivative(time: number, point1: number, point2: number) {
+  const inverse = 1 - time;
+  return 3 * inverse * inverse * point1 + 6 * inverse * time * (point2 - point1) + 3 * time * time * (1 - point2);
+}
+
+function cubicBezierProgress(progress: number, x1: number, y1: number, x2: number, y2: number) {
+  let time = progress;
+  for (let index = 0; index < 5; index += 1) {
+    const derivative = sampleCubicBezierDerivative(time, x1, x2);
+    if (Math.abs(derivative) < 0.0001) break;
+    time = MathUtils.clamp(time - (sampleCubicBezier(time, x1, x2) - progress) / derivative, 0, 1);
+  }
+  return sampleCubicBezier(time, y1, y2);
+}
+
+const cameraMoveEase = (progress: number) => cubicBezierProgress(progress, 0.77, 0, 0.175, 1);
+const cameraZoomEase = (progress: number) => cubicBezierProgress(progress, 0.23, 1, 0.32, 1);
 
 function PulseMarker({ position }: { position: [number, number, number] }) {
   return (
     <mesh position={position}>
-      <sphereGeometry args={[0.11, 18, 18]} />
+      <sphereGeometry args={[0.075, 16, 16]} />
       <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={2.2} />
-      <pointLight color="#FFFFFF" intensity={0.7} distance={1.3} />
+      <pointLight color="#FFFFFF" intensity={0.45} distance={0.8} />
     </mesh>
   );
 }
 
-function FeatureHotspot({ hitboxPosition, hitboxSize, markerPosition, onPress }: FeatureHotspotProps) {
+function FeatureHotspot({ hitboxSize, markerOffset, onPress }: FeatureHotspotProps) {
   const handlePress = (event: ThreeEvent<MouseEvent>) => {
     // Arthur: NarIyirm
     // 中文：透明热区扩大精细模型的可点击范围，并阻止点击继续穿透到厨房网格。
@@ -45,20 +138,144 @@ function FeatureHotspot({ hitboxPosition, hitboxSize, markerPosition, onPress }:
 
   return (
     <group>
-      <mesh position={hitboxPosition} onClick={handlePress}>
+      <mesh onClick={handlePress}>
         <boxGeometry args={hitboxSize} />
         <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
       </mesh>
-      <PulseMarker position={markerPosition} />
+      <PulseMarker position={markerOffset} />
     </group>
   );
 }
 
-function KitchenModel({ onReady }: { onReady?: () => void }) {
-  const { scene } = useGLTF(KITCHEN_MODEL_ASSET) as { scene: Object3D };
+function BurnerFlame({ active, reduceMotion }: { active: boolean; reduceMotion: boolean }) {
+  const groupRef = useRef<Group>(null);
+  const lightRef = useRef<PointLight>(null);
+  const startedAtRef = useRef<number | null>(null);
+  const invalidate = useThree((state) => state.invalidate);
+
+  useEffect(() => {
+    startedAtRef.current = null;
+    if (groupRef.current) groupRef.current.visible = active;
+    invalidate();
+  }, [active, invalidate]);
+
+  useFrame(({ clock }) => {
+    const group = groupRef.current;
+    if (!group || !active) return;
+
+    if (startedAtRef.current === null) startedAtRef.current = clock.elapsedTime;
+    const elapsed = clock.elapsedTime - startedAtRef.current;
+    const linearProgress = reduceMotion ? 1 : Math.min(elapsed / 0.24, 1);
+    const ignitionProgress = 1 - Math.pow(1 - linearProgress, 3);
+    const flicker = reduceMotion ? 1 : 0.94 + Math.sin(clock.elapsedTime * 29) * 0.04 + Math.sin(clock.elapsedTime * 43) * 0.02;
+
+    // Arthur: NarIyirm
+    // 中文：火焰只修改 Three.js 节点，并在短暂点火过程请求帧，不触发逐帧 React 状态更新。
+    // EN: Mutate only the Three.js node and request frames during the short ignition without per-frame React state.
+    group.scale.set(0.88 + ignitionProgress * 0.12, Math.max(0.06, ignitionProgress * flicker), 0.88 + ignitionProgress * 0.12);
+    if (lightRef.current) lightRef.current.intensity = ignitionProgress * 0.8 * flicker;
+    if (!reduceMotion) invalidate();
+  });
+
+  return (
+    <group ref={groupRef} position={[0, 0.025, 0]} visible={false}>
+      <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.025, 0]}>
+        <ringGeometry args={[0.10, 0.21, 28]} />
+        <meshBasicMaterial color="#36BFFF" transparent opacity={0.58} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+      </mesh>
+      {FLAME_RING.map((flamePosition, index) => (
+        <mesh key={index} position={flamePosition}>
+          <coneGeometry args={[0.032, 0.17, 7]} />
+          <meshBasicMaterial color={index % 2 === 0 ? '#7CF1FF' : '#258BFF'} transparent opacity={0.86} depthWrite={false} blending={AdditiveBlending} toneMapped={false} />
+        </mesh>
+      ))}
+      <pointLight ref={lightRef} position={[0, 0.22, 0]} color="#65DFFF" intensity={0} distance={1.25} decay={2} />
+    </group>
+  );
+}
+
+function setEmissiveIntensity(object: Object3D | undefined, intensity: number) {
+  object?.traverse((child) => {
+    const mesh = child as Mesh;
+    if (!mesh.isMesh) return;
+    const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+    materials.forEach((material) => {
+      const standardMaterial = material as MeshStandardMaterial;
+      if ('emissiveIntensity' in standardMaterial) standardMaterial.emissiveIntensity = intensity;
+    });
+  });
+}
+
+function KitchenModel({
+  activeInteraction,
+  effectInteraction,
+  lighting,
+  onReady,
+  onSelectFeature,
+  reduceMotion,
+}: {
+  activeInteraction: KitchenInteraction;
+  effectInteraction: KitchenInteraction;
+  lighting: KitchenLightingState;
+  onReady?: () => void;
+  onSelectFeature: (feature: KitchenFeature) => void;
+  reduceMotion: boolean;
+}) {
+  const { scene, animations } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
+  const { actions, mixer } = useAnimations(animations, scene);
   const hasPresentedFirstFrame = useRef(false);
+  const invalidate = useThree((state) => state.invalidate);
+  const anchors = useMemo(() => ({
+    burners: BURNER_ANCHORS.map((name) => scene.getObjectByName(name)).filter((anchor): anchor is Object3D => Boolean(anchor)),
+    ceilingLight: scene.getObjectByName('Ceiling_Light_Anchor'),
+    fridgeLight: scene.getObjectByName('Fridge_Light_Anchor'),
+    fridgeHotspot: scene.getObjectByName('Hotspot_Fridge'),
+    stoveHotspot: scene.getObjectByName('Hotspot_Stove'),
+    recipesHotspot: scene.getObjectByName('Hotspot_Recipes'),
+  }), [scene]);
+
+  useLayoutEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：灯泡材质跟随时间和开门状态变化，真实点光源则挂在模型锚点上，旋转视角不会产生漂移。
+    // EN: Bulb materials follow time and door state while real lights live on model anchors, preventing drift after rotation.
+    setEmissiveIntensity(scene.getObjectByName('Ceiling_Lamp_Bulb'), 0.08 + lighting.ceilingIntensity * 0.35);
+    setEmissiveIntensity(scene.getObjectByName('Fridge_Lamp'), effectInteraction === 'fridge' ? 2.5 : 0.05);
+    invalidate();
+  }, [effectInteraction, invalidate, lighting.ceilingIntensity, scene]);
+
+  useEffect(() => {
+    const doorPivot = scene.getObjectByName('Fridge_Door_Pivot');
+    const doorAction = actions.Fridge_Door_Open;
+
+    if (effectInteraction === 'fridge' && doorAction) {
+      doorAction.reset();
+      doorAction.setLoop(LoopOnce, 1);
+      doorAction.clampWhenFinished = true;
+      doorAction.timeScale = 1.35;
+      doorAction.play();
+
+      if (reduceMotion) {
+        doorAction.time = doorAction.getClip().duration;
+        doorAction.paused = true;
+        mixer.update(0);
+      }
+      invalidate();
+    }
+
+    return () => {
+      doorAction?.stop();
+      if (doorPivot) {
+        // Arthur: NarIyirm
+        // 中文：卸载时把缓存模型的门恢复关闭，返回首页不会保留上一次开门姿态。
+        // EN: Close the cached model door on unmount so returning home never keeps the previous pose.
+        doorPivot.quaternion.identity();
+        doorPivot.updateMatrixWorld(true);
+      }
+    };
+  }, [actions.Fridge_Door_Open, effectInteraction, invalidate, mixer, reduceMotion, scene]);
 
   useFrame(() => {
+    if (effectInteraction === 'fridge' && !reduceMotion) invalidate();
     if (hasPresentedFirstFrame.current || !onReady) return;
 
     // Arthur: NarIyirm
@@ -69,20 +286,58 @@ function KitchenModel({ onReady }: { onReady?: () => void }) {
   });
 
   return (
-    <group position={MODEL_POSITION} scale={MODEL_SCALE}>
-      {/* Arthur: NarIyirm
-          中文：原模型不足一个世界单位，在这里统一放大并按模型边界移回场景中心。
-          EN: The source is under one world unit, so it is scaled uniformly and recentered from its bounds. */}
-      {/* Arthur: NarIyirm
-          中文：精细厨房本体不参与射线检测，避免每次拖拽都扫描完整模型网格。
-          EN: The detailed kitchen has no pointer handlers, avoiding raycasts across the full model mesh. */}
+    <>
       <primitive object={scene} />
-    </group>
+
+      {/* Arthur: NarIyirm
+          中文：Portal 把反馈元素变成模型锚点的真实子节点，因此拖拽或旋转相机后仍与部件完全重合。
+          EN: Portals make feedback elements true children of model anchors, keeping them aligned after camera rotation. */}
+      {anchors.burners.map((anchor) => (
+        <Fragment key={anchor.uuid}>
+          {createPortal(
+            <BurnerFlame active={effectInteraction === 'stove'} reduceMotion={reduceMotion} />,
+            anchor,
+          )}
+        </Fragment>
+      ))}
+      {anchors.ceilingLight ? createPortal(
+        <pointLight color="#FFD08A" intensity={lighting.ceilingIntensity} distance={7.2} decay={2} />,
+        anchors.ceilingLight,
+      ) : null}
+      {anchors.fridgeLight ? createPortal(
+        <pointLight color="#FFF1C4" intensity={effectInteraction === 'fridge' ? 2.4 : 0} distance={2.1} decay={2} />,
+        anchors.fridgeLight,
+      ) : null}
+      {activeInteraction === null && anchors.fridgeHotspot ? createPortal(
+          <FeatureHotspot hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} />,
+          anchors.fridgeHotspot,
+        ) : null}
+      {activeInteraction === null && anchors.stoveHotspot ? createPortal(
+          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} />,
+          anchors.stoveHotspot,
+        ) : null}
+      {activeInteraction === null && anchors.recipesHotspot ? createPortal(
+          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} />,
+          anchors.recipesHotspot,
+        ) : null}
+    </>
   );
 }
 
-function KitchenCameraControls() {
+function KitchenCameraControls({
+  activeInteraction,
+  onEffectCue,
+  onFocusComplete,
+  reduceMotion,
+}: {
+  activeInteraction: KitchenInteraction;
+  onEffectCue: (feature: Exclude<KitchenInteraction, null>) => void;
+  onFocusComplete: (feature: Exclude<KitchenInteraction, null>) => void;
+  reduceMotion: boolean;
+}) {
+  const { scene } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
   const controlsRef = useRef<OrbitControlsImpl>(null);
+  const cameraMotionRef = useRef<CameraMotion | null>(null);
   const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const canvasWidth = useThree((state) => state.size.width);
@@ -90,8 +345,8 @@ function KitchenCameraControls() {
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
-    // 中文：画布和控制器就绪后统一设置相机，确保首次进入和屏幕尺寸变化时厨房都保持居中。
-    // EN: Set the camera after both canvas and controls are ready, keeping the kitchen centered on mount and resize.
+    // 中文：画布尺寸变化时重设完整厨房视角，保证墙体、地板和三个主要组件同时可见。
+    // EN: Reset the full-kitchen view after a canvas resize so walls, floor, and all main components stay visible.
     camera.position.set(...INITIAL_CAMERA_POSITION);
     camera.up.set(0, 1, 0);
     controlsRef.current?.target.set(...CAMERA_TARGET);
@@ -101,15 +356,102 @@ function KitchenCameraControls() {
     invalidate();
   }, [camera, canvasHeight, canvasWidth, invalidate]);
 
+  useEffect(() => {
+    if (!activeInteraction) {
+      cameraMotionRef.current = null;
+      return;
+    }
+
+    if (reduceMotion) {
+      onEffectCue(activeInteraction);
+      const timer = setTimeout(() => onFocusComplete(activeInteraction), REDUCED_MOTION_DELAY);
+      return () => clearTimeout(timer);
+    }
+
+    const focus = CAMERA_FOCUS[activeInteraction];
+    const anchor = scene.getObjectByName(focus.anchorName);
+    if (!anchor) {
+      onEffectCue(activeInteraction);
+      onFocusComplete(activeInteraction);
+      return;
+    }
+
+    scene.updateMatrixWorld(true);
+    const startTarget = controlsRef.current?.target.clone() ?? new Vector3(...CAMERA_TARGET);
+    const endTarget = anchor.getWorldPosition(new Vector3()).add(new Vector3(...focus.targetOffset));
+    const startSpherical = new Spherical().setFromVector3(camera.position.clone().sub(startTarget));
+    const endSpherical = new Spherical().setFromVector3(new Vector3(...focus.cameraOffset));
+    let thetaDelta = endSpherical.theta - startSpherical.theta;
+    if (thetaDelta > Math.PI) thetaDelta -= Math.PI * 2;
+    if (thetaDelta < -Math.PI) thetaDelta += Math.PI * 2;
+
+    // Arthur: NarIyirm
+    // 中文：从用户当前拖拽视角捕获球坐标，沿最短旋转方向移向目标，再延后推进形成“先对准、后聚焦”的镜头节奏。
+    // EN: Capture the user's current orbit, rotate by the shortest arc, then delay the push-in for an aim-then-focus rhythm.
+    cameraMotionRef.current = {
+      currentOffset: new Vector3(),
+      currentSpherical: new Spherical(),
+      currentTarget: new Vector3(),
+      duration: focus.duration,
+      endSpherical,
+      endTarget,
+      feature: activeInteraction,
+      hasCuedEffect: false,
+      startSpherical,
+      startedAt: null,
+      startTarget,
+      thetaDelta,
+    };
+    invalidate();
+  }, [activeInteraction, camera, invalidate, onEffectCue, onFocusComplete, reduceMotion, scene]);
+
+  useFrame(({ clock }) => {
+    const motion = cameraMotionRef.current;
+    if (!motion) return;
+    if (motion.startedAt === null) motion.startedAt = clock.elapsedTime;
+
+    const progress = MathUtils.clamp(((clock.elapsedTime - motion.startedAt) * 1000) / motion.duration, 0, 1);
+    const moveProgress = cameraMoveEase(progress);
+    const zoomStart = EFFECT_CUE_PROGRESS * 0.58;
+    const zoomProgress = cameraZoomEase(MathUtils.clamp((progress - zoomStart) / (1 - zoomStart), 0, 1));
+
+    if (!motion.hasCuedEffect && progress >= EFFECT_CUE_PROGRESS) {
+      motion.hasCuedEffect = true;
+      onEffectCue(motion.feature);
+    }
+
+    motion.currentTarget.lerpVectors(motion.startTarget, motion.endTarget, moveProgress);
+    motion.currentSpherical.set(
+      MathUtils.lerp(motion.startSpherical.radius, motion.endSpherical.radius, zoomProgress),
+      MathUtils.lerp(motion.startSpherical.phi, motion.endSpherical.phi, moveProgress),
+      motion.startSpherical.theta + motion.thetaDelta * moveProgress,
+    );
+    motion.currentOffset.setFromSpherical(motion.currentSpherical);
+    camera.position.copy(motion.currentTarget).add(motion.currentOffset);
+    camera.lookAt(motion.currentTarget);
+    camera.updateMatrixWorld();
+    controlsRef.current?.target.copy(motion.currentTarget);
+
+    if (progress < 1) {
+      invalidate();
+      return;
+    }
+
+    if (!motion.hasCuedEffect) onEffectCue(motion.feature);
+    cameraMotionRef.current = null;
+    onFocusComplete(motion.feature);
+  });
+
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
+      enabled={activeInteraction === null}
       enablePan={false}
-      enableDamping
+      enableDamping={activeInteraction === null}
       dampingFactor={0.12}
-      minDistance={15}
-      maxDistance={34}
+      minDistance={16}
+      maxDistance={31}
       minPolarAngle={0.62}
       maxPolarAngle={1.28}
       minAzimuthAngle={-0.95}
@@ -119,64 +461,103 @@ function KitchenCameraControls() {
   );
 }
 
-function KitchenScene({ onNavigate, onReady }: Kitchen3DPrototypeProps) {
+function KitchenScene({ activeInteraction, effectInteraction, lighting, onEffectCue, onFocusComplete, onReady, onSelectFeature, reduceMotion }: KitchenSceneProps) {
   return (
     <>
-      <color attach="background" args={['#D8EFF0']} />
-      <ambientLight intensity={1.25} />
-      <directionalLight position={[8, 14, 10]} intensity={2.1} color="#FFF6DE" />
-      <directionalLight position={[-8, 6, -4]} intensity={0.65} color="#B8E1EC" />
+      <KitchenTimeEnvironment lighting={lighting} />
 
       <Suspense fallback={null}>
-        <KitchenModel onReady={onReady} />
+        <KitchenModel
+          activeInteraction={activeInteraction}
+          effectInteraction={effectInteraction}
+          lighting={lighting}
+          onReady={onReady}
+          onSelectFeature={onSelectFeature}
+          reduceMotion={reduceMotion}
+        />
+        <KitchenCameraControls
+          activeInteraction={activeInteraction}
+          onEffectCue={onEffectCue}
+          onFocusComplete={onFocusComplete}
+          reduceMotion={reduceMotion}
+        />
       </Suspense>
-
-      {/* Arthur: NarIyirm
-          中文：精细模型只有少量命名节点，因此用独立热区维持冰箱、灶台和菜谱入口。
-          EN: The detailed model has few named nodes, so separate hitboxes preserve the three feature entries. */}
-      <FeatureHotspot hitboxPosition={[2.75, 2.15, -2.55]} hitboxSize={[2.15, 3.5, 1.6]} markerPosition={[2.75, 4.25, -2.25]} onPress={() => onNavigate('fridge')} />
-      <FeatureHotspot hitboxPosition={[0.7, 1.2, -1.7]} hitboxSize={[1.75, 1.45, 1.25]} markerPosition={[0.7, 2.2, -1.6]} onPress={() => onNavigate('ingredients')} />
-      <FeatureHotspot hitboxPosition={[0, 1.05, 1.15]} hitboxSize={[2.5, 1.7, 1.9]} markerPosition={[0, 2.15, 1.15]} onPress={() => onNavigate('recipes')} />
-
-      <KitchenCameraControls />
     </>
   );
 }
 
-export function Kitchen3DPrototype({ onNavigate, onReady }: Kitchen3DPrototypeProps) {
+export function Kitchen3DPrototype({ onInteractionStart, onNavigate, onReady }: Kitchen3DPrototypeProps) {
   const { active: isLoading, progress } = useProgress();
+  const lighting = useKitchenTimeLighting();
+  const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
+  const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const interactionRef = useRef<KitchenInteraction>(null);
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const handleSelectFeature = useCallback((feature: KitchenFeature) => {
+    if (interactionRef.current) return;
+
+    // Arthur: NarIyirm
+    // 中文：三个厨房入口统一先锁住输入并隐藏导航栏，再由镜头完成聚焦后决定目标页面。
+    // EN: All three kitchen entries lock input and hide chrome before camera focus decides the destination screen.
+    interactionRef.current = feature;
+    onInteractionStart?.();
+    setActiveInteraction(feature);
+  }, [onInteractionStart]);
+
+  const handleEffectCue = useCallback((feature: Exclude<KitchenInteraction, null>) => {
+    if (interactionRef.current === feature) setEffectInteraction(feature);
+  }, []);
+
+  const handleFocusComplete = useCallback((feature: Exclude<KitchenInteraction, null>) => {
+    if (interactionRef.current !== feature) return;
+    onNavigate(feature === 'fridge' ? 'fridge' : feature === 'stove' ? 'ingredients' : 'recipes');
+  }, [onNavigate]);
 
   return (
     <View style={styles.container} accessibilityLabel="可旋转的三维厨房，点击冰箱、灶台或餐桌进入对应页面">
       {/* Arthur: NarIyirm
-          中文：初始相机从厨房中央拉远，完整保留墙顶、地板边缘和外围背景留白。
-          EN: The initial camera pulls back from the kitchen center to retain walls, floor edges, and outer spacing. */}
-      {/* Arthur: NarIyirm
-          中文：按需渲染只在手势或场景变化时绘制；原生画布自行管理手机像素比，避免视口缩到左下角。
-          EN: Demand rendering draws only on changes; the native canvas owns device pixel ratio to prevent a lower-left viewport. */}
+          中文：新 GLB 使用真实米制大小和中心原点，不再通过补偿缩放与偏移猜测画面位置。
+          EN: The rebuilt GLB uses real scale and a centered origin, removing guessed scale and position compensation. */}
       <Canvas
         frameloop="demand"
         camera={{ position: INITIAL_CAMERA_POSITION, fov: 42, near: 0.1, far: 100 }}
         gl={{ antialias: false, alpha: false }}
       >
-        {/* Arthur: NarIyirm
-            中文：GLB 随 App 安装在本地，但 Canvas 仍只在开场结束后挂载，避免与开场动画同时占用资源。
-            EN: The GLB ships locally with the app, while Canvas still mounts only after the opener to avoid competing for resources. */}
-        <KitchenScene onNavigate={onNavigate} onReady={onReady} />
+        <KitchenScene
+          activeInteraction={activeInteraction}
+          effectInteraction={effectInteraction}
+          lighting={lighting}
+          onEffectCue={handleEffectCue}
+          onFocusComplete={handleFocusComplete}
+          onReady={onReady}
+          onSelectFeature={handleSelectFeature}
+          reduceMotion={reduceMotion}
+        />
       </Canvas>
       {isLoading ? (
         // Arthur: NarIyirm
-        // 中文：模型下载和解析期间显示明确进度，避免用户把短暂等待误认为再次卡死。
-        // EN: Show explicit progress during download and parsing so a short wait does not look frozen.
-        <KitchenLoading label={`正在解析厨房 ${Math.round(progress)}%`} />
+        // 中文：本地 GLB 仍需从安装包解压并由 GPU 解析，这里只显示真实的设备端解析进度。
+        // EN: The local GLB still needs package extraction and GPU parsing, so this shows only real on-device progress.
+        <KitchenLoading label={`正在解析厨房 ${Math.round(progress)}%`} backgroundColor={lighting.background} />
       ) : null}
     </View>
   );
 }
 
-function KitchenLoading({ label }: { label: string }) {
+function KitchenLoading({ label, backgroundColor }: { label: string; backgroundColor: string }) {
   return (
-    <View style={styles.loadingOverlay} pointerEvents="none">
+    <View style={[styles.loadingOverlay, { backgroundColor }]} pointerEvents="none">
       <ActivityIndicator size="small" color="#D47B21" />
       <Text style={styles.loadingText}>{label}</Text>
     </View>
@@ -185,6 +566,6 @@ function KitchenLoading({ label }: { label: string }) {
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  loadingOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', gap: 10, backgroundColor: '#D8EFF0' },
+  loadingOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: '#46645D', fontSize: 13, fontWeight: '600' },
 });

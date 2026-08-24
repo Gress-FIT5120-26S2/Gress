@@ -27,7 +27,7 @@
       [
         "expo-asset",
         {
-          "assets": ["./3DModel/Kitchen-Home-medium.glb"]
+          "assets": ["./3DModel/Kitchen-Home-rebuilt-lighting.glb"]
         }
       ]
     ]
