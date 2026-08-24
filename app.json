@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "KitchMemo",
+    "slug": "kitchmemo",
+    "description": "Keep your kitchen fresh, organised, and memorable.",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/kitchmemo-icon.png",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/kitchmemo-icon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "f23fe306-086e-4865-80b1-865c99f43862"
+      }
+    },
+    "owner": "gress-fit5120-26s2",
+    "plugins": [
+      "expo-font",
+      [
+        "expo-asset",
+        {
+          "assets": ["./3DModel/Kitchen-Home-medium.glb"]
+        }
+      ]
+    ]
+  }
+}

@@ -1,0 +1,96 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFF9EC"/>
+      <stop offset="100%" stop-color="#FFE8BF"/>
+    </linearGradient>
+    <linearGradient id="inner" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FFA126"/>
+      <stop offset="100%" stop-color="#F57A12"/>
+    </linearGradient>
+    <linearGradient id="orange" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#FFB12F"/>
+      <stop offset="100%" stop-color="#F57A12"/>
+    </linearGradient>
+    <linearGradient id="green" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#A9CC44"/>
+      <stop offset="100%" stop-color="#679E2F"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="14" stdDeviation="18" flood-color="#C5761A" flood-opacity="0.18"/>
+    </filter>
+  </defs>
+
+  <!-- App icon background -->
+  <rect x="44" y="44" width="936" height="936" rx="210" fill="url(#bg)"/>
+
+  <!-- Fridge body -->
+  <g filter="url(#shadow)">
+    <rect x="210" y="150" width="560" height="700" rx="110" fill="#FFFDF7" stroke="#FFF4DE" stroke-width="10"/>
+    <rect x="355" y="250" width="370" height="470" rx="54" fill="url(#inner)"/>
+    <rect x="378" y="482" width="324" height="24" rx="12" fill="#FFF8E8"/>
+  </g>
+
+  <!-- Handle -->
+  <rect x="260" y="385" width="42" height="160" rx="21" fill="url(#orange)"/>
+
+  <!-- Open door -->
+  <path d="M690 248
+           Q735 224 760 252
+           L823 285
+           Q838 294 838 320
+           L838 690
+           Q838 716 818 730
+           L739 784
+           Q716 800 692 782
+           Z"
+        fill="#FFFDF7" stroke="#FFF4DE" stroke-width="10"/>
+
+  <!-- Top jar -->
+  <rect x="398" y="352" width="112" height="96" rx="24" fill="#FFF1D4"/>
+  <rect x="396" y="332" width="116" height="34" rx="16" fill="#F68A13"/>
+
+  <!-- Bowl -->
+  <path d="M530 392 Q574 372 630 390 L620 446 H542 Z" fill="#F3A51D"/>
+  <path d="M544 390 Q548 350 565 334 Q573 324 581 342 Q592 316 607 332 Q619 345 616 388 Z" fill="url(#green)"/>
+
+  <!-- Carrot -->
+  <g transform="translate(454 570) rotate(-14)">
+    <path d="M0 0 Q38 -8 56 24 L32 162 Q27 190 10 160 L-10 28 Q-12 8 0 0 Z" fill="#F47A12"/>
+    <path d="M13 28 l19 -7 M10 60 l20 -7 M7 94 l18 -6" stroke="#D95E0D" stroke-width="8" stroke-linecap="round"/>
+    <path d="M5 -14 q-28 -34 -2 -62 q26 19 26 57 q8 -38 36 -48 q11 34 -26 61 q34 -22 51 -4 q-13 31 -58 30Z" fill="url(#green)"/>
+  </g>
+
+  <!-- Apple -->
+  <g transform="translate(565 576)">
+    <path d="M22 8 Q72 -18 105 18 Q126 43 113 91 Q99 143 62 153 Q21 142 8 94 Q-7 42 22 8 Z" fill="#89B739"/>
+    <path d="M63 0 Q70 -24 82 -34" stroke="#5B7D24" stroke-width="12" stroke-linecap="round"/>
+    <path d="M80 -28 Q110 -40 119 -15 Q95 -6 80 -28 Z" fill="#74A92F"/>
+  </g>
+
+  <!-- Foreground leaf -->
+  <path d="M126 676
+           Q184 648 240 684
+           Q281 712 290 774
+           Q295 828 246 868
+           Q199 904 132 885
+           Q86 871 84 820
+           Q82 744 126 676 Z"
+        fill="url(#green)"/>
+  <path d="M118 846 Q175 784 249 708" fill="none" stroke="#FFF6D9" stroke-width="12" stroke-linecap="round"/>
+
+  <!-- Clock -->
+  <g filter="url(#shadow)">
+    <circle cx="738" cy="738" r="132" fill="#FFFDF7" stroke="#F99B1C" stroke-width="24"/>
+    <line x1="738" y1="626" x2="738" y2="647" stroke="#F68A13" stroke-width="12" stroke-linecap="round"/>
+    <line x1="626" y1="738" x2="647" y2="738" stroke="#F68A13" stroke-width="12" stroke-linecap="round"/>
+    <line x1="738" y1="738" x2="738" y2="672" stroke="#F68A13" stroke-width="16" stroke-linecap="round"/>
+    <line x1="738" y1="738" x2="798" y2="700" stroke="#F68A13" stroke-width="16" stroke-linecap="round"/>
+    <circle cx="738" cy="738" r="13" fill="#F68A13"/>
+  </g>
+
+  <!-- Check -->
+  <path d="M744 820 L790 866 L872 776"
+        fill="none" stroke="#78A934" stroke-width="34"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
