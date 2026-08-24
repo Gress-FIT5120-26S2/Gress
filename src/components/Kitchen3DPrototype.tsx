@@ -1,4 +1,4 @@
-import { OrbitControls, useAnimations, useGLTF, useProgress } from '@react-three/drei/native';
+import { Billboard, OrbitControls, useAnimations, useGLTF, useProgress } from '@react-three/drei/native';
 import { Canvas, createPortal, type ThreeEvent, useFrame, useThree } from '@react-three/fiber/native';
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, View } from 'react-native';
@@ -11,6 +11,7 @@ import {
   type AnimationClip,
   type Group,
   type Mesh,
+  type MeshBasicMaterial,
   type MeshStandardMaterial,
   type Object3D,
   type PointLight,
@@ -21,19 +22,23 @@ import type { AppTab } from './FloatingTabBar';
 import {
   KitchenTimeEnvironment,
   type KitchenLightingState,
-  useKitchenTimeLighting,
 } from './KitchenTimeLighting';
 
 type Kitchen3DPrototypeProps = {
+  expiringCount?: number;
+  lighting: KitchenLightingState;
+  onExplore?: () => void;
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
   onReady?: () => void;
 };
 
 type FeatureHotspotProps = {
+  freshnessCount?: number;
   hitboxSize: [number, number, number];
   markerOffset: [number, number, number];
   onPress: () => void;
+  reduceMotion: boolean;
 };
 
 type KitchenInteraction = 'fridge' | 'stove' | 'recipes' | null;
@@ -56,8 +61,10 @@ type CameraMotion = {
 type KitchenSceneProps = {
   activeInteraction: KitchenInteraction;
   effectInteraction: KitchenInteraction;
+  expiringCount: number;
   lighting: KitchenLightingState;
   onEffectCue: (feature: Exclude<KitchenInteraction, null>) => void;
+  onExplore?: () => void;
   onFocusComplete: (feature: Exclude<KitchenInteraction, null>) => void;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
@@ -117,17 +124,99 @@ function cubicBezierProgress(progress: number, x1: number, y1: number, x2: numbe
 const cameraMoveEase = (progress: number) => cubicBezierProgress(progress, 0.77, 0, 0.175, 1);
 const cameraZoomEase = (progress: number) => cubicBezierProgress(progress, 0.23, 1, 0.32, 1);
 
-function PulseMarker({ position }: { position: [number, number, number] }) {
+const SEVEN_SEGMENT_DIGITS: Record<number, Array<'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g'>> = {
+  0: ['a', 'b', 'c', 'd', 'e', 'f'],
+  1: ['b', 'c'],
+  2: ['a', 'b', 'g', 'e', 'd'],
+  3: ['a', 'b', 'c', 'd', 'g'],
+  4: ['f', 'g', 'b', 'c'],
+  5: ['a', 'f', 'g', 'c', 'd'],
+  6: ['a', 'f', 'g', 'e', 'c', 'd'],
+  7: ['a', 'b', 'c'],
+  8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
+  9: ['a', 'b', 'c', 'd', 'f', 'g'],
+};
+
+const DIGIT_SEGMENTS = {
+  a: { position: [0, 0.034, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
+  b: { position: [0.024, 0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
+  c: { position: [0.024, -0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
+  d: { position: [0, -0.034, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
+  e: { position: [-0.024, -0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
+  f: { position: [-0.024, 0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
+  g: { position: [0, 0, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
+} as const;
+
+function FreshnessDigit({ count }: { count: number }) {
+  const digit = Math.min(9, Math.max(0, count));
+
   return (
-    <mesh position={position}>
-      <sphereGeometry args={[0.075, 16, 16]} />
-      <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={2.2} />
-      <pointLight color="#FFFFFF" intensity={0.45} distance={0.8} />
-    </mesh>
+    <group position={[0.135, 0.115, 0.012]}>
+      <mesh renderOrder={21}>
+        <circleGeometry args={[0.072, 24]} />
+        <meshBasicMaterial color="#26394A" transparent opacity={0.92} depthTest={false} toneMapped={false} />
+      </mesh>
+      <mesh renderOrder={22}>
+        <ringGeometry args={[0.062, 0.076, 24]} />
+        <meshBasicMaterial color="#F0A43C" depthTest={false} toneMapped={false} />
+      </mesh>
+      {/* Arthur: NarIyirm
+          中文：数字用简单几何段组成，避免在原生 3D 场景里额外加载字体，同时始终跟随冰箱锚点。
+          EN: Simple geometry segments form the count without loading a native 3D font, while remaining attached to the fridge anchor. */}
+      {SEVEN_SEGMENT_DIGITS[digit].map((segment) => (
+        <mesh key={segment} position={DIGIT_SEGMENTS[segment].position} renderOrder={23}>
+          <boxGeometry args={DIGIT_SEGMENTS[segment].size} />
+          <meshBasicMaterial color="#F8B95A" depthTest={false} toneMapped={false} />
+        </mesh>
+      ))}
+    </group>
   );
 }
 
-function FeatureHotspot({ hitboxSize, markerOffset, onPress }: FeatureHotspotProps) {
+function PulseMarker({ freshnessCount = 0, position, reduceMotion }: { freshnessCount?: number; position: [number, number, number]; reduceMotion: boolean }) {
+  const haloRef = useRef<Mesh>(null);
+  const haloMaterialRef = useRef<MeshBasicMaterial>(null);
+  const invalidate = useThree((state) => state.invalidate);
+  const hasFreshness = freshnessCount > 0;
+
+  useEffect(() => {
+    if (!hasFreshness || reduceMotion) return;
+
+    // Arthur: NarIyirm
+    // 中文：临期光环只以低频请求画面并直接修改 Three.js 节点，避免让完整厨房持续以满帧渲染。
+    // EN: The freshness halo requests low-frequency frames and mutates Three.js nodes directly so the full kitchen does not render continuously at maximum FPS.
+    const interval = setInterval(invalidate, 90);
+    return () => clearInterval(interval);
+  }, [hasFreshness, invalidate, reduceMotion]);
+
+  useFrame(({ clock }) => {
+    if (!hasFreshness || reduceMotion) return;
+    const pulse = (Math.sin(clock.elapsedTime * 2.25) + 1) / 2;
+    haloRef.current?.scale.setScalar(0.94 + pulse * 0.12);
+    if (haloMaterialRef.current) haloMaterialRef.current.opacity = 0.46 + pulse * 0.28;
+  });
+
+  return (
+    <>
+      <mesh position={position}>
+        <sphereGeometry args={[0.075, 16, 16]} />
+        <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={2.2} />
+        <pointLight color="#FFFFFF" intensity={0.45} distance={0.8} />
+      </mesh>
+      {hasFreshness ? (
+        <Billboard position={position} follow>
+          <mesh ref={haloRef} renderOrder={20}>
+            <ringGeometry args={[0.092, 0.122, 28]} />
+            <meshBasicMaterial ref={haloMaterialRef} color="#F0A43C" transparent opacity={0.6} depthTest={false} toneMapped={false} />
+          </mesh>
+          <FreshnessDigit count={freshnessCount} />
+        </Billboard>
+      ) : null}
+    </>
+  );
+}
+
+function FeatureHotspot({ freshnessCount, hitboxSize, markerOffset, onPress, reduceMotion }: FeatureHotspotProps) {
   const handlePress = (event: ThreeEvent<MouseEvent>) => {
     // Arthur: NarIyirm
     // 中文：透明热区扩大精细模型的可点击范围，并阻止点击继续穿透到厨房网格。
@@ -142,7 +231,7 @@ function FeatureHotspot({ hitboxSize, markerOffset, onPress }: FeatureHotspotPro
         <boxGeometry args={hitboxSize} />
         <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
       </mesh>
-      <PulseMarker position={markerOffset} />
+      <PulseMarker freshnessCount={freshnessCount} position={markerOffset} reduceMotion={reduceMotion} />
     </group>
   );
 }
@@ -209,6 +298,7 @@ function setEmissiveIntensity(object: Object3D | undefined, intensity: number) {
 function KitchenModel({
   activeInteraction,
   effectInteraction,
+  expiringCount,
   lighting,
   onReady,
   onSelectFeature,
@@ -216,6 +306,7 @@ function KitchenModel({
 }: {
   activeInteraction: KitchenInteraction;
   effectInteraction: KitchenInteraction;
+  expiringCount: number;
   lighting: KitchenLightingState;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
@@ -309,15 +400,15 @@ function KitchenModel({
         anchors.fridgeLight,
       ) : null}
       {activeInteraction === null && anchors.fridgeHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} />,
+          <FeatureHotspot freshnessCount={expiringCount} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} />,
           anchors.fridgeHotspot,
         ) : null}
       {activeInteraction === null && anchors.stoveHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} />,
+          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={reduceMotion} />,
           anchors.stoveHotspot,
         ) : null}
       {activeInteraction === null && anchors.recipesHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} />,
+          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={reduceMotion} />,
           anchors.recipesHotspot,
         ) : null}
     </>
@@ -327,11 +418,13 @@ function KitchenModel({
 function KitchenCameraControls({
   activeInteraction,
   onEffectCue,
+  onExplore,
   onFocusComplete,
   reduceMotion,
 }: {
   activeInteraction: KitchenInteraction;
   onEffectCue: (feature: Exclude<KitchenInteraction, null>) => void;
+  onExplore?: () => void;
   onFocusComplete: (feature: Exclude<KitchenInteraction, null>) => void;
   reduceMotion: boolean;
 }) {
@@ -457,11 +550,12 @@ function KitchenCameraControls({
       minAzimuthAngle={-0.95}
       maxAzimuthAngle={0.95}
       target={CAMERA_TARGET}
+      onStart={onExplore}
     />
   );
 }
 
-function KitchenScene({ activeInteraction, effectInteraction, lighting, onEffectCue, onFocusComplete, onReady, onSelectFeature, reduceMotion }: KitchenSceneProps) {
+function KitchenScene({ activeInteraction, effectInteraction, expiringCount, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion }: KitchenSceneProps) {
   return (
     <>
       <KitchenTimeEnvironment lighting={lighting} />
@@ -470,6 +564,7 @@ function KitchenScene({ activeInteraction, effectInteraction, lighting, onEffect
         <KitchenModel
           activeInteraction={activeInteraction}
           effectInteraction={effectInteraction}
+          expiringCount={expiringCount}
           lighting={lighting}
           onReady={onReady}
           onSelectFeature={onSelectFeature}
@@ -478,6 +573,7 @@ function KitchenScene({ activeInteraction, effectInteraction, lighting, onEffect
         <KitchenCameraControls
           activeInteraction={activeInteraction}
           onEffectCue={onEffectCue}
+          onExplore={onExplore}
           onFocusComplete={onFocusComplete}
           reduceMotion={reduceMotion}
         />
@@ -486,9 +582,8 @@ function KitchenScene({ activeInteraction, effectInteraction, lighting, onEffect
   );
 }
 
-export function Kitchen3DPrototype({ onInteractionStart, onNavigate, onReady }: Kitchen3DPrototypeProps) {
+export function Kitchen3DPrototype({ expiringCount = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady }: Kitchen3DPrototypeProps) {
   const { active: isLoading, progress } = useProgress();
-  const lighting = useKitchenTimeLighting();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -537,8 +632,10 @@ export function Kitchen3DPrototype({ onInteractionStart, onNavigate, onReady }: 
         <KitchenScene
           activeInteraction={activeInteraction}
           effectInteraction={effectInteraction}
+          expiringCount={expiringCount}
           lighting={lighting}
           onEffectCue={handleEffectCue}
+          onExplore={onExplore}
           onFocusComplete={handleFocusComplete}
           onReady={onReady}
           onSelectFeature={handleSelectFeature}

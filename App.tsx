@@ -6,6 +6,8 @@ import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionMana
 import { getApiHealth } from './src/api';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
+import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
+import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 
 // Arthur: NarIyirm
@@ -32,6 +34,11 @@ const transitionTones: Record<AppTab, string> = {
 };
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
+// Arthur: NarIyirm
+// 中文：临期数量先使用首页视觉样例值，后续只需把 Supabase 查询结果传入同一入口。
+// EN: The home preview uses a sample freshness count for now; the Supabase query can later feed this single entry point.
+const HOME_PREVIEW_EXPIRING_COUNT = 2;
+
 export default function App() {
   // Arthur: NarIyirm
   // 中文：开场层会等待厨房首帧完成，再淡出并显示可交互框架。
@@ -45,6 +52,7 @@ export default function App() {
   const [isCinematicActive, setIsCinematicActive] = useState(false);
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
+  const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
@@ -55,6 +63,8 @@ export default function App() {
   const finishOpening = useCallback(() => setIsOpening(false), []);
   const completeOpeningSequence = useCallback(() => setIsOpeningSequenceDone(true), []);
   const markKitchenReady = useCallback(() => setCanRevealKitchen(true), []);
+  const dismissHomeInteractionHint = useCallback(() => setShowHomeInteractionHint(false), []);
+  const kitchenLighting = useKitchenTimeLighting();
   const screen = screens[activeTab];
 
   useEffect(() => {
@@ -111,6 +121,7 @@ export default function App() {
   }, [canMountKitchen, canRevealKitchen]);
 
   const beginCinematicFocus = useCallback(() => {
+    dismissHomeInteractionHint();
     setIsCinematicActive(true);
     Animated.timing(chromeOpacity, {
       toValue: 0,
@@ -118,7 +129,7 @@ export default function App() {
       easing: SCREEN_EASE_OUT,
       useNativeDriver: true,
     }).start();
-  }, [chromeOpacity, reduceMotion]);
+  }, [chromeOpacity, dismissHomeInteractionHint, reduceMotion]);
 
   const handleCinematicNavigate = useCallback((targetTab: AppTab) => {
     if (transitionInProgressRef.current || targetTab === activeTab) return;
@@ -188,6 +199,15 @@ export default function App() {
     });
   }, [activeTab, chromeOpacity, reduceMotion, screenOpacity, screenScale, transitionOverlayOpacity]);
 
+  const openExpiringIngredients = useCallback(() => {
+    dismissHomeInteractionHint();
+    handleCinematicNavigate('fridge');
+  }, [dismissHomeInteractionHint, handleCinematicNavigate]);
+
+  const openSettings = useCallback(() => {
+    handleCinematicNavigate('profile');
+  }, [handleCinematicNavigate]);
+
   return (
     <View style={styles.container}>
       {/* Arthur: NarIyirm
@@ -204,6 +224,9 @@ export default function App() {
           {activeTab === 'home' && canMountKitchen ? (
             <Suspense fallback={<KitchenLoading />}>
               <Kitchen3DPrototype
+                expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+                lighting={kitchenLighting}
+                onExplore={dismissHomeInteractionHint}
                 onInteractionStart={beginCinematicFocus}
                 onNavigate={handleCinematicNavigate}
                 onReady={markKitchenReady}
@@ -230,6 +253,16 @@ export default function App() {
           pointerEvents={isCinematicActive ? 'none' : 'box-none'}
           style={[styles.chromeLayer, { opacity: chromeOpacity }]}
         >
+          {activeTab === 'home' ? (
+            <HomeAmbientOverlay
+              blurTarget={blurTargetRef}
+              expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+              onOpenExpiring={openExpiringIngredients}
+              onOpenSettings={openSettings}
+              phase={kitchenLighting.phase}
+              showInteractionHint={showHomeInteractionHint}
+            />
+          ) : null}
           <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />
         </Animated.View>
       )}
@@ -239,7 +272,7 @@ export default function App() {
           style={[styles.transitionOverlay, { backgroundColor: transitionTone, opacity: transitionOverlayOpacity }]}
         />
       ) : null}
-      <StatusBar style="dark" />
+      <StatusBar style={activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
           canReveal={canRevealKitchen}
