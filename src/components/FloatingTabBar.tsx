@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export type AppTab = 'home' | 'ingredients' | 'fridge' | 'recipes' | 'profile';
+export type AppTab = 'home' | 'shopping' | 'fridge' | 'achievements' | 'profile';
 
 type FloatingTabBarProps = {
   activeTab: AppTab;
@@ -13,9 +13,9 @@ type FloatingTabBarProps = {
 
 const tabs: Array<{ key: AppTab; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: 'home', label: '首页', icon: 'home-outline' },
-  { key: 'ingredients', label: '食材', icon: 'nutrition-outline' },
+  { key: 'shopping', label: '购物车', icon: 'cart-outline' },
   { key: 'fridge', label: '冰箱', icon: 'cube-outline' },
-  { key: 'recipes', label: '菜谱', icon: 'book-outline' },
+  { key: 'achievements', label: '成就', icon: 'trophy-outline' },
   { key: 'profile', label: '我的', icon: 'person-outline' },
 ];
 

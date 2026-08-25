@@ -18,18 +18,18 @@ const Kitchen3DPrototype = lazy(() =>
 );
 
 const screens: Record<AppTab, { eyebrow: string; title: string; description: string }> = {
-  home: { eyebrow: 'GOOD EVENING', title: 'What can we make today?', description: 'Your kitchen is ready for a fresh idea.' },
-  ingredients: { eyebrow: 'INGREDIENTS', title: 'Choose what you have', description: 'Start with the ingredients already in your kitchen.' },
+  home: { eyebrow: 'GOOD EVENING', title: 'How stocked is home?', description: 'See what is still at home before the next shop.' },
+  shopping: { eyebrow: 'SHOPPING CART', title: 'Shop with the kitchen in mind', description: 'Compare what you need with the stock already at home.' },
   fridge: { eyebrow: 'MY FRIDGE', title: 'Keep food in view', description: 'Track freshness before good ingredients go to waste.' },
-  recipes: { eyebrow: 'SAVED RECIPES', title: 'Made for your kitchen', description: 'A personal collection of recipes you want to remember.' },
+  achievements: { eyebrow: 'KITCHEN WINS', title: 'Small habits add up', description: 'See the food, money, and shopping trips you have saved.' },
   profile: { eyebrow: 'MY KITCHEN', title: 'Make it yours', description: 'Set your preferences, diets, and cooking goals.' },
 };
 
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
-  ingredients: '#FFF1DC',
+  shopping: '#FFF1DC',
   fridge: '#E1F0EF',
-  recipes: '#F5E9D6',
+  achievements: '#F5E9D6',
   profile: '#E8EEEA',
 };
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
@@ -38,6 +38,11 @@ const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 // 中文：临期数量先使用首页视觉样例值，后续只需把 Supabase 查询结果传入同一入口。
 // EN: The home preview uses a sample freshness count for now; the Supabase query can later feed this single entry point.
 const HOME_PREVIEW_EXPIRING_COUNT = 2;
+
+// Arthur: NarIyirm
+// 中文：购物车容量与冰箱库存共用一个 0–1 数据入口；目前是样例值，之后由 Supabase 库存统计替换。
+// EN: Cart fullness and fridge stock share one 0–1 data entry; Supabase inventory totals will replace this preview value.
+const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
 
 // Arthur: NarIyirm
 // 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
@@ -204,7 +209,7 @@ export default function App() {
     });
   }, [activeTab, chromeOpacity, reduceMotion, screenOpacity, screenScale, transitionOverlayOpacity]);
 
-  const openExpiringIngredients = useCallback(() => {
+  const openExpiringFridge = useCallback(() => {
     dismissHomeInteractionHint();
     handleCinematicNavigate('fridge');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
@@ -230,6 +235,7 @@ export default function App() {
             <Suspense fallback={<KitchenLoading />}>
               <Kitchen3DPrototype
                 expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+                inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
                 lighting={kitchenLighting}
                 onExplore={dismissHomeInteractionHint}
                 onInteractionStart={beginCinematicFocus}
@@ -263,7 +269,7 @@ export default function App() {
             <HomeAmbientOverlay
               blurTarget={blurTargetRef}
               expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
-              onOpenExpiring={openExpiringIngredients}
+              onOpenExpiring={openExpiringFridge}
               onOpenSettings={openSettings}
               phase={kitchenLighting.phase}
               showInteractionHint={showHomeInteractionHint}
