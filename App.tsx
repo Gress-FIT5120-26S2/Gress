@@ -39,6 +39,11 @@ const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 // EN: The home preview uses a sample freshness count for now; the Supabase query can later feed this single entry point.
 const HOME_PREVIEW_EXPIRING_COUNT = 2;
 
+// Arthur: NarIyirm
+// 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
+// EN: Home currently previews a rainy night; a weather service can later feed live conditions through the same 3D scene entry point.
+const HOME_PREVIEW_WEATHER = 'rain' as const;
+
 export default function App() {
   // Arthur: NarIyirm
   // 中文：开场层会等待厨房首帧完成，再淡出并显示可交互框架。
@@ -230,6 +235,7 @@ export default function App() {
                 onInteractionStart={beginCinematicFocus}
                 onNavigate={handleCinematicNavigate}
                 onReady={markKitchenReady}
+                weather={HOME_PREVIEW_WEATHER}
               />
             </Suspense>
           ) : activeTab === 'home' && !isOpening ? (

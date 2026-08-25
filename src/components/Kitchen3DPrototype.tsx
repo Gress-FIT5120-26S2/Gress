@@ -19,6 +19,7 @@ import {
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
 import type { AppTab } from './FloatingTabBar';
+import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
 import {
   KitchenTimeEnvironment,
   type KitchenLightingState,
@@ -31,6 +32,7 @@ type Kitchen3DPrototypeProps = {
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
   onReady?: () => void;
+  weather?: KitchenWeather;
 };
 
 type FeatureHotspotProps = {
@@ -69,6 +71,7 @@ type KitchenSceneProps = {
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
   reduceMotion: boolean;
+  weather: KitchenWeather;
 };
 
 const CAMERA_TARGET: [number, number, number] = [0, 1.3, 0];
@@ -176,18 +179,7 @@ function FreshnessDigit({ count }: { count: number }) {
 function PulseMarker({ freshnessCount = 0, position, reduceMotion }: { freshnessCount?: number; position: [number, number, number]; reduceMotion: boolean }) {
   const haloRef = useRef<Mesh>(null);
   const haloMaterialRef = useRef<MeshBasicMaterial>(null);
-  const invalidate = useThree((state) => state.invalidate);
   const hasFreshness = freshnessCount > 0;
-
-  useEffect(() => {
-    if (!hasFreshness || reduceMotion) return;
-
-    // Arthur: NarIyirm
-    // 中文：临期光环只以低频请求画面并直接修改 Three.js 节点，避免让完整厨房持续以满帧渲染。
-    // EN: The freshness halo requests low-frequency frames and mutates Three.js nodes directly so the full kitchen does not render continuously at maximum FPS.
-    const interval = setInterval(invalidate, 90);
-    return () => clearInterval(interval);
-  }, [hasFreshness, invalidate, reduceMotion]);
 
   useFrame(({ clock }) => {
     if (!hasFreshness || reduceMotion) return;
@@ -303,6 +295,7 @@ function KitchenModel({
   onReady,
   onSelectFeature,
   reduceMotion,
+  weather,
 }: {
   activeInteraction: KitchenInteraction;
   effectInteraction: KitchenInteraction;
@@ -311,6 +304,7 @@ function KitchenModel({
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
   reduceMotion: boolean;
+  weather: KitchenWeather;
 }) {
   const { scene, animations } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
   const { actions, mixer } = useAnimations(animations, scene);
@@ -319,11 +313,41 @@ function KitchenModel({
   const anchors = useMemo(() => ({
     burners: BURNER_ANCHORS.map((name) => scene.getObjectByName(name)).filter((anchor): anchor is Object3D => Boolean(anchor)),
     ceilingLight: scene.getObjectByName('Ceiling_Light_Anchor'),
+    fridgeDoor: scene.getObjectByName('Fridge_Door_Pivot'),
     fridgeLight: scene.getObjectByName('Fridge_Light_Anchor'),
     fridgeHotspot: scene.getObjectByName('Hotspot_Fridge'),
-    stoveHotspot: scene.getObjectByName('Hotspot_Stove'),
     recipesHotspot: scene.getObjectByName('Hotspot_Recipes'),
+    stoveHotspot: scene.getObjectByName('Hotspot_Stove'),
+    windowLight: scene.getObjectByName('Window_Light_Anchor'),
   }), [scene]);
+
+  useLayoutEffect(() => {
+    const closedRecipeBook = scene.getObjectByName('Recipe_Book');
+    if (!closedRecipeBook) return;
+
+    // Arthur: NarIyirm
+    // 中文：隐藏模型里不可动的旧书，在同一个餐桌锚点放置可翻页菜谱，避免两本书重叠。
+    // EN: Hide the model's static book and place the animated recipe at the same table anchor to prevent overlap.
+    const previousVisibility = closedRecipeBook.visible;
+    closedRecipeBook.visible = false;
+    invalidate();
+    return () => {
+      closedRecipeBook.visible = previousVisibility;
+    };
+  }, [invalidate, scene]);
+
+  useEffect(() => {
+    if (reduceMotion) {
+      invalidate();
+      return;
+    }
+
+    // Arthur: NarIyirm
+    // 中文：一个低频刷新器共同驱动雨滴、蒸汽和呼吸提示，避免每个装饰各自创建渲染循环。
+    // EN: One low-frequency invalidation loop drives rain, steam, and pulse cues instead of giving every detail its own render loop.
+    const interval = setInterval(invalidate, 90);
+    return () => clearInterval(interval);
+  }, [invalidate, reduceMotion]);
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
@@ -381,8 +405,20 @@ function KitchenModel({
       <primitive object={scene} />
 
       {/* Arthur: NarIyirm
-          中文：Portal 把反馈元素变成模型锚点的真实子节点，因此拖拽或旋转相机后仍与部件完全重合。
-          EN: Portals make feedback elements true children of model anchors, keeping them aligned after camera rotation. */}
+          中文：Portal 把动效和生活细节变成模型锚点的真实子节点，转动镜头或打开冰箱门后仍会留在正确位置。
+          EN: Portals make motion and lived-in details true children of model anchors, keeping them aligned after camera rotation or door movement. */}
+      {weather === 'rain' && anchors.windowLight ? createPortal(
+        <WindowRain reduceMotion={reduceMotion} />,
+        anchors.windowLight,
+      ) : null}
+      {anchors.recipesHotspot ? createPortal(
+        <TodayRecipeScene isBookOpen={effectInteraction === 'recipes'} reduceMotion={reduceMotion} />,
+        anchors.recipesHotspot,
+      ) : null}
+      {anchors.fridgeDoor ? createPortal(
+        <FridgeMemoryMagnet />,
+        anchors.fridgeDoor,
+      ) : null}
       {anchors.burners.map((anchor) => (
         <Fragment key={anchor.uuid}>
           {createPortal(
@@ -555,7 +591,7 @@ function KitchenCameraControls({
   );
 }
 
-function KitchenScene({ activeInteraction, effectInteraction, expiringCount, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion }: KitchenSceneProps) {
+function KitchenScene({ activeInteraction, effectInteraction, expiringCount, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion, weather }: KitchenSceneProps) {
   return (
     <>
       <KitchenTimeEnvironment lighting={lighting} />
@@ -569,6 +605,7 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, lig
           onReady={onReady}
           onSelectFeature={onSelectFeature}
           reduceMotion={reduceMotion}
+          weather={weather}
         />
         <KitchenCameraControls
           activeInteraction={activeInteraction}
@@ -582,7 +619,7 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, lig
   );
 }
 
-export function Kitchen3DPrototype({ expiringCount = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady }: Kitchen3DPrototypeProps) {
+export function Kitchen3DPrototype({ expiringCount = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, weather = 'clear' }: Kitchen3DPrototypeProps) {
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
@@ -640,6 +677,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, lighting, onExplore, onI
           onReady={onReady}
           onSelectFeature={handleSelectFeature}
           reduceMotion={reduceMotion}
+          weather={weather}
         />
       </Canvas>
       {isLoading ? (
