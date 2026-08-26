@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useI18n } from '../i18n';
 
 type OpeningAnimationProps = {
   canReveal: boolean;
@@ -9,8 +10,8 @@ type OpeningAnimationProps = {
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 // Arthur: NarIyirm
-// 中文：每项食材携带位置与错峰时间，统一驱动“冰箱食材进入菜谱”的效果。
-// EN: Each ingredient carries its position and delay to drive the fridge-to-recipe sequence.
+// 中文：每项食材携带位置与错峰时间，统一驱动“冰箱库存进入购物判断”的效果。
+// EN: Each ingredient carries its position and delay to drive the fridge-stock-to-shopping sequence.
 const ingredients = [
   { emoji: '🥬', top: 126, left: 40, delay: 0, y: 28 },
   { emoji: '🍅', top: 206, left: 102, delay: 55, y: -18 },
@@ -33,6 +34,7 @@ function Ingredient({ emoji, top, left, y, progress }: IngredientProps) {
 }
 
 export function OpeningAnimation({ canReveal, onSequenceComplete, onFinish }: OpeningAnimationProps) {
+  const { t } = useI18n();
   const door = useRef(new Animated.Value(0)).current;
   const recipe = useRef(new Animated.Value(0)).current;
   const wordmark = useRef(new Animated.Value(0)).current;
@@ -129,14 +131,14 @@ export function OpeningAnimation({ canReveal, onSequenceComplete, onFinish }: Op
         </View>
         <Animated.View style={[styles.recipeCard, { opacity: recipe, transform: [{ translateY: recipeTranslateY }, { scale: recipeScale }] }]}>
           <View style={styles.recipeAccent} />
-          <Text style={styles.recipeEyebrow}>TONIGHT&apos;S IDEA</Text>
-          <Text style={styles.recipeTitle}>Fresh fridge{`\n`}pasta</Text>
-          <View style={styles.recipeDetails}><Text style={styles.recipeDetail}>15 min</Text><View style={styles.dot} /><Text style={styles.recipeDetail}>3 ingredients</Text></View>
-          <View style={styles.sparkle}><Text style={styles.sparkleText}>✦</Text></View>
+          <Text style={styles.recipeEyebrow}>{t.opening.eyebrow}</Text>
+          <Text style={styles.recipeTitle}>{t.opening.title}</Text>
+          <View style={styles.recipeDetails}><Text style={styles.recipeDetail}>{t.opening.lowStock(3)}</Text><View style={styles.dot} /><Text style={styles.recipeDetail}>{t.opening.liveInventory}</Text></View>
+          <View style={styles.sparkle}><Text style={styles.sparkleText}>✓</Text></View>
         </Animated.View>
       </View>
       <Animated.View style={[styles.wordmark, { opacity: wordmark, transform: [{ translateY: wordmarkTranslateY }] }]}>
-        <Text style={styles.brand}>KitchMemo</Text><Text style={styles.tagline}>from fridge to table</Text>
+        <Text style={styles.brand}>KitchMemo</Text><Text style={styles.tagline}>{t.opening.tagline}</Text>
       </Animated.View>
     </Animated.View>
   );

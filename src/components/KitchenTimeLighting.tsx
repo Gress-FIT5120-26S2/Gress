@@ -1,6 +1,6 @@
 import { useThree } from '@react-three/fiber/native';
 import { useEffect, useMemo, useState } from 'react';
-import { AdditiveBlending, Color, DoubleSide } from 'three';
+import { AdditiveBlending, Color, DoubleSide, Object3D } from 'three';
 
 export type KitchenTimePhase = 'night' | 'dawn' | 'day' | 'sunset';
 
@@ -147,25 +147,58 @@ function CartoonMoon({ lighting }: { lighting: KitchenLightingState }) {
   );
 }
 
-export function KitchenTimeEnvironment({ lighting }: { lighting: KitchenLightingState }) {
+export function KitchenTimeEnvironment({ lighting, weather = 'clear' }: { lighting: KitchenLightingState; weather?: 'clear' | 'rain' }) {
   const invalidate = useThree((state) => state.invalidate);
+  const windowTarget = useMemo(() => new Object3D(), []);
+  const daylightFactor = weather === 'rain' ? 0.48 : 1;
+  const isNight = lighting.phase === 'night';
+  const windowLightColor = isNight ? lighting.moonColor : lighting.sunColor;
+  const windowLightIntensity = (isNight ? lighting.moonIntensity * 1.45 : lighting.sunIntensity * 2.35) * daylightFactor;
+  const patchOpacity = lighting.windowOpacity * daylightFactor;
 
-  useEffect(() => invalidate(), [invalidate, lighting]);
+  useEffect(() => invalidate(), [invalidate, lighting, weather]);
 
   return (
     <>
       <color attach="background" args={[lighting.background]} />
-      <ambientLight color={lighting.ambientColor} intensity={lighting.ambientIntensity} />
-      <directionalLight position={lighting.sunPosition} color={lighting.sunColor} intensity={lighting.sunIntensity} />
-      <directionalLight position={lighting.moonPosition} color={lighting.moonColor} intensity={lighting.moonIntensity} />
+      <ambientLight color={lighting.ambientColor} intensity={lighting.ambientIntensity * 0.54} />
+      <hemisphereLight args={[lighting.ambientColor, '#6C625A', lighting.ambientIntensity * 0.52]} />
 
       {/* Arthur: NarIyirm
-          中文：半透明地面光斑模拟窗框投影，保留卡通感并避免移动端实时阴影贴图开销。
-          EN: A translucent floor patch suggests window projection without the mobile cost of real-time shadow maps. */}
-      <mesh position={lighting.windowPosition} rotation={[-Math.PI / 2, 0, lighting.windowRotation]} renderOrder={2}>
-        <planeGeometry args={[2.65, 1.08]} />
-        <meshBasicMaterial color={lighting.windowColor} transparent opacity={lighting.windowOpacity} depthWrite={false} side={DoubleSide} blending={AdditiveBlending} toneMapped={false} />
+          中文：室外主光从真实窗户锚点射向厨房中央，天气只衰减窗光，室内顶灯仍可独立照明。
+          EN: Outdoor key light travels from the real window toward the kitchen center; weather attenuates only window light while the ceiling lamp remains independent. */}
+      <primitive object={windowTarget} position={[-0.55, 0.42, 0.42]} />
+      <spotLight
+        position={[-2.93, 1.84, -0.35]}
+        target={windowTarget}
+        color={windowLightColor}
+        intensity={windowLightIntensity}
+        angle={0.68}
+        penumbra={0.72}
+        distance={7.4}
+        decay={1.55}
+      />
+
+      <mesh position={[-2.94, 1.83, -0.35]} rotation={[0, Math.PI / 2, 0]} renderOrder={1}>
+        <planeGeometry args={[1.42, 1.1]} />
+        <meshBasicMaterial color={windowLightColor} transparent opacity={Math.max(0.025, patchOpacity * 0.24)} depthWrite={false} side={DoubleSide} blending={AdditiveBlending} toneMapped={false} />
       </mesh>
+
+      {/* Arthur: NarIyirm
+          中文：四块柔边光斑对应窗格，色温和落点随时间插值；它比一整块发光平面更接近真实窗光，又不启用昂贵的实时阴影。
+          EN: Four soft patches mirror the window panes and interpolate color and landing point over time, reading more naturally than one glowing slab without costly real-time shadows. */}
+      <group position={lighting.windowPosition} rotation={[-Math.PI / 2, 0, lighting.windowRotation]}>
+        <mesh position={[0, 0, -0.012]} renderOrder={1}>
+          <planeGeometry args={[3.05, 1.34]} />
+          <meshBasicMaterial color={lighting.windowColor} transparent opacity={patchOpacity * 0.18} depthWrite={false} side={DoubleSide} blending={AdditiveBlending} toneMapped={false} />
+        </mesh>
+        {([-1, 1] as const).flatMap((column) => ([-1, 1] as const).map((row) => (
+          <mesh key={`${column}-${row}`} position={[column * 0.67, row * 0.25, 0]} renderOrder={2}>
+            <planeGeometry args={[1.22, 0.43]} />
+            <meshBasicMaterial color={lighting.windowColor} transparent opacity={patchOpacity * 0.78} depthWrite={false} side={DoubleSide} blending={AdditiveBlending} toneMapped={false} />
+          </mesh>
+        )))}
+      </group>
 
       <CartoonSun lighting={lighting} />
       <CartoonMoon lighting={lighting} />

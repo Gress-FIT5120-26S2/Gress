@@ -8,7 +8,10 @@ import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
+import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
+import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/ProfileSettings';
+import { I18nProvider, useI18n } from './src/i18n';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -17,20 +20,13 @@ const Kitchen3DPrototype = lazy(() =>
   import('./src/components/Kitchen3DPrototype').then((module) => ({ default: module.Kitchen3DPrototype })),
 );
 
-const screens: Record<AppTab, { eyebrow: string; title: string; description: string }> = {
-  home: { eyebrow: 'GOOD EVENING', title: 'What can we make today?', description: 'Your kitchen is ready for a fresh idea.' },
-  ingredients: { eyebrow: 'INGREDIENTS', title: 'Choose what you have', description: 'Start with the ingredients already in your kitchen.' },
-  fridge: { eyebrow: 'MY FRIDGE', title: 'Keep food in view', description: 'Track freshness before good ingredients go to waste.' },
-  recipes: { eyebrow: 'SAVED RECIPES', title: 'Made for your kitchen', description: 'A personal collection of recipes you want to remember.' },
-  profile: { eyebrow: 'MY KITCHEN', title: 'Make it yours', description: 'Set your preferences, diets, and cooking goals.' },
-};
-
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
-  ingredients: '#FFF1DC',
+  shopping: '#FFF1DC',
   fridge: '#E1F0EF',
-  recipes: '#F5E9D6',
+  achievements: '#F5E9D6',
   profile: '#E8EEEA',
+  notifications: '#F7E9DA',
 };
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
@@ -40,11 +36,24 @@ const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const HOME_PREVIEW_EXPIRING_COUNT = 2;
 
 // Arthur: NarIyirm
+// 中文：购物车容量与冰箱库存共用一个 0–1 数据入口；目前是样例值，之后由 Supabase 库存统计替换。
+// EN: Cart fullness and fridge stock share one 0–1 data entry; Supabase inventory totals will replace this preview value.
+const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
+
+// Arthur: NarIyirm
+// 中文：未读数量同时驱动三维信箱、右上角角标和通知页；以后由 Supabase 的未读查询替换此样例值。
+// EN: One unread count drives the 3D mailbox, top-right badge, and inbox; a Supabase unread query can replace this preview value later.
+const HOME_PREVIEW_UNREAD_COUNT = 5;
+
+// Arthur: NarIyirm
 // 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
 // EN: Home currently previews a rainy night; a weather service can later feed live conditions through the same 3D scene entry point.
 const HOME_PREVIEW_WEATHER = 'rain' as const;
 
-export default function App() {
+type ConnectionState = 'connecting' | 'connected' | 'disconnected';
+
+function KitchMemoApp() {
+  const { t } = useI18n();
   // Arthur: NarIyirm
   // 中文：开场层会等待厨房首帧完成，再淡出并显示可交互框架。
   // EN: The opener waits for the kitchen's first frame before revealing the interactive shell.
@@ -52,8 +61,9 @@ export default function App() {
   const [isOpeningSequenceDone, setIsOpeningSequenceDone] = useState(false);
   const [canMountKitchen, setCanMountKitchen] = useState(false);
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
-  const [status, setStatus] = useState('正在连接后端…');
+  const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [activeTab, setActiveTab] = useState<AppTab>('home');
+  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -70,7 +80,8 @@ export default function App() {
   const markKitchenReady = useCallback(() => setCanRevealKitchen(true), []);
   const dismissHomeInteractionHint = useCallback(() => setShowHomeInteractionHint(false), []);
   const kitchenLighting = useKitchenTimeLighting();
-  const screen = screens[activeTab];
+  const screen = t.screens[activeTab];
+  const status = t.status[connectionState];
 
   useEffect(() => {
     // Arthur: NarIyirm
@@ -84,8 +95,8 @@ export default function App() {
     // 中文：启动时调用 Express 健康检查，并把连接结果传给首页提示文字。
     // EN: On launch, call the Express health check and pass its result to the home status text.
     getApiHealth()
-      .then(() => setStatus('后端与 Supabase 已连接'))
-      .catch(() => setStatus('暂未连接后端 — 请检查 .env.local 和 server/.env'));
+      .then(() => setConnectionState('connected'))
+      .catch(() => setConnectionState('disconnected'));
   }, []);
 
   useEffect(() => {
@@ -204,14 +215,15 @@ export default function App() {
     });
   }, [activeTab, chromeOpacity, reduceMotion, screenOpacity, screenScale, transitionOverlayOpacity]);
 
-  const openExpiringIngredients = useCallback(() => {
+  const openExpiringFridge = useCallback(() => {
     dismissHomeInteractionHint();
     handleCinematicNavigate('fridge');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
-  const openSettings = useCallback(() => {
-    handleCinematicNavigate('profile');
-  }, [handleCinematicNavigate]);
+  const openNotifications = useCallback(() => {
+    dismissHomeInteractionHint();
+    handleCinematicNavigate('notifications');
+  }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
   return (
     <View style={styles.container}>
@@ -230,11 +242,13 @@ export default function App() {
             <Suspense fallback={<KitchenLoading />}>
               <Kitchen3DPrototype
                 expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+                inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
                 lighting={kitchenLighting}
                 onExplore={dismissHomeInteractionHint}
                 onInteractionStart={beginCinematicFocus}
                 onNavigate={handleCinematicNavigate}
                 onReady={markKitchenReady}
+                unreadNotificationCount={HOME_PREVIEW_UNREAD_COUNT}
                 weather={HOME_PREVIEW_WEATHER}
               />
             </Suspense>
@@ -248,6 +262,7 @@ export default function App() {
                 <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
                 <Text style={styles.title}>{screen.title}</Text>
                 <Text style={styles.description}>{screen.description}</Text>
+                {activeTab === 'notifications' ? <NotificationInbox unreadCount={HOME_PREVIEW_UNREAD_COUNT} /> : null}
                 <Text style={styles.connection}>{status}</Text>
               </View>
             </>
@@ -263,11 +278,15 @@ export default function App() {
             <HomeAmbientOverlay
               blurTarget={blurTargetRef}
               expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
-              onOpenExpiring={openExpiringIngredients}
-              onOpenSettings={openSettings}
+              onOpenExpiring={openExpiringFridge}
+              onOpenNotifications={openNotifications}
               phase={kitchenLighting.phase}
               showInteractionHint={showHomeInteractionHint}
+              unreadCount={HOME_PREVIEW_UNREAD_COUNT}
             />
+          ) : null}
+          {activeTab === 'profile' ? (
+            <ProfileSettingsButton blurTarget={blurTargetRef} onPress={() => setIsSettingsVisible(true)} />
           ) : null}
           <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />
         </Animated.View>
@@ -286,15 +305,26 @@ export default function App() {
           onFinish={finishOpening}
         />
       )}
+      <LanguageSettingsModal onClose={() => setIsSettingsVisible(false)} visible={isSettingsVisible} />
     </View>
   );
 }
 
+export default function App() {
+  return (
+    <I18nProvider>
+      <KitchMemoApp />
+    </I18nProvider>
+  );
+}
+
 function KitchenLoading() {
+  const { t } = useI18n();
+
   return (
     <View style={styles.kitchenLoading}>
       <ActivityIndicator size="small" color="#D47B21" />
-      <Text style={styles.kitchenLoadingText}>正在准备 3D 厨房…</Text>
+      <Text style={styles.kitchenLoadingText}>{t.kitchen.preparing}</Text>
     </View>
   );
 }
