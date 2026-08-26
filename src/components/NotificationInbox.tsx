@@ -1,17 +1,20 @@
 import { Ionicons } from '@expo/vector-icons';
 import { StyleSheet, Text, View } from 'react-native';
+import { useI18n } from '../i18n';
 
-const PREVIEW_NOTIFICATIONS = [
-  { icon: 'time-outline', title: '草莓还有 2 天到期', detail: '今晚使用，口感会更好', tone: '#E8774C' },
-  { icon: 'cart-outline', title: '购物清单有 3 项待购买', detail: '牛奶、鸡蛋和燕麦库存偏低', tone: '#D39A3C' },
-  { icon: 'people-outline', title: '共享厨房有新变化', detail: '一件商品刚刚被标记为已购买', tone: '#5E9686' },
+const PREVIEW_NOTIFICATION_TYPES = [
+  { key: 'freshness', icon: 'time-outline', tone: '#E8774C' },
+  { key: 'shopping', icon: 'cart-outline', tone: '#D39A3C' },
+  { key: 'shared', icon: 'people-outline', tone: '#5E9686' },
 ] as const;
 
 export function NotificationInbox({ unreadCount }: { unreadCount: number }) {
+  const { t } = useI18n();
+
   return (
     <View style={styles.container}>
       <View style={styles.summaryRow}>
-        <Text style={styles.summary}>{unreadCount > 0 ? `${unreadCount} 条未读提醒` : '所有提醒都已读'}</Text>
+        <Text style={styles.summary}>{unreadCount > 0 ? t.notifications.unreadSummary(unreadCount) : t.notifications.allRead}</Text>
         <View style={[styles.statusDot, unreadCount === 0 && styles.statusDotRead]} />
       </View>
 
@@ -19,21 +22,24 @@ export function NotificationInbox({ unreadCount }: { unreadCount: number }) {
           中文：通知页先使用可替换的样例列表；接入 Supabase 后只需把查询结果映射成相同的标题、详情和类型字段。
           EN: The inbox uses replaceable preview rows; Supabase results can later map into the same title, detail, and type fields. */}
       <View style={styles.list}>
-        {PREVIEW_NOTIFICATIONS.map((notification, index) => (
-          <View key={notification.title} style={[styles.item, unreadCount <= PREVIEW_NOTIFICATIONS.length && index === PREVIEW_NOTIFICATIONS.length - 1 && styles.itemLast]}>
+        {PREVIEW_NOTIFICATION_TYPES.map((notification, index) => {
+          const copy = t.notifications.items[notification.key];
+          return (
+          <View key={notification.key} style={[styles.item, unreadCount <= PREVIEW_NOTIFICATION_TYPES.length && index === PREVIEW_NOTIFICATION_TYPES.length - 1 && styles.itemLast]}>
             <View style={[styles.iconWell, { backgroundColor: `${notification.tone}18` }]}>
               <Ionicons name={notification.icon} size={20} color={notification.tone} />
             </View>
             <View style={styles.copy}>
-              <Text style={styles.title}>{notification.title}</Text>
-              <Text style={styles.detail}>{notification.detail}</Text>
+              <Text style={styles.title}>{copy.title}</Text>
+              <Text style={styles.detail}>{copy.detail}</Text>
             </View>
             {index < unreadCount ? <View style={styles.unreadDot} /> : null}
           </View>
-        ))}
-        {unreadCount > PREVIEW_NOTIFICATIONS.length ? (
+          );
+        })}
+        {unreadCount > PREVIEW_NOTIFICATION_TYPES.length ? (
           <View style={styles.moreRow}>
-            <Text style={styles.moreText}>另有 {unreadCount - PREVIEW_NOTIFICATIONS.length} 条较早提醒</Text>
+            <Text style={styles.moreText}>{t.notifications.older(unreadCount - PREVIEW_NOTIFICATION_TYPES.length)}</Text>
           </View>
         ) : null}
       </View>

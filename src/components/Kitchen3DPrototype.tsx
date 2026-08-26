@@ -18,6 +18,7 @@ import {
 } from 'three';
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
+import { useI18n } from '../i18n';
 import type { AppTab } from './FloatingTabBar';
 import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
 import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
@@ -671,6 +672,7 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inv
 }
 
 export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
+  const { t } = useI18n();
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
@@ -722,7 +724,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   }, [onNavigate]);
 
   return (
-    <View style={styles.container} accessibilityLabel="可旋转的三维厨房；冰箱、购物车和信箱可进入页面，灶台和菜谱可在原地互动">
+    <View style={styles.container} accessibilityLabel={t.kitchen.accessibility}>
       {/* Arthur: NarIyirm
           中文：新 GLB 使用真实米制大小和中心原点，不再通过补偿缩放与偏移猜测画面位置。
           EN: The rebuilt GLB uses real scale and a centered origin, removing guessed scale and position compensation. */}
@@ -753,7 +755,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
         // Arthur: NarIyirm
         // 中文：本地 GLB 仍需从安装包解压并由 GPU 解析，这里只显示真实的设备端解析进度。
         // EN: The local GLB still needs package extraction and GPU parsing, so this shows only real on-device progress.
-        <KitchenLoading label={`正在解析厨房 ${Math.round(progress)}%`} backgroundColor={lighting.background} />
+        <KitchenLoading label={t.kitchen.parsing(Math.round(progress))} backgroundColor={lighting.background} />
       ) : null}
     </View>
   );

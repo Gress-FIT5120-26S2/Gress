@@ -47,3 +47,4 @@ KitchMemo connects fridge inventory with shopping awareness before and during a 
 - Provide reduced-motion alternatives for camera and transition animations.
 - Never communicate freshness state through colour alone.
 - Keep interactive targets comfortably tappable and provide accessible labels for 3D hotspots.
+- Route every user-facing string and accessibility label through the shared Chinese/English dictionary; Chinese is the default and the saved user preference controls the complete interface.

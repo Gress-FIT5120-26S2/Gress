@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useI18n } from '../i18n';
 
 export type AppTab = 'home' | 'shopping' | 'fridge' | 'achievements' | 'profile' | 'notifications';
 
@@ -11,15 +12,19 @@ type FloatingTabBarProps = {
   blurTarget: RefObject<View | null>;
 };
 
-const tabs: Array<{ key: AppTab; label: string; icon: keyof typeof Ionicons.glyphMap }> = [
-  { key: 'home', label: '首页', icon: 'home-outline' },
-  { key: 'shopping', label: '购物车', icon: 'cart-outline' },
-  { key: 'fridge', label: '冰箱', icon: 'cube-outline' },
-  { key: 'achievements', label: '成就', icon: 'trophy-outline' },
-  { key: 'profile', label: '我的', icon: 'person-outline' },
+type BottomTab = Exclude<AppTab, 'notifications'>;
+
+const tabs: Array<{ key: BottomTab; icon: keyof typeof Ionicons.glyphMap }> = [
+  { key: 'home', icon: 'home-outline' },
+  { key: 'shopping', icon: 'cart-outline' },
+  { key: 'fridge', icon: 'cube-outline' },
+  { key: 'achievements', icon: 'trophy-outline' },
+  { key: 'profile', icon: 'person-outline' },
 ];
 
 export function FloatingTabBar({ activeTab, onChange, blurTarget }: FloatingTabBarProps) {
+  const { t } = useI18n();
+
   return (
     <BlurView blurMethod="dimezisBlurViewSdk31Plus" blurTarget={blurTarget} intensity={76} tint="systemUltraThinMaterialLight" style={styles.glass}>
       {/* Arthur: NarIyirm
@@ -27,9 +32,10 @@ export function FloatingTabBar({ activeTab, onChange, blurTarget }: FloatingTabB
           EN: Selection changes local tab state; Expo Router navigation can plug in here later. */}
       {tabs.map((tab) => {
         const selected = tab.key === activeTab;
-        return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={tab.label} accessibilityState={{ selected }} onPress={() => onChange(tab.key)} style={({ pressed }) => [styles.tab, selected && styles.tabSelected, pressed && styles.tabPressed]}>
+        const label = t.tabs[tab.key];
+        return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => onChange(tab.key)} style={({ pressed }) => [styles.tab, selected && styles.tabSelected, pressed && styles.tabPressed]}>
           <Ionicons name={tab.icon} size={23} color={selected ? '#D77A1B' : '#506057'} />
-          <Text style={[styles.label, selected && styles.labelSelected]}>{tab.label}</Text>
+          <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
         </Pressable>;
       })}
     </BlurView>

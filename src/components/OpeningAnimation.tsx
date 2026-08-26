@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
+import { useI18n } from '../i18n';
 
 type OpeningAnimationProps = {
   canReveal: boolean;
@@ -33,6 +34,7 @@ function Ingredient({ emoji, top, left, y, progress }: IngredientProps) {
 }
 
 export function OpeningAnimation({ canReveal, onSequenceComplete, onFinish }: OpeningAnimationProps) {
+  const { t } = useI18n();
   const door = useRef(new Animated.Value(0)).current;
   const recipe = useRef(new Animated.Value(0)).current;
   const wordmark = useRef(new Animated.Value(0)).current;
@@ -129,14 +131,14 @@ export function OpeningAnimation({ canReveal, onSequenceComplete, onFinish }: Op
         </View>
         <Animated.View style={[styles.recipeCard, { opacity: recipe, transform: [{ translateY: recipeTranslateY }, { scale: recipeScale }] }]}>
           <View style={styles.recipeAccent} />
-          <Text style={styles.recipeEyebrow}>NEXT SHOP</Text>
-          <Text style={styles.recipeTitle}>Know what is{`\n`}already home</Text>
-          <View style={styles.recipeDetails}><Text style={styles.recipeDetail}>3 low stock</Text><View style={styles.dot} /><Text style={styles.recipeDetail}>live inventory</Text></View>
+          <Text style={styles.recipeEyebrow}>{t.opening.eyebrow}</Text>
+          <Text style={styles.recipeTitle}>{t.opening.title}</Text>
+          <View style={styles.recipeDetails}><Text style={styles.recipeDetail}>{t.opening.lowStock(3)}</Text><View style={styles.dot} /><Text style={styles.recipeDetail}>{t.opening.liveInventory}</Text></View>
           <View style={styles.sparkle}><Text style={styles.sparkleText}>✓</Text></View>
         </Animated.View>
       </View>
       <Animated.View style={[styles.wordmark, { opacity: wordmark, transform: [{ translateY: wordmarkTranslateY }] }]}>
-        <Text style={styles.brand}>KitchMemo</Text><Text style={styles.tagline}>from fridge to smarter shopping</Text>
+        <Text style={styles.brand}>KitchMemo</Text><Text style={styles.tagline}>{t.opening.tagline}</Text>
       </Animated.View>
     </Animated.View>
   );

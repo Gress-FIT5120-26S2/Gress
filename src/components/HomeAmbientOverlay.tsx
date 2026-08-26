@@ -2,6 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useI18n } from '../i18n';
 import type { KitchenTimePhase } from './KitchenTimeLighting';
 
 type HomeAmbientOverlayProps = {
@@ -22,13 +23,6 @@ const NIGHT_STARS = [
   { left: '84%', top: '22%', opacity: 0.4, size: 1.5 },
 ] as const;
 
-function getPeriodLabel(phase: KitchenTimePhase) {
-  if (phase === 'night') return '今晚的厨房';
-  if (phase === 'dawn') return '清晨的厨房';
-  if (phase === 'sunset') return '傍晚的厨房';
-  return '今天的厨房';
-}
-
 export function HomeAmbientOverlay({
   blurTarget,
   expiringCount,
@@ -38,8 +32,9 @@ export function HomeAmbientOverlay({
   showInteractionHint,
   unreadCount,
 }: HomeAmbientOverlayProps) {
+  const { t } = useI18n();
   const isNight = phase === 'night';
-  const headline = expiringCount > 0 ? `${expiringCount} 件食材值得先用` : '今天的食材状态很好';
+  const headline = expiringCount > 0 ? t.home.expiring(expiringCount) : t.home.freshnessGood;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -65,7 +60,7 @@ export function HomeAmbientOverlay({
       ) : null}
 
       <Pressable
-        accessibilityHint="打开冰箱并查看临期食材"
+        accessibilityHint={t.home.freshnessHint}
         accessibilityLabel={headline}
         accessibilityRole="button"
         hitSlop={8}
@@ -74,7 +69,7 @@ export function HomeAmbientOverlay({
         style={({ pressed }) => [styles.freshnessCopy, pressed && styles.copyPressed]}
       >
         <Text style={[styles.periodLabel, isNight ? styles.nightPrimary : styles.dayPrimary]}>
-          {getPeriodLabel(phase)}
+          {t.home.period[phase]}
         </Text>
         <Text style={[styles.freshnessHeadline, isNight ? styles.nightPrimary : styles.dayPrimary]}>
           {headline}
@@ -82,8 +77,8 @@ export function HomeAmbientOverlay({
       </Pressable>
 
       <Pressable
-        accessibilityHint="查看食材、购物和共享厨房提醒"
-        accessibilityLabel={unreadCount > 0 ? `打开信箱，${unreadCount} 条未读提醒` : '打开信箱'}
+        accessibilityHint={t.home.mailboxHint}
+        accessibilityLabel={unreadCount > 0 ? t.home.mailboxUnread(unreadCount) : t.home.mailboxEmpty}
         accessibilityRole="button"
         hitSlop={8}
         onPress={onOpenNotifications}
@@ -109,7 +104,7 @@ export function HomeAmbientOverlay({
       {showInteractionHint ? (
         <View pointerEvents="none" style={styles.interactionHint}>
           <Text style={[styles.interactionHintText, isNight ? styles.nightSecondary : styles.daySecondary]}>
-            拖动查看 · 轻点白点进入
+            {t.home.interactionHint}
           </Text>
         </View>
       ) : null}
