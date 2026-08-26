@@ -3,7 +3,7 @@ import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
-export type AppTab = 'home' | 'shopping' | 'fridge' | 'achievements' | 'profile';
+export type AppTab = 'home' | 'shopping' | 'fridge' | 'achievements' | 'profile' | 'notifications';
 
 type FloatingTabBarProps = {
   activeTab: AppTab;

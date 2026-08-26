@@ -8,6 +8,7 @@ import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
+import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 
 // Arthur: NarIyirm
@@ -23,6 +24,7 @@ const screens: Record<AppTab, { eyebrow: string; title: string; description: str
   fridge: { eyebrow: 'MY FRIDGE', title: 'Keep food in view', description: 'Track freshness before good ingredients go to waste.' },
   achievements: { eyebrow: 'KITCHEN WINS', title: 'Small habits add up', description: 'See the food, money, and shopping trips you have saved.' },
   profile: { eyebrow: 'MY KITCHEN', title: 'Make it yours', description: 'Set your preferences, diets, and cooking goals.' },
+  notifications: { eyebrow: 'KITCHEN MAIL', title: 'A gentle heads-up', description: 'Freshness, shopping, and shared-home updates in one quiet place.' },
 };
 
 const transitionTones: Record<AppTab, string> = {
@@ -31,6 +33,7 @@ const transitionTones: Record<AppTab, string> = {
   fridge: '#E1F0EF',
   achievements: '#F5E9D6',
   profile: '#E8EEEA',
+  notifications: '#F7E9DA',
 };
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
@@ -43,6 +46,11 @@ const HOME_PREVIEW_EXPIRING_COUNT = 2;
 // 中文：购物车容量与冰箱库存共用一个 0–1 数据入口；目前是样例值，之后由 Supabase 库存统计替换。
 // EN: Cart fullness and fridge stock share one 0–1 data entry; Supabase inventory totals will replace this preview value.
 const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
+
+// Arthur: NarIyirm
+// 中文：未读数量同时驱动三维信箱、右上角角标和通知页；以后由 Supabase 的未读查询替换此样例值。
+// EN: One unread count drives the 3D mailbox, top-right badge, and inbox; a Supabase unread query can replace this preview value later.
+const HOME_PREVIEW_UNREAD_COUNT = 5;
 
 // Arthur: NarIyirm
 // 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
@@ -214,9 +222,10 @@ export default function App() {
     handleCinematicNavigate('fridge');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
-  const openSettings = useCallback(() => {
-    handleCinematicNavigate('profile');
-  }, [handleCinematicNavigate]);
+  const openNotifications = useCallback(() => {
+    dismissHomeInteractionHint();
+    handleCinematicNavigate('notifications');
+  }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
   return (
     <View style={styles.container}>
@@ -241,6 +250,7 @@ export default function App() {
                 onInteractionStart={beginCinematicFocus}
                 onNavigate={handleCinematicNavigate}
                 onReady={markKitchenReady}
+                unreadNotificationCount={HOME_PREVIEW_UNREAD_COUNT}
                 weather={HOME_PREVIEW_WEATHER}
               />
             </Suspense>
@@ -254,6 +264,7 @@ export default function App() {
                 <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
                 <Text style={styles.title}>{screen.title}</Text>
                 <Text style={styles.description}>{screen.description}</Text>
+                {activeTab === 'notifications' ? <NotificationInbox unreadCount={HOME_PREVIEW_UNREAD_COUNT} /> : null}
                 <Text style={styles.connection}>{status}</Text>
               </View>
             </>
@@ -270,9 +281,10 @@ export default function App() {
               blurTarget={blurTargetRef}
               expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
               onOpenExpiring={openExpiringFridge}
-              onOpenSettings={openSettings}
+              onOpenNotifications={openNotifications}
               phase={kitchenLighting.phase}
               showInteractionHint={showHomeInteractionHint}
+              unreadCount={HOME_PREVIEW_UNREAD_COUNT}
             />
           ) : null}
           <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />

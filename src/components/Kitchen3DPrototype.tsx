@@ -20,6 +20,7 @@ import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
 import type { AppTab } from './FloatingTabBar';
 import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
+import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
 import { KitchenShoppingCart, SHOPPING_CART_POSITION } from './KitchenShoppingCart';
 import {
   KitchenTimeEnvironment,
@@ -34,19 +35,20 @@ type Kitchen3DPrototypeProps = {
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
   onReady?: () => void;
+  unreadNotificationCount?: number;
   weather?: KitchenWeather;
 };
 
 type FeatureHotspotProps = {
-  freshnessCount?: number;
+  statusCount?: number;
   hitboxSize: [number, number, number];
   markerOffset: [number, number, number];
   onPress: () => void;
   reduceMotion: boolean;
 };
 
-type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping';
-type KitchenNavigationFeature = Extract<KitchenFeature, 'fridge' | 'shopping'>;
+type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox';
+type KitchenNavigationFeature = Extract<KitchenFeature, 'fridge' | 'shopping' | 'mailbox'>;
 type KitchenInteraction = KitchenNavigationFeature | null;
 type LoadedKitchen = { scene: Object3D; animations: AnimationClip[] };
 type CameraFocusConfig = {
@@ -84,6 +86,7 @@ type KitchenSceneProps = {
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
   reduceMotion: boolean;
+  unreadNotificationCount: number;
   weather: KitchenWeather;
 };
 
@@ -103,6 +106,12 @@ const CAMERA_FOCUS: Record<KitchenNavigationFeature, CameraFocusConfig> = {
     cameraOffset: [3.05, 2.15, 4.1],
     targetOffset: [0, 0.62, 0],
     duration: 1120,
+  },
+  mailbox: {
+    worldPosition: KITCHEN_MAILBOX_POSITION,
+    cameraOffset: [3.35, 1.55, 3.7],
+    targetOffset: [0, 0.16, 0],
+    duration: 1320,
   },
 };
 const BURNER_ANCHORS = ['Stove_Burner_Left_Anchor', 'Stove_Burner_Right_Anchor'] as const;
@@ -157,7 +166,7 @@ const DIGIT_SEGMENTS = {
   g: { position: [0, 0, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
 } as const;
 
-function FreshnessDigit({ count }: { count: number }) {
+function StatusDigit({ count }: { count: number }) {
   const digit = Math.min(9, Math.max(0, count));
 
   return (
@@ -171,8 +180,8 @@ function FreshnessDigit({ count }: { count: number }) {
         <meshBasicMaterial color="#F0A43C" depthTest={false} toneMapped={false} />
       </mesh>
       {/* Arthur: NarIyirm
-          中文：数字用简单几何段组成，避免在原生 3D 场景里额外加载字体，同时始终跟随冰箱锚点。
-          EN: Simple geometry segments form the count without loading a native 3D font, while remaining attached to the fridge anchor. */}
+          中文：数字用简单几何段组成，避免在原生 3D 场景里额外加载字体，并始终跟随对应物体的锚点。
+          EN: Simple geometry segments form the count without loading a native 3D font and remain attached to the relevant object anchor. */}
       {SEVEN_SEGMENT_DIGITS[digit].map((segment) => (
         <mesh key={segment} position={DIGIT_SEGMENTS[segment].position} renderOrder={23}>
           <boxGeometry args={DIGIT_SEGMENTS[segment].size} />
@@ -183,13 +192,13 @@ function FreshnessDigit({ count }: { count: number }) {
   );
 }
 
-function PulseMarker({ freshnessCount = 0, position, reduceMotion }: { freshnessCount?: number; position: [number, number, number]; reduceMotion: boolean }) {
+function PulseMarker({ statusCount = 0, position, reduceMotion }: { statusCount?: number; position: [number, number, number]; reduceMotion: boolean }) {
   const haloRef = useRef<Mesh>(null);
   const haloMaterialRef = useRef<MeshBasicMaterial>(null);
-  const hasFreshness = freshnessCount > 0;
+  const hasStatus = statusCount > 0;
 
   useFrame(({ clock }) => {
-    if (!hasFreshness || reduceMotion) return;
+    if (!hasStatus || reduceMotion) return;
     const pulse = (Math.sin(clock.elapsedTime * 2.25) + 1) / 2;
     haloRef.current?.scale.setScalar(0.94 + pulse * 0.12);
     if (haloMaterialRef.current) haloMaterialRef.current.opacity = 0.46 + pulse * 0.28;
@@ -202,20 +211,20 @@ function PulseMarker({ freshnessCount = 0, position, reduceMotion }: { freshness
         <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={2.2} />
         <pointLight color="#FFFFFF" intensity={0.45} distance={0.8} />
       </mesh>
-      {hasFreshness ? (
+      {hasStatus ? (
         <Billboard position={position} follow>
           <mesh ref={haloRef} renderOrder={20}>
             <ringGeometry args={[0.092, 0.122, 28]} />
             <meshBasicMaterial ref={haloMaterialRef} color="#F0A43C" transparent opacity={0.6} depthTest={false} toneMapped={false} />
           </mesh>
-          <FreshnessDigit count={freshnessCount} />
+          <StatusDigit count={statusCount} />
         </Billboard>
       ) : null}
     </>
   );
 }
 
-function FeatureHotspot({ freshnessCount, hitboxSize, markerOffset, onPress, reduceMotion }: FeatureHotspotProps) {
+function FeatureHotspot({ statusCount, hitboxSize, markerOffset, onPress, reduceMotion }: FeatureHotspotProps) {
   const handlePress = (event: ThreeEvent<MouseEvent>) => {
     // Arthur: NarIyirm
     // 中文：透明热区扩大精细模型的可点击范围，并阻止点击继续穿透到厨房网格。
@@ -230,7 +239,7 @@ function FeatureHotspot({ freshnessCount, hitboxSize, markerOffset, onPress, red
         <boxGeometry args={hitboxSize} />
         <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
       </mesh>
-      <PulseMarker freshnessCount={freshnessCount} position={markerOffset} reduceMotion={reduceMotion} />
+      <PulseMarker statusCount={statusCount} position={markerOffset} reduceMotion={reduceMotion} />
     </group>
   );
 }
@@ -305,6 +314,7 @@ function KitchenModel({
   onReady,
   onSelectFeature,
   reduceMotion,
+  unreadNotificationCount,
   weather,
 }: {
   activeInteraction: KitchenInteraction;
@@ -317,6 +327,7 @@ function KitchenModel({
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
   reduceMotion: boolean;
+  unreadNotificationCount: number;
   weather: KitchenWeather;
 }) {
   const { scene, animations } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
@@ -440,6 +451,18 @@ function KitchenModel({
           </group>
         ) : null}
       </group>
+      <group position={KITCHEN_MAILBOX_POSITION} rotation={KITCHEN_MAILBOX_ROTATION}>
+        <KitchenMailbox active={effectInteraction === 'mailbox'} reduceMotion={reduceMotion} unreadCount={unreadNotificationCount} />
+        {activeInteraction === null ? (
+          <FeatureHotspot
+            statusCount={unreadNotificationCount}
+            hitboxSize={[1.05, 1.25, 0.8]}
+            markerOffset={[0, 0.76, 0.18]}
+            onPress={() => onSelectFeature('mailbox')}
+            reduceMotion={reduceMotion}
+          />
+        ) : null}
+      </group>
       {anchors.burners.map((anchor) => (
         <Fragment key={anchor.uuid}>
           {createPortal(
@@ -457,7 +480,7 @@ function KitchenModel({
         anchors.fridgeLight,
       ) : null}
       {activeInteraction === null && anchors.fridgeHotspot ? createPortal(
-          <FeatureHotspot freshnessCount={expiringCount} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} />,
+          <FeatureHotspot statusCount={expiringCount} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} />,
           anchors.fridgeHotspot,
         ) : null}
       {activeInteraction === null && anchors.stoveHotspot ? createPortal(
@@ -615,10 +638,10 @@ function KitchenCameraControls({
   );
 }
 
-function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isStoveLit, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion, weather }: KitchenSceneProps) {
+function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isStoveLit, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
   return (
     <>
-      <KitchenTimeEnvironment lighting={lighting} />
+      <KitchenTimeEnvironment lighting={lighting} weather={weather} />
 
       <Suspense fallback={null}>
         <KitchenModel
@@ -632,6 +655,7 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inv
           onReady={onReady}
           onSelectFeature={onSelectFeature}
           reduceMotion={reduceMotion}
+          unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
         <KitchenCameraControls
@@ -646,7 +670,7 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inv
   );
 }
 
-export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, weather = 'clear' }: Kitchen3DPrototypeProps) {
+export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
@@ -681,8 +705,8 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
     if (interactionRef.current) return;
 
     // Arthur: NarIyirm
-    // 中文：只有冰箱和购物车会锁住输入并进入镜头导航；灶台与菜谱仅更新首页中的本地动效状态。
-    // EN: Only fridge and cart lock input for camera navigation; stove and recipe update local home-scene effects only.
+    // 中文：冰箱、购物车和信箱会锁住输入并进入镜头导航；灶台与菜谱只更新首页中的本地动效状态。
+    // EN: Fridge, cart, and mailbox lock input for camera navigation; stove and recipe update local home-scene effects only.
     interactionRef.current = feature;
     onInteractionStart?.();
     setActiveInteraction(feature);
@@ -694,11 +718,11 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
 
   const handleFocusComplete = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current !== feature) return;
-    onNavigate(feature === 'fridge' ? 'fridge' : 'shopping');
+    onNavigate(feature === 'fridge' ? 'fridge' : feature === 'shopping' ? 'shopping' : 'notifications');
   }, [onNavigate]);
 
   return (
-    <View style={styles.container} accessibilityLabel="可旋转的三维厨房；冰箱和购物车可进入页面，灶台和菜谱可在原地互动">
+    <View style={styles.container} accessibilityLabel="可旋转的三维厨房；冰箱、购物车和信箱可进入页面，灶台和菜谱可在原地互动">
       {/* Arthur: NarIyirm
           中文：新 GLB 使用真实米制大小和中心原点，不再通过补偿缩放与偏移猜测画面位置。
           EN: The rebuilt GLB uses real scale and a centered origin, removing guessed scale and position compensation. */}
@@ -721,6 +745,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
           onReady={onReady}
           onSelectFeature={handleSelectFeature}
           reduceMotion={reduceMotion}
+          unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
       </Canvas>

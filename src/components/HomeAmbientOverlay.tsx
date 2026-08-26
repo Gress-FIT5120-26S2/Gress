@@ -8,9 +8,10 @@ type HomeAmbientOverlayProps = {
   blurTarget: RefObject<View | null>;
   expiringCount: number;
   onOpenExpiring: () => void;
-  onOpenSettings: () => void;
+  onOpenNotifications: () => void;
   phase: KitchenTimePhase;
   showInteractionHint: boolean;
+  unreadCount: number;
 };
 
 const NIGHT_STARS = [
@@ -32,9 +33,10 @@ export function HomeAmbientOverlay({
   blurTarget,
   expiringCount,
   onOpenExpiring,
-  onOpenSettings,
+  onOpenNotifications,
   phase,
   showInteractionHint,
+  unreadCount,
 }: HomeAmbientOverlayProps) {
   const isNight = phase === 'night';
   const headline = expiringCount > 0 ? `${expiringCount} 件食材值得先用` : '今天的食材状态很好';
@@ -80,21 +82,27 @@ export function HomeAmbientOverlay({
       </Pressable>
 
       <Pressable
-        accessibilityLabel="打开设置"
+        accessibilityHint="查看食材、购物和共享厨房提醒"
+        accessibilityLabel={unreadCount > 0 ? `打开信箱，${unreadCount} 条未读提醒` : '打开信箱'}
         accessibilityRole="button"
         hitSlop={8}
-        onPress={onOpenSettings}
+        onPress={onOpenNotifications}
         pressRetentionOffset={12}
-        style={({ pressed }) => [styles.settingsButton, pressed && styles.settingsPressed]}
+        style={({ pressed }) => [styles.mailButton, pressed && styles.mailPressed]}
       >
         <BlurView
           blurMethod="dimezisBlurViewSdk31Plus"
           blurTarget={blurTarget}
           intensity={42}
           tint={isNight ? 'systemUltraThinMaterialDark' : 'systemUltraThinMaterialLight'}
-          style={[styles.settingsGlass, isNight ? styles.settingsGlassNight : styles.settingsGlassDay]}
+          style={[styles.mailGlass, isNight ? styles.mailGlassNight : styles.mailGlassDay]}
         >
-          <Ionicons name="settings-sharp" size={25} color={isNight ? '#F1F4F5' : '#365048'} />
+          <Ionicons name={unreadCount > 0 ? 'mail-unread-outline' : 'mail-outline'} size={25} color={isNight ? '#F1F4F5' : '#365048'} />
+          {unreadCount > 0 ? (
+            <View style={styles.unreadBadge}>
+              <Text style={styles.unreadBadgeText}>{Math.min(unreadCount, 9)}</Text>
+            </View>
+          ) : null}
         </BlurView>
       </Pressable>
 
@@ -119,11 +127,13 @@ const styles = StyleSheet.create({
   dayPrimary: { color: '#633F2D' },
   nightSecondary: { color: 'rgba(218,231,242,0.72)' },
   daySecondary: { color: 'rgba(55,78,70,0.70)' },
-  settingsButton: { position: 'absolute', top: 72, right: 22, width: 52, height: 52 },
-  settingsPressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
-  settingsGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1 },
-  settingsGlassNight: { borderColor: 'rgba(226,237,247,0.22)', backgroundColor: 'rgba(91,112,132,0.26)' },
-  settingsGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
+  mailButton: { position: 'absolute', top: 72, right: 22, width: 52, height: 52 },
+  mailPressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
+  mailGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1 },
+  mailGlassNight: { borderColor: 'rgba(226,237,247,0.22)', backgroundColor: 'rgba(91,112,132,0.26)' },
+  mailGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
+  unreadBadge: { position: 'absolute', top: 8, right: 8, minWidth: 16, height: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#E8774C', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)' },
+  unreadBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', lineHeight: 11 },
   interactionHint: { position: 'absolute', right: 24, bottom: '18%', left: 24, alignItems: 'center' },
   interactionHintText: { fontSize: 13, fontWeight: '600', lineHeight: 18, letterSpacing: 0.15 },
 });
