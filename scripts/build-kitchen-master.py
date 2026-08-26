@@ -350,10 +350,10 @@ cylinder("Rug_Inner", (-0.15, -0.75, 0.066), 0.40, 0.020, glass, root, vertices=
 # 中文：吊灯外观和锚点写进模型，真实光源强度由 App 根据时间控制。
 # EN: The pendant and anchors live in the model while the app controls real light intensity from local time.
 ceiling_lamp = empty("Ceiling_Lamp", location=(-0.15, -0.75, 0), parent=root, interaction="ceiling-light")
-cylinder("Ceiling_Lamp_Cord", (0, 0, 2.88), 0.018, 0.36, metal, ceiling_lamp, vertices=16, bevel=0.004)
-cone("Ceiling_Lamp_Shade", (0, 0, 2.61), 0.34, 0.15, 0.30, lamp_shade, ceiling_lamp, bevel=0.020)
-sphere("Ceiling_Lamp_Bulb", (0, 0, 2.43), (0.105, 0.105, 0.13), lamp_bulb, ceiling_lamp, subdivisions=3)
-empty("Ceiling_Light_Anchor", (-0.15, -0.75, 2.42), root, "ceiling-light")
+cylinder("Ceiling_Lamp_Cord", (0, 0, 3.10), 0.018, 0.24, metal, ceiling_lamp, vertices=16, bevel=0.004)
+cone("Ceiling_Lamp_Shade", (0, 0, 2.88), 0.34, 0.15, 0.30, lamp_shade, ceiling_lamp, bevel=0.020)
+sphere("Ceiling_Lamp_Bulb", (0, 0, 2.70), (0.105, 0.105, 0.13), lamp_bulb, ceiling_lamp, subdivisions=3)
+empty("Ceiling_Light_Anchor", (-0.15, -0.75, 2.69), root, "ceiling-light")
 empty("Window_Light_Anchor", (-2.95, 0.35, 1.82), root, "window-light")
 empty("Sun_Anchor", (0, 3.15, 3.65), root, "sun")
 empty("Moon_Anchor", (0, 3.15, 3.65), root, "moon")

@@ -93,11 +93,6 @@ export function HomeAmbientOverlay({
           style={[styles.mailGlass, isNight ? styles.mailGlassNight : styles.mailGlassDay]}
         >
           <Ionicons name={unreadCount > 0 ? 'mail-unread-outline' : 'mail-outline'} size={25} color={isNight ? '#F1F4F5' : '#365048'} />
-          {unreadCount > 0 ? (
-            <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{Math.min(unreadCount, 9)}</Text>
-            </View>
-          ) : null}
         </BlurView>
       </Pressable>
 
@@ -127,8 +122,6 @@ const styles = StyleSheet.create({
   mailGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1 },
   mailGlassNight: { borderColor: 'rgba(226,237,247,0.22)', backgroundColor: 'rgba(91,112,132,0.26)' },
   mailGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
-  unreadBadge: { position: 'absolute', top: 8, right: 8, minWidth: 16, height: 16, paddingHorizontal: 4, alignItems: 'center', justifyContent: 'center', borderRadius: 8, backgroundColor: '#E8774C', borderWidth: 1, borderColor: 'rgba(255,255,255,0.88)' },
-  unreadBadgeText: { color: '#FFFFFF', fontSize: 9, fontWeight: '800', lineHeight: 11 },
   interactionHint: { position: 'absolute', right: 24, bottom: '18%', left: 24, alignItems: 'center' },
   interactionHintText: { fontSize: 13, fontWeight: '600', lineHeight: 18, letterSpacing: 0.15 },
 });

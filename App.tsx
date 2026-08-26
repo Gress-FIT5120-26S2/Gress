@@ -7,6 +7,7 @@ import { getApiHealth } from './src/api';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
+import { FridgeScreen } from './src/components/FridgeScreen';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
@@ -234,7 +235,7 @@ function KitchMemoApp() {
         <Animated.View
           style={[
             styles.screenStage,
-            activeTab === 'home' ? styles.homeContent : styles.standardContent,
+            activeTab === 'home' ? styles.homeContent : activeTab === 'fridge' ? styles.fridgeContent : styles.standardContent,
             { opacity: screenOpacity, transform: [{ scale: screenScale }] },
           ]}
         >
@@ -254,9 +255,11 @@ function KitchMemoApp() {
             </Suspense>
           ) : activeTab === 'home' && !isOpening ? (
             <KitchenLoading />
+          ) : activeTab === 'fridge' ? (
+            <FridgeScreen />
           ) : activeTab !== 'home' ? (
             <>
-              <View style={[styles.glow, activeTab === 'fridge' && styles.glowCool]} />
+              <View style={styles.glow} />
               <Text style={styles.greeting}>KITCHMEMO</Text>
               <View style={styles.screenCopy}>
                 <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
@@ -334,6 +337,7 @@ const styles = StyleSheet.create({
   content: { flex: 1, overflow: 'hidden' },
   screenStage: { flex: 1, overflow: 'hidden' },
   homeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  fridgeContent: { paddingHorizontal: 0, paddingTop: 0 },
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
   chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
   transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
