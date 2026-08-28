@@ -1,7 +1,8 @@
+import { Ionicons } from '@expo/vector-icons';
 import { Billboard, OrbitControls, useAnimations, useGLTF, useProgress } from '@react-three/drei/native';
 import { Canvas, createPortal, type ThreeEvent, useFrame, useThree } from '@react-three/fiber/native';
 import { Fragment, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import {
   AdditiveBlending,
   LoopOnce,
@@ -41,11 +42,12 @@ type Kitchen3DPrototypeProps = {
 };
 
 type FeatureHotspotProps = {
-  statusCount?: number;
+  hasStatus?: boolean;
   hitboxSize: [number, number, number];
   markerOffset: [number, number, number];
   onPress: () => void;
   reduceMotion: boolean;
+  selected?: boolean;
 };
 
 type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox';
@@ -66,7 +68,7 @@ type CameraMotion = {
   duration: number;
   endSpherical: Spherical;
   endTarget: Vector3;
-  feature: KitchenNavigationFeature;
+  feature: KitchenNavigationFeature | null;
   hasCuedEffect: boolean;
   startSpherical: Spherical;
   startedAt: number | null;
@@ -75,6 +77,7 @@ type CameraMotion = {
 };
 type KitchenSceneProps = {
   activeInteraction: KitchenInteraction;
+  cameraResetRequest: number;
   effectInteraction: KitchenInteraction;
   expiringCount: number;
   inventoryFillRatio: number;
@@ -82,11 +85,16 @@ type KitchenSceneProps = {
   isStoveLit: boolean;
   lighting: KitchenLightingState;
   onEffectCue: (feature: KitchenNavigationFeature) => void;
+  onCameraActivity: () => void;
+  onCameraChanged: () => void;
+  onCameraResetComplete: () => void;
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
+  pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
+  isResettingCamera: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
 };
@@ -95,22 +103,23 @@ const CAMERA_TARGET: [number, number, number] = [0, 1.3, 0];
 const INITIAL_CAMERA_POSITION: [number, number, number] = [10.8, 8.8, 16.6];
 const REDUCED_MOTION_DELAY = 180;
 const EFFECT_CUE_PROGRESS = 0.32;
+const CAMERA_IDLE_RESET_DELAY = 12_000;
 const CAMERA_FOCUS: Record<KitchenNavigationFeature, CameraFocusConfig> = {
   fridge: {
     anchorName: 'Hotspot_Fridge',
-    cameraOffset: [3.8, 2.15, 5.15] as [number, number, number],
-    targetOffset: [0, 0.08, 0.04] as [number, number, number],
+    cameraOffset: [0, 1.15, 5.65] as [number, number, number],
+    targetOffset: [0, 0.12, 0] as [number, number, number],
     duration: 1320,
   },
   shopping: {
     worldPosition: SHOPPING_CART_POSITION,
-    cameraOffset: [3.05, 2.15, 4.1],
+    cameraOffset: [-1.45, 1.72, 4.12],
     targetOffset: [0, 0.62, 0],
     duration: 1120,
   },
   mailbox: {
     worldPosition: KITCHEN_MAILBOX_POSITION,
-    cameraOffset: [3.35, 1.55, 3.7],
+    cameraOffset: [4.25, 0.82, 0],
     targetOffset: [0, 0.16, 0],
     duration: 1320,
   },
@@ -144,88 +153,61 @@ function cubicBezierProgress(progress: number, x1: number, y1: number, x2: numbe
 const cameraMoveEase = (progress: number) => cubicBezierProgress(progress, 0.77, 0, 0.175, 1);
 const cameraZoomEase = (progress: number) => cubicBezierProgress(progress, 0.23, 1, 0.32, 1);
 
-const SEVEN_SEGMENT_DIGITS: Record<number, Array<'a' | 'b' | 'c' | 'd' | 'e' | 'f' | 'g'>> = {
-  0: ['a', 'b', 'c', 'd', 'e', 'f'],
-  1: ['b', 'c'],
-  2: ['a', 'b', 'g', 'e', 'd'],
-  3: ['a', 'b', 'c', 'd', 'g'],
-  4: ['f', 'g', 'b', 'c'],
-  5: ['a', 'f', 'g', 'c', 'd'],
-  6: ['a', 'f', 'g', 'e', 'c', 'd'],
-  7: ['a', 'b', 'c'],
-  8: ['a', 'b', 'c', 'd', 'e', 'f', 'g'],
-  9: ['a', 'b', 'c', 'd', 'f', 'g'],
-};
+function PulseMarker({ hasStatus = false, position, reduceMotion, selected = false }: { hasStatus?: boolean; position: [number, number, number]; reduceMotion: boolean; selected?: boolean }) {
+  const markerRef = useRef<Group>(null);
+  const whiteMaterialRef = useRef<MeshBasicMaterial>(null);
+  const alertMaterialRef = useRef<MeshBasicMaterial>(null);
+  const lightRef = useRef<PointLight>(null);
+  const invalidate = useThree((state) => state.invalidate);
 
-const DIGIT_SEGMENTS = {
-  a: { position: [0, 0.034, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
-  b: { position: [0.024, 0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
-  c: { position: [0.024, -0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
-  d: { position: [0, -0.034, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
-  e: { position: [-0.024, -0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
-  f: { position: [-0.024, 0.018, 0] as [number, number, number], size: [0.008, 0.027, 0.006] as [number, number, number] },
-  g: { position: [0, 0, 0] as [number, number, number], size: [0.042, 0.008, 0.006] as [number, number, number] },
-} as const;
+  useEffect(() => invalidate(), [hasStatus, invalidate, selected]);
 
-function StatusDigit({ count }: { count: number }) {
-  const digit = Math.min(9, Math.max(0, count));
+  useFrame(({ clock }, delta) => {
+    const marker = markerRef.current;
+    if (!marker) return;
 
-  return (
-    <group position={[0.135, 0.115, 0.012]}>
-      <mesh renderOrder={21}>
-        <circleGeometry args={[0.072, 24]} />
-        <meshBasicMaterial color="#26394A" transparent opacity={0.92} depthTest={false} toneMapped={false} />
-      </mesh>
-      <mesh renderOrder={22}>
-        <ringGeometry args={[0.062, 0.076, 24]} />
-        <meshBasicMaterial color="#F0A43C" depthTest={false} toneMapped={false} />
-      </mesh>
-      {/* Arthur: NarIyirm
-          中文：数字用简单几何段组成，避免在原生 3D 场景里额外加载字体，并始终跟随对应物体的锚点。
-          EN: Simple geometry segments form the count without loading a native 3D font and remain attached to the relevant object anchor. */}
-      {SEVEN_SEGMENT_DIGITS[digit].map((segment) => (
-        <mesh key={segment} position={DIGIT_SEGMENTS[segment].position} renderOrder={23}>
-          <boxGeometry args={DIGIT_SEGMENTS[segment].size} />
-          <meshBasicMaterial color="#F8B95A" depthTest={false} toneMapped={false} />
-        </mesh>
-      ))}
-    </group>
-  );
-}
+    const breathing = reduceMotion ? 1 : 0.92 + ((Math.sin(clock.elapsedTime * 2.1) + 1) / 2) * 0.14;
+    const blinking = reduceMotion ? 1 : 0.38 + ((Math.sin(clock.elapsedTime * 5.4) + 1) / 2) * 0.62;
+    const targetScale = selected ? 0.04 : breathing;
+    const nextScale = MathUtils.damp(marker.scale.x, targetScale, selected ? 18 : 8, Math.min(delta, 0.05));
+    marker.scale.setScalar(nextScale);
 
-function PulseMarker({ statusCount = 0, position, reduceMotion }: { statusCount?: number; position: [number, number, number]; reduceMotion: boolean }) {
-  const haloRef = useRef<Mesh>(null);
-  const haloMaterialRef = useRef<MeshBasicMaterial>(null);
-  const hasStatus = statusCount > 0;
-
-  useFrame(({ clock }) => {
-    if (!hasStatus || reduceMotion) return;
-    const pulse = (Math.sin(clock.elapsedTime * 2.25) + 1) / 2;
-    haloRef.current?.scale.setScalar(0.94 + pulse * 0.12);
-    if (haloMaterialRef.current) haloMaterialRef.current.opacity = 0.46 + pulse * 0.28;
+    if (whiteMaterialRef.current) whiteMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : 0.9;
+    if (alertMaterialRef.current) alertMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : blinking;
+    if (lightRef.current) lightRef.current.intensity = selected ? 0 : hasStatus ? 0.5 * blinking : 0.34 * breathing;
+    if (Math.abs(nextScale - targetScale) > 0.01) invalidate();
   });
 
   return (
-    <>
-      <mesh position={position}>
-        <sphereGeometry args={[0.075, 16, 16]} />
-        <meshStandardMaterial color="#FFFFFF" emissive="#FFFFFF" emissiveIntensity={2.2} />
-        <pointLight color="#FFFFFF" intensity={0.45} distance={0.8} />
-      </mesh>
-      {hasStatus ? (
-        <Billboard position={position} follow>
-          <mesh ref={haloRef} renderOrder={20}>
-            <ringGeometry args={[0.092, 0.122, 28]} />
-            <meshBasicMaterial ref={haloMaterialRef} color="#F0A43C" transparent opacity={0.6} depthTest={false} toneMapped={false} />
+    <Billboard position={position} follow>
+      <group ref={markerRef}>
+        {hasStatus ? (
+          <>
+            {/* Arthur: NarIyirm
+                中文：有事件时用无数字的竖向琥珀灯取代白点，闪烁只表达“值得查看”。
+                EN: A number-free vertical amber lamp replaces the white dot for events; its blink communicates only that something needs attention. */}
+            <mesh position={[0, 0.035, 0]} renderOrder={20}>
+              <capsuleGeometry args={[0.045, 0.12, 6, 14]} />
+              <meshBasicMaterial ref={alertMaterialRef} color="#FFC24F" transparent opacity={1} depthTest={false} toneMapped={false} />
+            </mesh>
+            <mesh position={[0, -0.075, 0]} renderOrder={20}>
+              <cylinderGeometry args={[0.032, 0.042, 0.045, 14]} />
+              <meshBasicMaterial color="#A86822" depthTest={false} toneMapped={false} />
+            </mesh>
+          </>
+        ) : (
+          <mesh renderOrder={20}>
+            <sphereGeometry args={[0.075, 18, 18]} />
+            <meshBasicMaterial ref={whiteMaterialRef} color="#FFFFFF" transparent opacity={0.9} depthTest={false} toneMapped={false} />
           </mesh>
-          <StatusDigit count={statusCount} />
-        </Billboard>
-      ) : null}
-    </>
+        )}
+        <pointLight ref={lightRef} color={hasStatus ? '#FFC24F' : '#FFFFFF'} intensity={0.4} distance={0.85} />
+      </group>
+    </Billboard>
   );
 }
 
-function FeatureHotspot({ statusCount, hitboxSize, markerOffset, onPress, reduceMotion }: FeatureHotspotProps) {
+function FeatureHotspot({ hasStatus, hitboxSize, markerOffset, onPress, reduceMotion, selected }: FeatureHotspotProps) {
   const handlePress = (event: ThreeEvent<MouseEvent>) => {
     // Arthur: NarIyirm
     // 中文：透明热区扩大精细模型的可点击范围，并阻止点击继续穿透到厨房网格。
@@ -240,7 +222,7 @@ function FeatureHotspot({ statusCount, hitboxSize, markerOffset, onPress, reduce
         <boxGeometry args={hitboxSize} />
         <meshBasicMaterial transparent opacity={0.001} depthWrite={false} />
       </mesh>
-      <PulseMarker statusCount={statusCount} position={markerOffset} reduceMotion={reduceMotion} />
+      <PulseMarker hasStatus={hasStatus} position={markerOffset} reduceMotion={reduceMotion} selected={selected} />
     </group>
   );
 }
@@ -314,6 +296,7 @@ function KitchenModel({
   lighting,
   onReady,
   onSelectFeature,
+  pressedFeature,
   reduceMotion,
   unreadNotificationCount,
   weather,
@@ -327,6 +310,7 @@ function KitchenModel({
   lighting: KitchenLightingState;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
+  pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
@@ -446,21 +430,22 @@ function KitchenModel({
       ) : null}
       <group position={SHOPPING_CART_POSITION}>
         <KitchenShoppingCart active={effectInteraction === 'shopping'} inventoryFillRatio={inventoryFillRatio} reduceMotion={reduceMotion} />
-        {activeInteraction === null ? (
+        {activeInteraction === null || activeInteraction === 'shopping' ? (
           <group position={[0, 0.65, 0]}>
-            <FeatureHotspot hitboxSize={[1.45, 1.3, 1.1]} markerOffset={[0, 0.77, 0]} onPress={() => onSelectFeature('shopping')} reduceMotion={reduceMotion} />
+            <FeatureHotspot hasStatus={inventoryFillRatio < 0.35} hitboxSize={[1.45, 1.3, 1.1]} markerOffset={[0, 0.77, 0]} onPress={() => onSelectFeature('shopping')} reduceMotion={reduceMotion} selected={pressedFeature === 'shopping'} />
           </group>
         ) : null}
       </group>
       <group position={KITCHEN_MAILBOX_POSITION} rotation={KITCHEN_MAILBOX_ROTATION}>
         <KitchenMailbox active={effectInteraction === 'mailbox'} reduceMotion={reduceMotion} unreadCount={unreadNotificationCount} />
-        {activeInteraction === null ? (
+        {activeInteraction === null || activeInteraction === 'mailbox' ? (
           <FeatureHotspot
-            statusCount={unreadNotificationCount}
+            hasStatus={unreadNotificationCount > 0}
             hitboxSize={[1.05, 1.25, 0.8]}
             markerOffset={[0, 0.76, 0.18]}
             onPress={() => onSelectFeature('mailbox')}
             reduceMotion={reduceMotion}
+            selected={pressedFeature === 'mailbox'}
           />
         ) : null}
       </group>
@@ -480,16 +465,16 @@ function KitchenModel({
         <pointLight color="#FFF1C4" intensity={effectInteraction === 'fridge' ? 2.4 : 0} distance={2.1} decay={2} />,
         anchors.fridgeLight,
       ) : null}
-      {activeInteraction === null && anchors.fridgeHotspot ? createPortal(
-          <FeatureHotspot statusCount={expiringCount} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} />,
+      {(activeInteraction === null || activeInteraction === 'fridge') && anchors.fridgeHotspot ? createPortal(
+          <FeatureHotspot hasStatus={expiringCount > 0} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} selected={pressedFeature === 'fridge'} />,
           anchors.fridgeHotspot,
         ) : null}
       {activeInteraction === null && anchors.stoveHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={reduceMotion} />,
+          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={reduceMotion} selected={pressedFeature === 'stove'} />,
           anchors.stoveHotspot,
         ) : null}
       {activeInteraction === null && anchors.recipesHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={reduceMotion} />,
+          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={reduceMotion} selected={pressedFeature === 'recipes'} />,
           anchors.recipesHotspot,
         ) : null}
     </>
@@ -498,12 +483,22 @@ function KitchenModel({
 
 function KitchenCameraControls({
   activeInteraction,
+  cameraResetRequest,
+  isResettingCamera,
+  onCameraActivity,
+  onCameraChanged,
+  onCameraResetComplete,
   onEffectCue,
   onExplore,
   onFocusComplete,
   reduceMotion,
 }: {
   activeInteraction: KitchenInteraction;
+  cameraResetRequest: number;
+  isResettingCamera: boolean;
+  onCameraActivity: () => void;
+  onCameraChanged: () => void;
+  onCameraResetComplete: () => void;
   onEffectCue: (feature: KitchenNavigationFeature) => void;
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
@@ -582,6 +577,37 @@ function KitchenCameraControls({
     invalidate();
   }, [activeInteraction, camera, invalidate, onEffectCue, onFocusComplete, reduceMotion, scene]);
 
+  useEffect(() => {
+    if (cameraResetRequest === 0 || activeInteraction) return;
+
+    const startTarget = controlsRef.current?.target.clone() ?? new Vector3(...CAMERA_TARGET);
+    const endTarget = new Vector3(...CAMERA_TARGET);
+    const startSpherical = new Spherical().setFromVector3(camera.position.clone().sub(startTarget));
+    const endSpherical = new Spherical().setFromVector3(new Vector3(...INITIAL_CAMERA_POSITION).sub(endTarget));
+    let thetaDelta = endSpherical.theta - startSpherical.theta;
+    if (thetaDelta > Math.PI) thetaDelta -= Math.PI * 2;
+    if (thetaDelta < -Math.PI) thetaDelta += Math.PI * 2;
+
+    // Arthur: NarIyirm
+    // 中文：手动和空闲复位共用同一条球面相机路径，从用户当前视角平滑返回初始全景。
+    // EN: Manual and idle resets share one spherical camera path that returns smoothly from the user's current view to the initial overview.
+    cameraMotionRef.current = {
+      currentOffset: new Vector3(),
+      currentSpherical: new Spherical(),
+      currentTarget: new Vector3(),
+      duration: reduceMotion ? 1 : 760,
+      endSpherical,
+      endTarget,
+      feature: null,
+      hasCuedEffect: true,
+      startSpherical,
+      startedAt: null,
+      startTarget,
+      thetaDelta,
+    };
+    invalidate();
+  }, [activeInteraction, camera, cameraResetRequest, invalidate, reduceMotion]);
+
   useFrame(({ clock }) => {
     const motion = cameraMotionRef.current;
     if (!motion) return;
@@ -592,7 +618,7 @@ function KitchenCameraControls({
     const zoomStart = EFFECT_CUE_PROGRESS * 0.58;
     const zoomProgress = cameraZoomEase(MathUtils.clamp((progress - zoomStart) / (1 - zoomStart), 0, 1));
 
-    if (!motion.hasCuedEffect && progress >= EFFECT_CUE_PROGRESS) {
+    if (motion.feature && !motion.hasCuedEffect && progress >= EFFECT_CUE_PROGRESS) {
       motion.hasCuedEffect = true;
       onEffectCue(motion.feature);
     }
@@ -614,16 +640,20 @@ function KitchenCameraControls({
       return;
     }
 
-    if (!motion.hasCuedEffect) onEffectCue(motion.feature);
+    if (motion.feature && !motion.hasCuedEffect) onEffectCue(motion.feature);
     cameraMotionRef.current = null;
-    onFocusComplete(motion.feature);
+    if (motion.feature) onFocusComplete(motion.feature);
+    else {
+      controlsRef.current?.update();
+      onCameraResetComplete();
+    }
   });
 
   return (
     <OrbitControls
       ref={controlsRef}
       makeDefault
-      enabled={activeInteraction === null}
+      enabled={activeInteraction === null && !isResettingCamera}
       enablePan={false}
       enableDamping={activeInteraction === null}
       dampingFactor={0.12}
@@ -634,12 +664,17 @@ function KitchenCameraControls({
       minAzimuthAngle={-0.95}
       maxAzimuthAngle={0.95}
       target={CAMERA_TARGET}
-      onStart={onExplore}
+      onStart={() => {
+        onExplore?.();
+        onCameraChanged();
+        onCameraActivity();
+      }}
+      onEnd={onCameraActivity}
     />
   );
 }
 
-function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isStoveLit, lighting, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
+function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isResettingCamera, isStoveLit, lighting, onCameraActivity, onCameraChanged, onCameraResetComplete, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, pressedFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
   return (
     <>
       <KitchenTimeEnvironment lighting={lighting} weather={weather} />
@@ -655,12 +690,18 @@ function KitchenScene({ activeInteraction, effectInteraction, expiringCount, inv
           lighting={lighting}
           onReady={onReady}
           onSelectFeature={onSelectFeature}
+          pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
         <KitchenCameraControls
           activeInteraction={activeInteraction}
+          cameraResetRequest={cameraResetRequest}
+          isResettingCamera={isResettingCamera}
+          onCameraActivity={onCameraActivity}
+          onCameraChanged={onCameraChanged}
+          onCameraResetComplete={onCameraResetComplete}
           onEffectCue={onEffectCue}
           onExplore={onExplore}
           onFocusComplete={onFocusComplete}
@@ -677,9 +718,15 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
   const [isRecipeBookOpen, setIsRecipeBookOpen] = useState(false);
+  const [cameraResetRequest, setCameraResetRequest] = useState(0);
+  const [cameraActivityVersion, setCameraActivityVersion] = useState(0);
+  const [isCameraModified, setIsCameraModified] = useState(false);
+  const [isResettingCamera, setIsResettingCamera] = useState(false);
   const [isStoveLit, setIsStoveLit] = useState(false);
+  const [pressedFeature, setPressedFeature] = useState<KitchenFeature | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const interactionRef = useRef<KitchenInteraction>(null);
+  const markerFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -691,16 +738,56 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
     };
   }, []);
 
+  useEffect(() => () => {
+    if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
+  }, []);
+
+  const registerCameraActivity = useCallback(() => {
+    setCameraActivityVersion((version) => version + 1);
+  }, []);
+
+  const handleCameraChanged = useCallback(() => {
+    setIsCameraModified(true);
+  }, []);
+
+  const requestCameraReset = useCallback(() => {
+    if (interactionRef.current || isResettingCamera) return;
+    setIsCameraModified(false);
+    setIsResettingCamera(true);
+    setCameraResetRequest((request) => request + 1);
+  }, [isResettingCamera]);
+
+  const handleCameraResetComplete = useCallback(() => {
+    setIsResettingCamera(false);
+    setIsCameraModified(false);
+  }, []);
+
+  useEffect(() => {
+    if (!isCameraModified || isResettingCamera || activeInteraction) return;
+
+    // Arthur: NarIyirm
+    // 中文：只在用户改变过相机后开始空闲计时，新的拖拽、缩放或点击会重新计时。
+    // EN: Idle timing starts only after the camera changes; any new drag, zoom, or tap restarts the countdown.
+    const timer = setTimeout(requestCameraReset, CAMERA_IDLE_RESET_DELAY);
+    return () => clearTimeout(timer);
+  }, [activeInteraction, cameraActivityVersion, isCameraModified, isResettingCamera, requestCameraReset]);
+
   const handleSelectFeature = useCallback((feature: KitchenFeature) => {
+    registerCameraActivity();
+    if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
+    setPressedFeature(feature);
+
     if (feature === 'stove') {
       onExplore?.();
       setIsStoveLit((isLit) => !isLit);
+      markerFeedbackTimerRef.current = setTimeout(() => setPressedFeature(null), 240);
       return;
     }
 
     if (feature === 'recipes') {
       onExplore?.();
       setIsRecipeBookOpen(true);
+      markerFeedbackTimerRef.current = setTimeout(() => setPressedFeature(null), 240);
       return;
     }
 
@@ -712,7 +799,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
     interactionRef.current = feature;
     onInteractionStart?.();
     setActiveInteraction(feature);
-  }, [onExplore, onInteractionStart]);
+  }, [onExplore, onInteractionStart, registerCameraActivity]);
 
   const handleEffectCue = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current === feature) setEffectInteraction(feature);
@@ -724,7 +811,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   }, [onNavigate]);
 
   return (
-    <View style={styles.container} accessibilityLabel={t.kitchen.accessibility}>
+    <View style={styles.container} accessibilityLabel={t.kitchen.accessibility} onTouchStart={registerCameraActivity}>
       {/* Arthur: NarIyirm
           中文：新 GLB 使用真实米制大小和中心原点，不再通过补偿缩放与偏移猜测画面位置。
           EN: The rebuilt GLB uses real scale and a centered origin, removing guessed scale and position compensation. */}
@@ -735,22 +822,45 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
       >
         <KitchenScene
           activeInteraction={activeInteraction}
+          cameraResetRequest={cameraResetRequest}
           effectInteraction={effectInteraction}
           expiringCount={expiringCount}
           inventoryFillRatio={inventoryFillRatio}
           isRecipeBookOpen={isRecipeBookOpen}
+          isResettingCamera={isResettingCamera}
           isStoveLit={isStoveLit}
           lighting={lighting}
+          onCameraActivity={registerCameraActivity}
+          onCameraChanged={handleCameraChanged}
+          onCameraResetComplete={handleCameraResetComplete}
           onEffectCue={handleEffectCue}
           onExplore={onExplore}
           onFocusComplete={handleFocusComplete}
           onReady={onReady}
           onSelectFeature={handleSelectFeature}
+          pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
       </Canvas>
+      {isCameraModified && !activeInteraction && !isResettingCamera ? (
+        <Pressable
+          accessibilityHint={t.kitchen.resetCameraHint}
+          accessibilityLabel={t.kitchen.resetCamera}
+          accessibilityRole="button"
+          hitSlop={8}
+          onPress={requestCameraReset}
+          pressRetentionOffset={12}
+          style={({ pressed }) => [
+            styles.resetCameraButton,
+            lighting.phase === 'night' ? styles.resetCameraButtonNight : styles.resetCameraButtonDay,
+            pressed && styles.resetCameraButtonPressed,
+          ]}
+        >
+          <Ionicons name="locate-outline" size={23} color={lighting.phase === 'night' ? '#F1F4F5' : '#365048'} />
+        </Pressable>
+      ) : null}
       {isLoading ? (
         // Arthur: NarIyirm
         // 中文：本地 GLB 仍需从安装包解压并由 GPU 解析，这里只显示真实的设备端解析进度。
@@ -772,6 +882,10 @@ function KitchenLoading({ label, backgroundColor }: { label: string; backgroundC
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  resetCameraButton: { position: 'absolute', top: 136, right: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderWidth: 1 },
+  resetCameraButtonDay: { borderColor: 'rgba(255,255,255,0.76)', backgroundColor: 'rgba(241,248,246,0.82)' },
+  resetCameraButtonNight: { borderColor: 'rgba(226,237,247,0.24)', backgroundColor: 'rgba(47,68,87,0.82)' },
+  resetCameraButtonPressed: { opacity: 0.78, transform: [{ scale: 0.97 }] },
   loadingOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', gap: 10 },
   loadingText: { color: '#46645D', fontSize: 13, fontWeight: '600' },
 });

@@ -1,4 +1,4 @@
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -34,7 +34,11 @@ export function FloatingTabBar({ activeTab, onChange, blurTarget }: FloatingTabB
         const selected = tab.key === activeTab;
         const label = t.tabs[tab.key];
         return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => onChange(tab.key)} style={({ pressed }) => [styles.tab, selected && styles.tabSelected, pressed && styles.tabPressed]}>
-          <Ionicons name={tab.icon} size={23} color={selected ? '#D77A1B' : '#506057'} />
+          {tab.key === 'fridge' ? (
+            <MaterialCommunityIcons name="fridge-outline" size={23} color={selected ? '#D77A1B' : '#506057'} />
+          ) : (
+            <Ionicons name={tab.icon} size={23} color={selected ? '#D77A1B' : '#506057'} />
+          )}
           <Text style={[styles.label, selected && styles.labelSelected]}>{label}</Text>
         </Pressable>;
       })}

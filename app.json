@@ -8,9 +8,14 @@
     "icon": "./assets/kitchmemo-icon.png",
     "userInterfaceStyle": "light",
     "ios": {
+      "bundleIdentifier": "com.gressfit5120.kitchmemo",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
       "supportsTablet": true
     },
     "android": {
+      "package": "com.gressfit5120.kitchmemo",
       "predictiveBackGestureEnabled": false
     },
     "web": {
@@ -27,9 +32,10 @@
       [
         "expo-asset",
         {
-          "assets": ["./3DModel/Kitchen-Home-rebuilt-lighting.glb"]
+          "assets": ["./models/Kitchen-Home-rebuilt-lighting.glb"]
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }
