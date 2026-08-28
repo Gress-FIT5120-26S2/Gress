@@ -34,7 +34,8 @@
         {
           "assets": ["./models/Kitchen-Home-rebuilt-lighting.glb"]
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

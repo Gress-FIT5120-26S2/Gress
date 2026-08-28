@@ -13,6 +13,8 @@ import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/ProfileSettings';
 import { I18nProvider, useI18n } from './src/i18n';
+import { getDeviceId } from './src/services/deviceId';
+import { error } from 'three';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -55,6 +57,8 @@ type ConnectionState = 'connecting' | 'connected' | 'disconnected';
 
 function KitchMemoApp() {
   const { t } = useI18n();
+
+  const [deviceId, setDeviceId] = useState<string | null>(null);
   // Arthur: NarIyirm
   // 中文：开场层会等待厨房首帧完成，再淡出并显示可交互框架。
   // EN: The opener waits for the kitchen's first frame before revealing the interactive shell.
@@ -83,6 +87,21 @@ function KitchMemoApp() {
   const kitchenLighting = useKitchenTimeLighting();
   const screen = t.screens[activeTab];
   const status = t.status[connectionState];
+
+  useEffect(() => {
+    let mounted = true;
+    getDeviceId().then(id => {
+      if (mounted) {
+        setDeviceId(id);
+        console.log('Device ID:', id);
+      }
+    }).catch (error => {
+      console.error('Failed to get device ID:', error);
+    });
+    return () => {
+      mounted = false;
+    };
+  }, []);
 
   useEffect(() => {
     // Arthur: NarIyirm

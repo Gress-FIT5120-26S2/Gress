@@ -1,3 +1,4 @@
+import { getDeviceId } from './services/deviceId';
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
 export async function getApiHealth(): Promise<void> {
@@ -8,7 +9,13 @@ export async function getApiHealth(): Promise<void> {
     throw new Error('EXPO_PUBLIC_API_URL is not configured');
   }
 
-  const response = await fetch(`${apiUrl}/api/health`);
+  const deviceId = await getDeviceId();
+
+  const response = await fetch(`${apiUrl}/api/health`, {
+    headers: {
+      'Device-ID': deviceId,
+    },
+  });
   if (!response.ok) {
     throw new Error(`API health check failed: ${response.status}`);
   }
