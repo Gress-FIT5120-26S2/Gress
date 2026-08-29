@@ -1,6 +1,6 @@
-import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
+import { inventoryRouter } from './routes/inventory.js';
 import { supabase } from './supabase.js';
 import cartRouter from './routes/cart.js';
 import restockRouter from './routes/restock.js';
@@ -10,6 +10,7 @@ const port = Number(process.env.PORT ?? 3001);
 
 app.use(cors());
 app.use(express.json());
+app.use('/api', inventoryRouter);
 app.use('/api', cartRouter);
 app.use('/api', restockRouter);
 

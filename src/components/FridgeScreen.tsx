@@ -1,21 +1,28 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useMemo, useState } from 'react';
-import { FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
+import { createInventoryBatch, getInventorySnapshot, type InventorySnapshot } from '../api';
 import { useI18n } from '../i18n';
+import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
+import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
+import { FridgeFilterChip } from './fridge/FridgeFilterChip';
+import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
+import { InventoryEntryFlow, type InventoryEntrySubmission } from './inventory-entry/InventoryEntryFlow';
 
-type FridgeScope = 'personal' | 'household';
-type StorageZone = 'chilled' | 'frozen' | 'pantry';
+type StorageZone = FridgeStorageZone;
 type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
 type FoodCategory = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
-type InventoryItemId = 'milk' | 'tomato' | 'egg' | 'blueberry' | 'rice' | 'peas' | 'soySauce' | 'yogurt' | 'bread';
 
 type InventoryItem = {
-  id: InventoryItemId;
+  id: string;
   category: FoodCategory;
   storage: StorageZone;
   emoji: string;
   daysLeft: number | null;
-  needsRestock?: boolean;
+  isExpired: boolean;
+  amount: string;
+  name: string;
+  needsRestock: boolean;
 };
 
 type FilterOption = {
@@ -46,38 +53,104 @@ const CATEGORY_STYLE: Record<FoodCategory, { tone: string; tint: string }> = {
   other: { tone: '#697784', tint: '#F0F3F5' },
 };
 
-const MY_FRIDGE: InventoryItem[] = [
-  { id: 'milk', category: 'drinks', storage: 'chilled', emoji: '🥛', daysLeft: 4 },
-  { id: 'tomato', category: 'vegetables', storage: 'chilled', emoji: '🍅', daysLeft: 2 },
-  { id: 'egg', category: 'meat', storage: 'chilled', emoji: '🥚', daysLeft: 8 },
-  { id: 'blueberry', category: 'fruit', storage: 'chilled', emoji: '🫐', daysLeft: 1 },
-  { id: 'rice', category: 'staples', storage: 'pantry', emoji: '🍚', daysLeft: null, needsRestock: true },
-  { id: 'peas', category: 'vegetables', storage: 'frozen', emoji: '🫛', daysLeft: 35 },
-  { id: 'soySauce', category: 'condiments', storage: 'pantry', emoji: '🫙', daysLeft: 122, needsRestock: true },
-];
-
-const FAMILY_FRIDGE: InventoryItem[] = [
-  ...MY_FRIDGE,
-  { id: 'yogurt', category: 'drinks', storage: 'chilled', emoji: '🥣', daysLeft: 6 },
-  { id: 'bread', category: 'staples', storage: 'pantry', emoji: '🍞', daysLeft: -1 },
-];
-
 const isStatusMatch = (item: InventoryItem, filter: FridgeFilter | null) => {
   if (!filter) return true;
-  if (filter === 'expired') return item.daysLeft !== null && item.daysLeft < 0;
-  if (filter === 'expiring') return item.daysLeft !== null && item.daysLeft >= 0 && item.daysLeft <= 3;
+  if (filter === 'expired') return item.isExpired;
+  if (filter === 'expiring') return !item.isExpired && item.daysLeft !== null && item.daysLeft <= 3;
   if (filter === 'restock') return Boolean(item.needsRestock);
   return item.storage === filter;
 };
 
-export function FridgeScreen() {
+const inventoryKeyExtractor = (item: InventoryItem) => item.id;
+
+const CATEGORY_EMOJI: Record<FoodCategory, string> = {
+  meat: '🥚',
+  vegetables: '🥬',
+  fruit: '🍎',
+  staples: '🍚',
+  condiments: '🫙',
+  drinks: '🥛',
+  other: '📦',
+};
+
+function isFoodCategory(value: string): value is FoodCategory {
+  return CATEGORIES.includes(value as FoodCategory);
+}
+
+function formatQuantity(value: number) {
+  return Number.isInteger(value) ? String(value) : String(value);
+}
+
+function getDaysLeft(expiresAt: string | null) {
+  if (!expiresAt) return null;
+  const remainingMilliseconds = new Date(expiresAt).getTime() - Date.now();
+  if (Number.isNaN(remainingMilliseconds)) return null;
+  return Math.max(0, Math.ceil(remainingMilliseconds / 86_400_000));
+}
+
+function isExpiredAt(expiresAt: string | null) {
+  if (!expiresAt) return false;
+  const expiryMilliseconds = new Date(expiresAt).getTime();
+  // Arthur: NarIyirm
+  // 中文：过期状态直接比较精确时间戳；剩余“天数”只用于展示，不能决定分钟级的过期边界。
+  // EN: Expiry compares exact timestamps; remaining "days" is display-only and must not decide a minute-level expiry boundary.
+  return !Number.isNaN(expiryMilliseconds) && expiryMilliseconds < Date.now();
+}
+
+// Arthur: NarIyirm
+// 中文：主页面继续集中管理数据、筛选状态和整体布局，只把重复且视觉独立的组件放到 fridge 子目录。
+// EN: The screen keeps data, filter state, and page layout together; only repeated visual components live in the fridge subfolder.
+type FridgeScreenProps = {
+  blurTarget?: RefObject<View | null>;
+};
+
+export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const { t } = useI18n();
-  const [fridgeScope, setFridgeScope] = useState<FridgeScope>('personal');
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(null);
   const [activeCategory, setActiveCategory] = useState<FoodCategory | null>(null);
-  const inventory = fridgeScope === 'personal' ? MY_FRIDGE : FAMILY_FRIDGE;
-  const currentScopeLabel = t.fridge.scopes[fridgeScope];
+  const [isAddSheetVisible, setIsAddSheetVisible] = useState(false);
+  const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
+  const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  const [hasInventoryLoadError, setHasInventoryLoadError] = useState(false);
+
+  const loadInventory = useCallback(async () => {
+    setIsLoadingInventory(true);
+    try {
+      const nextSnapshot = await getInventorySnapshot();
+      setSnapshot(nextSnapshot);
+      setHasInventoryLoadError(false);
+    } catch {
+      setHasInventoryLoadError(true);
+      throw error;
+    } finally {
+      setIsLoadingInventory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：进入冰箱页后用当前设备对应的真实冰箱替换演示数据；失败时保留空状态，不显示过期缓存数据。
+    // EN: Opening the fridge loads the real fridge for this device; failures keep an empty state instead of showing stale mock data.
+    void loadInventory().catch(() => undefined);
+  }, [loadInventory]);
+
+  const inventory = useMemo<InventoryItem[]>(() => (snapshot?.batches ?? []).map((batch) => {
+    const category = isFoodCategory(batch.categoryCode) ? batch.categoryCode : 'other';
+    return {
+      amount: `${formatQuantity(batch.remainingQuantity)} ${t.fridge.manualEntry.units[batch.unit as keyof typeof t.fridge.manualEntry.units] ?? batch.unit}`,
+      category,
+      daysLeft: getDaysLeft(batch.expiresAt),
+      emoji: CATEGORY_EMOJI[category],
+      id: batch.id,
+      isExpired: isExpiredAt(batch.expiresAt),
+      name: batch.name,
+      needsRestock: batch.needsRestock,
+      storage: batch.storageZone,
+    };
+  }), [snapshot, t.fridge.manualEntry.units]);
+  const currentScopeLabel = snapshot?.fridge.name ?? t.fridge.scopes.personal;
 
   // Arthur: NarIyirm
   // 中文：界面语言只改变展示文案，筛选始终使用稳定的内部键，避免切换语言时丢失当前条件。
@@ -85,8 +158,8 @@ export function FridgeScreen() {
   const visibleItems = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLocaleLowerCase();
     return inventory.filter((item) => {
-      const localizedName = t.fridge.items[item.id].name.toLocaleLowerCase();
-      const matchesName = !normalizedQuery || localizedName.includes(normalizedQuery);
+      const localizedName = item.name.toLocaleLowerCase();
+      const matchesName = normalizedQuery.length === 0 || localizedName.includes(normalizedQuery);
       return matchesName && isStatusMatch(item, activeFilter) && (!activeCategory || item.category === activeCategory);
     });
   }, [activeCategory, activeFilter, inventory, searchTerm, t]);
@@ -99,8 +172,8 @@ export function FridgeScreen() {
     () => Object.fromEntries(CATEGORIES.map((category) => [category, inventory.filter((item) => item.category === category).length])) as Record<FoodCategory, number>,
     [inventory],
   );
-  const hasActiveConditions = Boolean(activeFilter || activeCategory || searchTerm.trim());
-  const sectionTitle = searchTerm.trim()
+  const hasActiveConditions = activeFilter !== null || activeCategory !== null || searchTerm.trim().length > 0;
+  const sectionTitle = searchTerm.trim().length > 0
     ? t.fridge.titles.search
     : activeFilter
       ? t.fridge.titleFor(t.fridge.filters[activeFilter])
@@ -108,26 +181,80 @@ export function FridgeScreen() {
         ? t.fridge.titleFor(t.fridge.categories[activeCategory])
         : t.fridge.titles.all;
 
-  const clearFilters = () => {
+  const clearFilters = useCallback(() => {
     setSearchTerm('');
     setActiveFilter(null);
     setActiveCategory(null);
-  };
+  }, []);
+
+  const openAddSheet = useCallback(() => setIsAddSheetVisible(true), []);
+  const closeAddSheet = useCallback(() => setIsAddSheetVisible(false), []);
+  const selectAddMethod = useCallback((method: AddItemMethod) => {
+    // Arthur: NarIyirm
+    // 中文：这个回调只会在选择窗完全卸载后触发，因此不会与手动录入的原生 Modal 重叠。
+    // EN: This callback fires only after the chooser unmounts, preventing overlap with the manual entry native Modal.
+    if (method === 'manual') setIsManualEntryVisible(true);
+  }, []);
+
+  const closeManualEntry = useCallback(() => setIsManualEntryVisible(false), []);
+  const saveInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
+    // Arthur: NarIyirm
+    // 中文：手动录入和未来的识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
+    // EN: Manual and future recognition entry share this submission contract; the server chooses the target fridge from Device-ID.
+    await createInventoryBatch({
+      categoryCode: submission.batch.categoryCode,
+      expiresAt: submission.batch.expiresAt,
+      initialQuantity: submission.batch.initialQuantity,
+      name: submission.batch.name,
+      purchasePrice: submission.batch.purchasePrice,
+      restockRule: submission.restockRule
+        ? {
+          enabled: true,
+          minimumQuantity: submission.restockRule.minimumQuantity,
+          targetQuantity: submission.restockRule.targetQuantity,
+        }
+        : null,
+      storageZone: submission.batch.storageZone,
+      unit: submission.batch.unit,
+    });
+    await loadInventory();
+  }, [loadInventory]);
+
+  const renderInventoryItem = useCallback(({ item }: ListRenderItemInfo<InventoryItem>) => {
+    const categoryStyle = CATEGORY_STYLE[item.category];
+    const freshnessText = item.daysLeft === null
+      ? null
+      : item.isExpired
+        ? t.fridge.freshness.expired
+        : item.daysLeft === 0
+          ? t.fridge.freshness.today
+          : t.fridge.freshness.daysLeft(item.daysLeft);
+
+    return (
+      <FridgeFoodCard
+        amount={item.amount}
+        categoryTint={categoryStyle.tint}
+        categoryTone={categoryStyle.tone}
+        daysLeft={item.daysLeft}
+        emoji={item.emoji}
+        freshnessText={freshnessText}
+        isExpired={item.isExpired}
+        name={item.name}
+        needsRestock={Boolean(item.needsRestock)}
+        storage={item.storage}
+        storageLabel={t.fridge.filters[item.storage]}
+      />
+    );
+  }, [t]);
 
   return (
     <View style={styles.screen}>
       <View style={styles.topArea}>
         <View style={styles.toolbar}>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel={t.fridge.switchA11y(currentScopeLabel)}
-            onPress={() => setFridgeScope((scope) => scope === 'personal' ? 'household' : 'personal')}
-            style={({ pressed }) => [styles.fridgeSwitcher, pressed ? styles.pressed : null]}
-          >
+          <View accessibilityLabel={currentScopeLabel} style={styles.fridgeSwitcher}>
             <MaterialCommunityIcons name="fridge-outline" size={20} color="#496A61" />
             <Text numberOfLines={1} style={styles.fridgeSwitcherText}>{currentScopeLabel}</Text>
-            <Ionicons name="chevron-down" size={16} color="#496A61" />
-          </Pressable>
+          </View>
           <View style={styles.searchField}>
             <Ionicons name="search-outline" size={21} color="#6E817A" />
             <TextInput
@@ -140,7 +267,7 @@ export function FridgeScreen() {
               style={styles.searchInput}
             />
             {searchTerm.length > 0 ? (
-              <Pressable accessibilityLabel={t.fridge.clearSearch} onPress={() => setSearchTerm('')} hitSlop={8}>
+              <Pressable accessibilityLabel={t.fridge.clearSearch} accessibilityRole="button" onPress={() => setSearchTerm('')} hitSlop={8}>
                 <Ionicons name="close-circle" size={18} color="#80918B" />
               </Pressable>
             ) : null}
@@ -148,28 +275,18 @@ export function FridgeScreen() {
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {FILTERS.map((filter) => {
-            const selected = activeFilter === filter.key;
-            return (
-              <Pressable
-                key={filter.key}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}
-                onPress={() => setActiveFilter((current) => current === filter.key ? null : filter.key)}
-                style={({ pressed }) => [
-                  styles.filterChip,
-                  { borderColor: selected ? filter.tone : filter.tint, backgroundColor: selected ? filter.tone : '#FFFFFF' },
-                  pressed ? styles.pressed : null,
-                ]}
-              >
-                <Ionicons name={filter.icon} size={17} color={selected ? '#FFFFFF' : filter.tone} />
-                <Text style={[styles.filterText, { color: selected ? '#FFFFFF' : filter.tone }]}>{t.fridge.filters[filter.key]}</Text>
-                <View style={[styles.countBubble, { backgroundColor: selected ? 'rgba(255,255,255,0.22)' : filter.tint }]}>
-                  <Text style={[styles.countText, { color: selected ? '#FFFFFF' : filter.tone }]}>{filterCounts[filter.key]}</Text>
-                </View>
-              </Pressable>
-            );
-          })}
+          {FILTERS.map((filter) => (
+            <FridgeFilterChip
+              key={filter.key}
+              count={filterCounts[filter.key]}
+              icon={filter.icon}
+              label={t.fridge.filters[filter.key]}
+              onPress={() => setActiveFilter((current) => current === filter.key ? null : filter.key)}
+              selected={activeFilter === filter.key}
+              tint={filter.tint}
+              tone={filter.tone}
+            />
+          ))}
         </ScrollView>
       </View>
 
@@ -177,9 +294,16 @@ export function FridgeScreen() {
         <View style={styles.categoryRail}>
           <Text numberOfLines={1} style={styles.categoryHeading}>{t.fridge.categoryHeading}</Text>
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
-            <CategoryButton count={inventory.length} label={t.fridge.categories.all} onPress={() => setActiveCategory(null)} selected={!activeCategory} tint="#EEEFFD" tone="#6255D9" />
+            <FridgeCategoryButton
+              count={inventory.length}
+              label={t.fridge.categories.all}
+              onPress={() => setActiveCategory(null)}
+              selected={activeCategory === null}
+              tint="#EEEFFD"
+              tone="#6255D9"
+            />
             {CATEGORIES.map((category) => (
-              <CategoryButton
+              <FridgeCategoryButton
                 key={category}
                 count={categoryCounts[category]}
                 label={t.fridge.categories[category]}
@@ -198,75 +322,58 @@ export function FridgeScreen() {
               <Text numberOfLines={1} style={styles.heading}>{sectionTitle}</Text>
               <Text numberOfLines={1} style={styles.subheading}>{t.fridge.itemCount(visibleItems.length, hasActiveConditions)}</Text>
             </View>
-            {hasActiveConditions ? (
-              <Pressable accessibilityRole="button" accessibilityLabel={t.fridge.clearFilters} onPress={clearFilters} style={({ pressed }) => [styles.clearButton, pressed ? styles.pressed : null]}>
-                <Ionicons name="refresh-outline" size={17} color="#C96E1A" />
+            <View style={styles.headingActions}>
+              {hasActiveConditions ? (
+                <Pressable accessibilityRole="button" accessibilityLabel={t.fridge.clearFilters} onPress={clearFilters} style={({ pressed }) => [styles.clearButton, pressed ? styles.pressed : null]}>
+                  <Ionicons name="refresh-outline" size={17} color="#C96E1A" />
+                </Pressable>
+              ) : null}
+              <Pressable
+                accessibilityLabel={t.fridge.addItem.open}
+                accessibilityRole="button"
+                onPress={openAddSheet}
+                style={({ pressed }) => [styles.addButton, pressed ? styles.pressed : null]}
+              >
+                <Ionicons name="add" size={29} color="#FFFFFF" />
               </Pressable>
-            ) : null}
+            </View>
           </View>
 
           <FlatList
             data={visibleItems}
             numColumns={2}
-            keyExtractor={(item) => item.id}
+            keyExtractor={inventoryKeyExtractor}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={false}
             columnWrapperStyle={styles.cardRow}
             contentContainerStyle={visibleItems.length > 0 ? styles.cardGrid : styles.emptyList}
-            renderItem={({ item }) => (
-              <FoodCard
-                amount={t.fridge.items[item.id].amount}
-                freshnessText={item.daysLeft === null ? null : item.daysLeft < 0 ? t.fridge.freshness.expired : item.daysLeft === 0 ? t.fridge.freshness.today : t.fridge.freshness.daysLeft(item.daysLeft)}
-                item={item}
-                name={t.fridge.items[item.id].name}
-                storageLabel={t.fridge.filters[item.storage]}
+            renderItem={renderInventoryItem}
+            ListEmptyComponent={isLoadingInventory ? (
+              <View style={styles.loadingState}><ActivityIndicator color="#168ACB" /></View>
+            ) : (
+              <EmptyInventory
+                buttonLabel={hasInventoryLoadError ? t.fridge.reloadInventory : t.fridge.clearFilters}
+                description={hasInventoryLoadError ? t.status.disconnected : t.fridge.emptyDescription}
+                onClear={hasInventoryLoadError ? () => { void loadInventory().catch(() => undefined); } : clearFilters}
+                title={t.fridge.emptyTitle(sectionTitle)}
               />
             )}
-            ListEmptyComponent={<EmptyInventory description={t.fridge.emptyDescription} onClear={clearFilters} title={t.fridge.emptyTitle(sectionTitle)} buttonLabel={t.fridge.clearFilters} />}
           />
         </View>
       </View>
-    </View>
-  );
-}
-
-type CategoryButtonProps = { count: number; label: string; onPress: () => void; selected: boolean; tint: string; tone: string };
-
-function CategoryButton({ count, label, onPress, selected, tint, tone }: CategoryButtonProps) {
-  return (
-    <Pressable accessibilityRole="button" accessibilityState={{ selected }} onPress={onPress} style={({ pressed }) => [styles.categoryItem, { backgroundColor: selected ? tone : tint }, pressed ? styles.pressed : null]}>
-      <View style={[styles.categoryAccent, { backgroundColor: selected ? '#FFFFFF' : tone }]} />
-      <Text numberOfLines={2} style={[styles.categoryLabel, { color: selected ? '#FFFFFF' : tone }]}>{label}</Text>
-      <Text style={[styles.categoryCount, { color: selected ? '#FFFFFF' : tone }]}>{count}</Text>
-    </Pressable>
-  );
-}
-
-type FoodCardProps = { amount: string; freshnessText: string | null; item: InventoryItem; name: string; storageLabel: string };
-
-function FoodCard({ amount, freshnessText, item, name, storageLabel }: FoodCardProps) {
-  const categoryStyle = CATEGORY_STYLE[item.category];
-  const isExpired = item.daysLeft !== null && item.daysLeft < 0;
-  const isSoon = item.daysLeft !== null && item.daysLeft >= 0 && item.daysLeft <= 3;
-  const freshnessColor = isExpired ? '#C7494C' : isSoon ? '#BE701B' : '#2E9460';
-  const freshnessTint = isExpired ? '#FFF0F1' : isSoon ? '#FFF3E7' : '#EAF8F0';
-  const storageIcon: keyof typeof Ionicons.glyphMap = item.storage === 'frozen' ? 'snow-outline' : item.storage === 'chilled' ? 'water-outline' : 'cube-outline';
-
-  return (
-    <View style={[styles.foodCard, { backgroundColor: categoryStyle.tint, borderColor: `${categoryStyle.tone}20` }]}>
-      <View style={styles.cardTop}>
-        <View style={styles.emojiTile}><Text style={styles.emoji}>{item.emoji}</Text></View>
-        <Text numberOfLines={2} style={styles.foodName}>{name}</Text>
-      </View>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.amount}>{amount}</Text>
-      <View style={styles.cardMeta}>
-        <View style={styles.storageBadge}>
-          <Ionicons name={storageIcon} size={13} color="#287A8B" />
-          <Text numberOfLines={1} style={styles.storageText}>{storageLabel}</Text>
-        </View>
-        {freshnessText ? <View style={[styles.freshnessBadge, { backgroundColor: freshnessTint }]}><Text numberOfLines={1} style={[styles.freshnessText, { color: freshnessColor }]}>{freshnessText}</Text></View> : null}
-      </View>
-      {item.needsRestock ? <View style={styles.restockDot} /> : null}
+      <AddItemMethodSheet
+        copy={t.fridge.addItem}
+        onClose={closeAddSheet}
+        onSelect={selectAddMethod}
+        visible={isAddSheetVisible}
+      />
+      <InventoryEntryFlow
+        blurTarget={blurTarget}
+        onClose={closeManualEntry}
+        onSubmit={saveInventoryEntry}
+        source="manual"
+        visible={isManualEntryVisible}
+      />
     </View>
   );
 }
@@ -277,7 +384,7 @@ function EmptyInventory({ buttonLabel, description, onClear, title }: { buttonLa
       <View style={styles.emptyIcon}><MaterialCommunityIcons name="fridge-outline" size={38} color="#7C9289" /></View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyDescription}>{description}</Text>
-      <Pressable accessibilityRole="button" onPress={onClear} style={({ pressed }) => [styles.emptyButton, pressed ? styles.pressed : null]}>
+      <Pressable accessibilityLabel={buttonLabel} accessibilityRole="button" onPress={onClear} style={({ pressed }) => [styles.emptyButton, pressed ? styles.pressed : null]}>
         <Ionicons name="filter-outline" size={17} color="#C96E1A" />
         <Text style={styles.emptyButtonText}>{buttonLabel}</Text>
       </Pressable>
@@ -294,39 +401,22 @@ const styles = StyleSheet.create({
   searchField: { flex: 1, minWidth: 0, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 0, color: '#203C33', fontSize: 14, fontWeight: '600' },
   filterRow: { gap: 8, paddingTop: 13, paddingHorizontal: 16, paddingRight: 30 },
-  filterChip: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 10, borderWidth: 1, borderRadius: 18, borderCurve: 'continuous' },
-  filterText: { fontSize: 13, fontWeight: '800' },
-  countBubble: { minWidth: 19, height: 19, alignItems: 'center', justifyContent: 'center', borderRadius: 10, borderCurve: 'continuous' },
-  countText: { fontSize: 11, fontWeight: '900' },
   content: { flex: 1, flexDirection: 'row', paddingBottom: 106 },
   categoryRail: { width: 102, flexGrow: 0, flexShrink: 0, paddingTop: 16, backgroundColor: '#FBFDFC' },
   categoryHeading: { paddingHorizontal: 13, color: '#6A7B74', fontSize: 12, fontWeight: '800' },
   categoryList: { gap: 9, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 18 },
-  categoryItem: { position: 'relative', width: 78, minHeight: 72, alignItems: 'flex-start', justifyContent: 'center', gap: 3, overflow: 'hidden', paddingVertical: 10, paddingRight: 7, paddingLeft: 20, borderRadius: 14, borderCurve: 'continuous' },
-  categoryAccent: { position: 'absolute', top: 13, bottom: 13, left: 9, width: 4, borderRadius: 2, borderCurve: 'continuous' },
-  categoryLabel: { width: '100%', fontSize: 12, fontWeight: '800', lineHeight: 15 },
-  categoryCount: { fontSize: 12, fontWeight: '800' },
   inventoryArea: { flex: 1, minWidth: 0, paddingTop: 18, paddingRight: 14, paddingLeft: 8 },
   sectionHeading: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 11 },
   headingCopy: { flex: 1, minWidth: 0, gap: 3 },
   heading: { color: '#173D31', fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
   subheading: { color: '#61766D', fontSize: 12, fontWeight: '600' },
+  headingActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   clearButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFF1E3' },
+  addButton: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderCurve: 'continuous', backgroundColor: '#F58220', boxShadow: '0 7px 16px rgba(245, 130, 32, 0.28)' },
   cardGrid: { gap: 10, paddingBottom: 24 },
   cardRow: { justifyContent: 'space-between', gap: 10 },
-  foodCard: { position: 'relative', width: '48%', minHeight: 145, padding: 11, borderWidth: 1, borderRadius: 15, borderCurve: 'continuous' },
-  cardTop: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8 },
-  emojiTile: { width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.68)' },
-  emoji: { fontSize: 24 },
-  foodName: { flex: 1, minWidth: 0, color: '#183B30', fontSize: 15, fontWeight: '800', lineHeight: 18 },
-  amount: { marginTop: 9, color: '#24483B', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
-  cardMeta: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },
-  storageBadge: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
-  storageText: { maxWidth: 54, color: '#287A8B', fontSize: 10, fontWeight: '800' },
-  freshnessBadge: { minHeight: 24, justifyContent: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, borderCurve: 'continuous' },
-  freshnessText: { fontSize: 10, fontWeight: '800' },
-  restockDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4, borderCurve: 'continuous', backgroundColor: '#1593A9' },
   emptyList: { flexGrow: 1, paddingBottom: 16 },
+  loadingState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center' },
   emptyState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   emptyIcon: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 34, borderCurve: 'continuous', backgroundColor: '#EDF6F2' },
   emptyTitle: { marginTop: 17, color: '#1B3D33', fontSize: 18, fontWeight: '800', textAlign: 'center' },

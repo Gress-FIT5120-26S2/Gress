@@ -1,3 +1,4 @@
+import './env.js';
 import { createClient } from '@supabase/supabase-js';
 
 const url = process.env.SUPABASE_URL;

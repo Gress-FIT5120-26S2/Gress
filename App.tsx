@@ -276,7 +276,7 @@ function KitchMemoApp() {
           ) : activeTab === 'home' && !isOpening ? (
             <KitchenLoading />
           ) : activeTab === 'fridge' ? (
-            <FridgeScreen />
+            <FridgeScreen blurTarget={blurTargetRef} />
           ) : activeTab === 'shopping' ? (       
             <ShoppingScreen />                    
           ) : activeTab !== 'home' ? (
