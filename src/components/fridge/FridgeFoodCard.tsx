@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 export type FridgeStorageZone = 'chilled' | 'frozen' | 'pantry';
 
@@ -14,6 +14,7 @@ type FridgeFoodCardProps = {
   isExpired: boolean;
   name: string;
   needsRestock: boolean;
+  onPress: () => void;
   storage: FridgeStorageZone;
   storageLabel: string;
 };
@@ -31,6 +32,7 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
   isExpired,
   name,
   needsRestock,
+  onPress,
   storage,
   storageLabel,
 }: FridgeFoodCardProps) {
@@ -44,7 +46,12 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
       : 'cube-outline';
 
   return (
-    <View style={[styles.card, { backgroundColor: categoryTint, borderColor: `${categoryTone}20` }]}>
+    <Pressable
+      accessibilityLabel={name}
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.card, { backgroundColor: categoryTint, borderColor: `${categoryTone}20` }, pressed && styles.pressed]}
+    >
       <View style={styles.top}>
         <View style={styles.emojiTile}><Text style={styles.emoji}>{emoji}</Text></View>
         <Text numberOfLines={2} style={styles.name}>{name}</Text>
@@ -62,7 +69,7 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
         ) : null}
       </View>
       {needsRestock ? <View style={styles.restockDot} /> : null}
-    </View>
+    </Pressable>
   );
 });
 
@@ -79,4 +86,5 @@ const styles = StyleSheet.create({
   freshnessBadge: { minHeight: 24, justifyContent: 'center', paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, borderCurve: 'continuous' },
   freshnessText: { fontSize: 10, fontWeight: '800' },
   restockDot: { position: 'absolute', top: 9, right: 9, width: 7, height: 7, borderRadius: 4, borderCurve: 'continuous', backgroundColor: '#1593A9' },
+  pressed: { opacity: 0.78, transform: [{ scale: 0.985 }] },
 });

@@ -1,13 +1,27 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
-import { createInventoryBatch, getInventorySnapshot, type InventorySnapshot } from '../api';
+import {
+  createInventoryBatch,
+  getInventoryBatchDetail,
+  getInventorySnapshot,
+  setInventoryRestockRule,
+  updateInventoryBatch,
+  type InventoryBatchDetail,
+  type InventorySnapshot,
+} from '../services/inventoryApi';
 import { useI18n } from '../i18n';
 import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
 import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
-import { InventoryEntryFlow, type InventoryEntrySubmission } from './inventory-entry/InventoryEntryFlow';
+import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
+import {
+  InventoryEntryFlow,
+  type InventoryEntryInitialValues,
+  type InventoryEntrySubmission,
+  type InventoryUnit,
+} from './inventory-entry/InventoryEntryFlow';
 
 type StorageZone = FridgeStorageZone;
 type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
@@ -81,6 +95,14 @@ function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
+function formatEntryDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatEntryTime(date: Date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 function getDaysLeft(expiresAt: string | null) {
   if (!expiresAt) return null;
   const remainingMilliseconds = new Date(expiresAt).getTime() - Date.now();
@@ -111,6 +133,8 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const [activeCategory, setActiveCategory] = useState<FoodCategory | null>(null);
   const [isAddSheetVisible, setIsAddSheetVisible] = useState(false);
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
+  const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
+  const [editingBatch, setEditingBatch] = useState<InventoryBatchDetail | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [hasInventoryLoadError, setHasInventoryLoadError] = useState(false);
@@ -121,7 +145,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       const nextSnapshot = await getInventorySnapshot();
       setSnapshot(nextSnapshot);
       setHasInventoryLoadError(false);
-    } catch {
+    } catch (error) {
       setHasInventoryLoadError(true);
       throw error;
     } finally {
@@ -193,10 +217,16 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     // Arthur: NarIyirm
     // 中文：这个回调只会在选择窗完全卸载后触发，因此不会与手动录入的原生 Modal 重叠。
     // EN: This callback fires only after the chooser unmounts, preventing overlap with the manual entry native Modal.
-    if (method === 'manual') setIsManualEntryVisible(true);
+    if (method === 'manual') {
+      setEditingBatch(null);
+      setIsManualEntryVisible(true);
+    }
   }, []);
 
-  const closeManualEntry = useCallback(() => setIsManualEntryVisible(false), []);
+  const closeManualEntry = useCallback(() => {
+    setIsManualEntryVisible(false);
+    setEditingBatch(null);
+  }, []);
   const saveInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
     // Arthur: NarIyirm
     // 中文：手动录入和未来的识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
@@ -220,6 +250,58 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     await loadInventory();
   }, [loadInventory]);
 
+  const openBatchEditor = useCallback(async (batchUid: string) => {
+    // Arthur: NarIyirm
+    // 中文：详情窗关闭后重新获取最新版本再编辑，避免共享冰箱中用旧 version 覆盖其他设备刚完成的修改。
+    // EN: Reload the latest version after closing the detail sheet so editing cannot overwrite a change just made by another shared-fridge device.
+    try {
+      const result = await getInventoryBatchDetail(batchUid);
+      setEditingBatch(result.batch);
+      setIsManualEntryVisible(true);
+    } catch {
+      setSelectedBatchUid(batchUid);
+    }
+  }, []);
+
+  const saveEditedInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
+    if (!editingBatch) return;
+    await updateInventoryBatch(editingBatch.id, {
+      categoryCode: submission.batch.categoryCode,
+      expectedVersion: editingBatch.version,
+      expiresAt: submission.batch.expiresAt,
+      name: submission.batch.name,
+      purchasePrice: submission.batch.purchasePrice,
+      remainingQuantity: submission.batch.remainingQuantity,
+      storageZone: submission.batch.storageZone,
+      unit: submission.batch.unit,
+    });
+    await setInventoryRestockRule(editingBatch.id, submission.restockRule ? {
+      enabled: true,
+      minimumQuantity: submission.restockRule.minimumQuantity,
+      targetQuantity: submission.restockRule.targetQuantity,
+    } : null);
+    await loadInventory();
+  }, [editingBatch, loadInventory]);
+
+  const editInitialValues = useMemo<InventoryEntryInitialValues | undefined>(() => {
+    if (!editingBatch) return undefined;
+    const expiry = editingBatch.expiresAt ? new Date(editingBatch.expiresAt) : null;
+    return {
+      categoryCode: editingBatch.categoryCode,
+      expiryDate: expiry ? formatEntryDate(expiry) : undefined,
+      expiryEnabled: Boolean(expiry),
+      expiryTime: expiry ? formatEntryTime(expiry) : undefined,
+      name: editingBatch.name,
+      price: editingBatch.purchasePrice === null ? '' : String(editingBatch.purchasePrice),
+      quantity: formatQuantity(editingBatch.remainingQuantity),
+      restockEnabled: Boolean(editingBatch.restockRule?.enabled),
+      restockMinimumQuantity: editingBatch.restockRule?.minimumQuantity,
+      restockTargetQuantity: editingBatch.restockRule?.targetQuantity,
+      storageZone: editingBatch.storageZone,
+      unit: editingBatch.unit as InventoryUnit,
+    };
+  }, [editingBatch]);
+
   const renderInventoryItem = useCallback(({ item }: ListRenderItemInfo<InventoryItem>) => {
     const categoryStyle = CATEGORY_STYLE[item.category];
     const freshnessText = item.daysLeft === null
@@ -241,6 +323,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
         isExpired={item.isExpired}
         name={item.name}
         needsRestock={Boolean(item.needsRestock)}
+        onPress={() => setSelectedBatchUid(item.id)}
         storage={item.storage}
         storageLabel={t.fridge.filters[item.storage]}
       />
@@ -369,10 +452,20 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       />
       <InventoryEntryFlow
         blurTarget={blurTarget}
+        initialValues={editInitialValues}
+        mode={editingBatch ? 'edit' : 'create'}
         onClose={closeManualEntry}
-        onSubmit={saveInventoryEntry}
+        onSubmit={editingBatch ? saveEditedInventoryEntry : saveInventoryEntry}
         source="manual"
         visible={isManualEntryVisible}
+      />
+      <InventoryItemDetailSheet
+        batchUid={selectedBatchUid}
+        blurTarget={blurTarget}
+        onChanged={loadInventory}
+        onClose={() => setSelectedBatchUid(null)}
+        onEdit={(batchUid) => { setSelectedBatchUid(null); void openBatchEditor(batchUid); }}
+        visible={selectedBatchUid !== null}
       />
     </View>
   );
