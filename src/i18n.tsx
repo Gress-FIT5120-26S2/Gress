@@ -78,6 +78,16 @@ const zh = {
       shared: { title: '共享厨房有新变化', detail: '一件商品刚刚被标记为已购买' },
     },
   },
+  shopping: {
+    restockTab: '建议购物',
+    cartTab: '购物车',
+    addToCart: '加入购物车',
+    add: '添加',
+    placeholder: '添加物品…',
+    restockEmpty: '暂时没有需要补货的东西',
+    cartEmpty: '购物车是空的',
+    remaining: (current: number, minimum: number, unit: string) => `剩 ${current}/${minimum} ${unit}`,
+  },
   kitchen: {
     accessibility: '可旋转的三维厨房；冰箱、购物车和信箱可进入页面，灶台和菜谱可在原地互动',
     resetCamera: '恢复厨房视角',
@@ -181,6 +191,16 @@ const en: Translation = {
       shopping: { title: '3 items are waiting on your list', detail: 'Milk, eggs, and oats are running low' },
       shared: { title: 'Something changed in your shared kitchen', detail: 'One item was just marked as purchased' },
     },
+  },
+    shopping: {
+    restockTab: 'Suggested',
+    cartTab: 'Cart',
+    addToCart: 'Add to cart',
+    add: 'Add',
+    placeholder: 'Add an item…',
+    restockEmpty: 'Nothing to restock right now',
+    cartEmpty: 'Your cart is empty',
+    remaining: (current: number, minimum: number, unit: string) => `${current}/${minimum} ${unit} left`,
   },
   kitchen: {
     accessibility: 'Rotatable 3D kitchen. Fridge, cart, and mailbox open pages; stove and recipe book interact in place.',

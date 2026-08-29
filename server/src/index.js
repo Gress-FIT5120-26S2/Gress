@@ -2,12 +2,16 @@ import 'dotenv/config';
 import cors from 'cors';
 import express from 'express';
 import { supabase } from './supabase.js';
+import cartRouter from './routes/cart.js';
+import restockRouter from './routes/restock.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
 app.use(cors());
 app.use(express.json());
+app.use('/api', cartRouter);
+app.use('/api', restockRouter);
 
 app.get('/api/health', async (_request, response) => {
   // Arthur: NarIyirm
