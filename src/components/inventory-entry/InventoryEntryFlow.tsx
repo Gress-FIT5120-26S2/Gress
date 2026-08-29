@@ -15,7 +15,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { getFoodPresetSuggestion } from '../../api';
+import { getFoodPresetSuggestion } from '../../services/inventoryApi';
 import { useI18n } from '../../i18n';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
@@ -27,6 +27,7 @@ export type InventoryUnit = 'item' | 'g' | 'kg' | 'ml' | 'L' | 'bag' | 'bottle' 
 
 export type InventoryEntryInitialValues = Partial<{
   categoryCode: InventoryCategoryCode;
+  expiryEnabled: boolean;
   expiryDate: string;
   expiryTime: string;
   name: string;
@@ -34,6 +35,9 @@ export type InventoryEntryInitialValues = Partial<{
   quantity: string;
   storageZone: InventoryStorageZone;
   unit: InventoryUnit;
+  restockEnabled: boolean;
+  restockMinimumQuantity: number;
+  restockTargetQuantity: number;
 }>;
 
 export type InventoryEntrySubmission = {
@@ -63,6 +67,7 @@ export type InventoryEntrySubmission = {
 type InventoryEntryFlowProps = {
   blurTarget?: RefObject<View | null>;
   initialValues?: InventoryEntryInitialValues;
+  mode?: 'create' | 'edit';
   onClose: () => void;
   onSubmit: (submission: InventoryEntrySubmission) => void | Promise<void>;
   source?: InventoryEntrySource;
@@ -99,6 +104,7 @@ function parseLocalDateTime(date: string, time: string) {
 export function InventoryEntryFlow({
   blurTarget,
   initialValues,
+  mode = 'create',
   onClose,
   onSubmit,
   source = 'manual',
@@ -138,8 +144,8 @@ export function InventoryEntryFlow({
     const defaultExpiry = addDays(now, 7);
 
     // Arthur: NarIyirm
-    // 中文：每次打开都创建新批次草稿；识别录入以后可以通过 initialValues 复用同一套确认页面。
-    // EN: Each opening creates a fresh batch draft; recognition can later reuse this confirmation UI through initialValues.
+    // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和未来的识别录入因此可以复用同一套表单。
+    // EN: Each opening initialises its draft from initialValues so create, edit, and future recognition flows can share one form.
     setName(initialValues?.name ?? '');
     setQuantity(initialValues?.quantity ?? '');
     setUnit(initialValues?.unit ?? 'item');
@@ -150,13 +156,13 @@ export function InventoryEntryFlow({
     setSuggestionApplied(false);
     setSuggestionLoading(false);
     setSuggestionLookupFinished(false);
-    setExpiryEnabled(true);
+    setExpiryEnabled(initialValues?.expiryEnabled ?? true);
     setExpiryDate(initialValues?.expiryDate ?? formatDate(defaultExpiry));
     setExpiryTime(initialValues?.expiryTime ?? formatTime(now));
     setWarningDays(3);
-    setRestockEnabled(false);
-    setMinimumQuantity(1);
-    setTargetQuantity(2);
+    setRestockEnabled(initialValues?.restockEnabled ?? false);
+    setMinimumQuantity(initialValues?.restockMinimumQuantity ?? 1);
+    setTargetQuantity(initialValues?.restockTargetQuantity ?? 2);
     setNameError(null);
     setQuantityError(null);
     setPriceError(null);
@@ -350,7 +356,7 @@ export function InventoryEntryFlow({
               <Text style={styles.headerButtonText}>{copy.cancel}</Text>
             </Pressable>
             <View pointerEvents="none" style={styles.headerTitleWrap}>
-              <Text numberOfLines={1} style={styles.headerTitle}>{copy.title}</Text>
+              <Text numberOfLines={1} style={styles.headerTitle}>{mode === 'edit' ? copy.editTitle : copy.title}</Text>
             </View>
             <View style={styles.headerSpacer} />
           </View>
@@ -477,7 +483,7 @@ export function InventoryEntryFlow({
               onPress={handleSubmit}
               style={({ pressed }) => [styles.primaryButton, isSaving ? styles.disabledButton : null, pressed ? styles.pressed : null]}
             >
-              <Text style={styles.primaryButtonText}>{isSaving ? copy.saving : copy.save}</Text>
+              <Text style={styles.primaryButtonText}>{isSaving ? copy.saving : mode === 'edit' ? copy.saveChanges : copy.save}</Text>
               <Ionicons name="checkmark-circle" size={19} color="#FFFFFF" />
             </Pressable>
             {saveError ? <Text style={styles.footerError}>{saveError}</Text> : null}

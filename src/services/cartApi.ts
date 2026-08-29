@@ -1,14 +1,4 @@
-// src/services/cartApi.ts
-// Client for both sides of the shopping screen:
-//   - the editable cart  (shopping_cart_items)
-//   - the derived restock suggestions (get_restock_suggestions)
-// Uses the SAME base URL and device header convention as src/api.ts, so the
-// whole app points at one backend and the server reads one header name.
-import { getDeviceId } from './deviceId';
-
-// Same source as api.ts. On a real device this must be your machine's LAN IP
-// (e.g. http://192.168.x.x:3000), set in the app's env as EXPO_PUBLIC_API_URL.
-const apiUrl = process.env.EXPO_PUBLIC_API_URL;
+import { requestApi } from './apiClient';
 
 export type CartItem = {
   item_uid: string;
@@ -33,25 +23,10 @@ export type RestockSuggestion = {
   preset_uid: string | null;
 };
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
-  const deviceId = await getDeviceId();
-  // NOTE: header name matches api.ts ('Device-ID'). The server routers must
-  // read this same header when resolving fridge membership.
-  const res = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers: {
-      'Content-Type': 'application/json',
-      'Device-ID': deviceId,
-      ...(init.headers ?? {}),
-    },
-  });
-  if (!res.ok) throw new Error(`API ${res.status}`);
-  return res.status === 204 ? (undefined as T) : res.json();
-}
-
-// --- editable cart ---
-export const fetchCart = () => request<CartItem[]>('/api/cart');
+// Arthur: NarIyirm
+// 中文：购物车和库存统一通过 requestApi 进入 Express，因此测试/生产地址、Device-ID 和错误处理只维护一份。
+// EN: Cart and inventory share requestApi so environment routing, Device-ID, and error handling have one source of truth.
+export const fetchCart = () => requestApi<CartItem[]>('/api/cart');
 
 export const addCartItem = (body: {
   name: string;
@@ -60,21 +35,22 @@ export const addCartItem = (body: {
   category_uid?: string;
   preset_uid?: string;
   source?: CartItem['source'];
-}) => request<CartItem>('/api/cart', { method: 'POST', body: JSON.stringify(body) });
+}) => requestApi<CartItem>('/api/cart', { method: 'POST', body: JSON.stringify(body) });
 
 export const toggleCartItem = (id: string, is_checked: boolean) =>
-  request<CartItem>(`/api/cart/${id}/toggle`, {
+  requestApi<CartItem>(`/api/cart/${id}/toggle`, {
     method: 'PATCH',
     body: JSON.stringify({ is_checked }),
   });
 
 export const deleteCartItem = (id: string) =>
-  request<void>(`/api/cart/${id}`, { method: 'DELETE' });
+  requestApi<void>(`/api/cart/${id}`, { method: 'DELETE' });
 
-// --- derived restock suggestions ---
 export const fetchRestock = async (): Promise<RestockSuggestion[]> => {
-  const rows = await request<RestockSuggestion[]>('/api/restock');
-  // numeric columns can arrive as strings from Postgres; coerce for arithmetic
+  const rows = await requestApi<RestockSuggestion[]>('/api/restock');
+  // Arthur: NarIyirm
+  // 中文：Postgres numeric 字段可能以字符串返回，在服务边界统一转换，避免页面计算时出现字符串拼接。
+  // EN: PostgreSQL numeric fields may arrive as strings, so coerce them at the service boundary before UI arithmetic.
   return rows.map((r) => ({
     ...r,
     current_quantity: Number(r.current_quantity),

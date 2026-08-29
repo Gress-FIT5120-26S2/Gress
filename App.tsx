@@ -3,7 +3,7 @@ import { Asset } from 'expo-asset';
 import { BlurTargetView } from 'expo-blur';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
-import { getApiHealth } from './src/api';
+import { getApiHealth } from './src/services/apiClient';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
