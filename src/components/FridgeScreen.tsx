@@ -252,7 +252,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     setIsManualEntryVisible(true);
   }, []);
 
-  const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult) => {
+  const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult, photoUri: string) => {
     if (result.food === 'unknown' || result.freshness === 'unknown') return;
     const foodName = t.fridge.photoRecognition.foodNames[result.food];
     const { suggestion } = await getFoodPresetSuggestion(result.food);
@@ -276,6 +276,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       food: result.food,
       freshness: result.freshness,
       initialValues,
+      photoUri,
       storageZone: suggestion.storageZone,
       unit: 'item',
     });

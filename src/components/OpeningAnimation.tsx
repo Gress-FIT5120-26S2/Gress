@@ -1,4 +1,6 @@
-import { useEffect, useRef } from 'react';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useEffect, useRef, type ComponentProps } from 'react';
 import { AccessibilityInfo, Animated, Easing, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../i18n';
 
@@ -7,146 +9,229 @@ type OpeningAnimationProps = {
   onSequenceComplete: () => void;
   onFinish: () => void;
 };
+
+type OrbitItem = {
+  name: ComponentProps<typeof MaterialCommunityIcons>['name'];
+};
+
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-
-// Arthur: NarIyirm
-// 中文：每项食材携带位置与错峰时间，统一驱动“冰箱库存进入购物判断”的效果。
-// EN: Each ingredient carries its position and delay to drive the fridge-stock-to-shopping sequence.
-const ingredients = [
-  { emoji: '🥬', top: 126, left: 40, delay: 0, y: 28 },
-  { emoji: '🍅', top: 206, left: 102, delay: 55, y: -18 },
-  { emoji: '🍋', top: 290, left: 43, delay: 110, y: -2 },
+const LAUNCH_START_DELAY = 380;
+const LAUNCH_STAGGER = 560;
+const LAUNCH_DURATION = 1400;
+const ORBIT_DURATION = 7600;
+const ORBIT_SAMPLE_COUNT = 32;
+const ORBIT_ITEMS: OrbitItem[] = [
+  { name: 'silverware-fork-knife' },
+  { name: 'pot-steam-outline' },
+  { name: 'food-apple-outline' },
+  { name: 'leaf' },
+  { name: 'carrot' },
+  { name: 'chef-hat' },
+  { name: 'bread-slice-outline' },
 ];
+// Arthur: NarIyirm
+// 中文：所有食材共享同一个连续轨道时钟和等角度基准，落轨后天然保持固定间距。
+// EN: Every ingredient shares one continuous orbit clock and equal-angle baseline, so spacing stays fixed after joining.
+const ORBIT_BASE_ANGLES = ORBIT_ITEMS.map((_, index) => (index / ORBIT_ITEMS.length) * Math.PI * 2 - Math.PI / 2);
 
-type IngredientProps = (typeof ingredients)[number] & { progress: Animated.Value };
-
-function Ingredient({ emoji, top, left, y, progress }: IngredientProps) {
-  const opacity = progress.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 1, 0] });
-  const translateX = progress.interpolate({ inputRange: [0, 1, 2], outputRange: [0, 0, 104] });
-  const translateY = progress.interpolate({ inputRange: [0, 1, 2], outputRange: [14, 0, y] });
-  const scale = progress.interpolate({ inputRange: [0, 1, 2], outputRange: [0.92, 1, 0.86] });
+function OrbitIcon({ item, index, launchPhase, orbitPhase }: { item: OrbitItem; index: number; launchPhase: Animated.Value; orbitPhase: Animated.Value }) {
+  const launchProgress = launchPhase;
+  const launchOpacity = launchProgress.interpolate({ inputRange: [0, 0.12, 1], outputRange: [0, 1, 1] });
+  const launchScale = launchProgress.interpolate({ inputRange: [0, 0.74, 1], outputRange: [0.78, 1.16, 1] });
+  const orbitStartAngle = ORBIT_BASE_ANGLES[index];
+  const targetPosition = { x: Math.cos(orbitStartAngle) * 94, y: Math.sin(orbitStartAngle) * 94 };
+  const tangentBend = { x: -targetPosition.y * 0.24, y: targetPosition.x * 0.24 };
+  const curvedMidpoint = { x: targetPosition.x * 0.55 + tangentBend.x, y: targetPosition.y * 0.55 + tangentBend.y };
+  // Arthur: NarIyirm
+  // 中文：用更密的圆周采样代替八边形轨迹，避免图标经过折点时产生上下跳动感。
+  // EN: Densely sample the circle instead of tracing an octagon, preventing vertical jolts at segment corners.
+  const orbitPhaseInput = Array.from({ length: ORBIT_SAMPLE_COUNT + 1 }, (_, step) => step / ORBIT_SAMPLE_COUNT);
+  const orbitXOutput = orbitPhaseInput.map((step) => Math.cos(orbitStartAngle + step * Math.PI * 2) * 94);
+  const orbitYOutput = orbitPhaseInput.map((step) => Math.sin(orbitStartAngle + step * Math.PI * 2) * 94);
+  const orbitX = orbitPhase.interpolate({ inputRange: orbitPhaseInput, outputRange: orbitXOutput });
+  const orbitY = orbitPhase.interpolate({ inputRange: orbitPhaseInput, outputRange: orbitYOutput });
+  const launchX = launchProgress.interpolate({ inputRange: [0, 0.48, 1], outputRange: [0, curvedMidpoint.x, targetPosition.x] });
+  const launchY = launchProgress.interpolate({ inputRange: [0, 0.48, 1], outputRange: [0, curvedMidpoint.y, targetPosition.y] });
+  // 中文：喷射完成前保留弯曲路径，完成后无缝切换到同一轨道的圆周坐标。
+  // EN: Keep the curved launch path until settling, then hand off seamlessly to the shared circular track.
+  const positionX = Animated.add(launchX, Animated.multiply(Animated.subtract(orbitX, targetPosition.x), launchProgress));
+  const positionY = Animated.add(launchY, Animated.multiply(Animated.subtract(orbitY, targetPosition.y), launchProgress));
 
   return (
-    <Animated.View style={[styles.ingredient, { top, left, opacity, transform: [{ translateX }, { translateY }, { scale }] }]}>
-      <Text style={styles.ingredientEmoji}>{emoji}</Text>
+    <Animated.View
+      style={[
+        styles.orbitItem,
+        {
+          opacity: launchOpacity,
+          transform: [
+            { translateX: positionX },
+            { translateY: positionY },
+            { scale: launchScale },
+          ],
+        },
+      ]}
+    >
+      <MaterialCommunityIcons color="rgba(255, 246, 225, 0.77)" name={item.name} size={25} />
+    </Animated.View>
+  );
+}
+
+function LoadingDot({ index, phase, reveal }: { index: number; phase: Animated.Value; reveal: Animated.AnimatedInterpolation<number> }) {
+  const dotOffset = Animated.modulo(Animated.add(phase, index / 3), 1);
+  const dotOpacity = dotOffset.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.38, 1, 0.38] });
+  const dotScale = dotOffset.interpolate({ inputRange: [0, 0.5, 1], outputRange: [0.72, 1.28, 0.72] });
+  const dotTranslateY = dotOffset.interpolate({ inputRange: [0, 0.5, 1], outputRange: [1, -4, 1] });
+
+  return <Animated.View style={[styles.dot, { opacity: Animated.multiply(reveal, dotOpacity), transform: [{ translateY: dotTranslateY }, { scale: dotScale }] }]} />;
+}
+
+function LoadingDots({ progress, phase }: { progress: Animated.Value; phase: Animated.Value }) {
+  const reveal = progress.interpolate({ inputRange: [1560, 1840], outputRange: [0, 1], extrapolate: 'clamp' });
+
+  return (
+    <Animated.View
+      accessibilityLabel="Loading"
+      style={[
+        styles.loadingDots,
+        {
+          opacity: reveal,
+          transform: [{ translateY: progress.interpolate({ inputRange: [1560, 1840], outputRange: [6, 0], extrapolate: 'clamp' }) }],
+        },
+      ]}
+    >
+      <LoadingDot index={0} phase={phase} reveal={reveal} />
+      <LoadingDot index={1} phase={phase} reveal={reveal} />
+      <LoadingDot index={2} phase={phase} reveal={reveal} />
     </Animated.View>
   );
 }
 
 export function OpeningAnimation({ canReveal, onSequenceComplete, onFinish }: OpeningAnimationProps) {
   const { t } = useI18n();
-  const door = useRef(new Animated.Value(0)).current;
-  const recipe = useRef(new Animated.Value(0)).current;
-  const wordmark = useRef(new Animated.Value(0)).current;
-  const overlay = useRef(new Animated.Value(1)).current;
-  const ingredientProgress = useRef(ingredients.map(() => new Animated.Value(0))).current;
+  const progress = useRef(new Animated.Value(0)).current;
+  const overlayOpacity = useRef(new Animated.Value(1)).current;
+  const launchPhases = useRef(ORBIT_ITEMS.map(() => new Animated.Value(0))).current;
+  const orbitPhase = useRef(new Animated.Value(0)).current;
+  const loadingPhase = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     let cancelled = false;
-    let finishTimer: ReturnType<typeof setTimeout> | undefined;
+    let completionTimer: ReturnType<typeof setTimeout> | undefined;
 
     const start = async () => {
       const reducedMotion = await AccessibilityInfo.isReduceMotionEnabled();
       if (cancelled) return;
 
+      // Arthur: NarIyirm
+      // 中文：这是一次性的启动过场，没有手势；使用原生驱动仅传递透明度和变换，可避开 Expo Go 的 Worklets 启动错误。
+      // EN: This is a one-off, non-gesture opener; native-driven opacity and transforms avoid Expo Go Worklets startup failures.
       if (reducedMotion) {
-        door.setValue(1);
-        recipe.setValue(1);
-        wordmark.setValue(1);
-        ingredientProgress.forEach((value) => value.setValue(1));
-        finishTimer = setTimeout(onSequenceComplete, 160);
+        progress.setValue(1900);
+        launchPhases.forEach((phase) => phase.setValue(1));
+        completionTimer = setTimeout(onSequenceComplete, 180);
         return;
       }
 
+      Animated.timing(progress, { toValue: 1900, duration: 1900, easing: EASE_OUT, useNativeDriver: true }).start();
       // Arthur: NarIyirm
-      // 中文：只把位移、缩放和透明度交给 React Native 原生驱动，避开会导致 Expo Go 闪退的 Worklets 初始化。
-      // EN: Send only translation, scale, and opacity to the React Native native driver, bypassing the Worklets initialization that crashes Expo Go.
-      const ingredientAnimations = ingredientProgress.map((value, index) => Animated.sequence([
-        Animated.delay(ingredients[index].delay + 280),
-        Animated.timing(value, { toValue: 1, duration: 360, easing: EASE_OUT, useNativeDriver: true }),
-        Animated.delay(430),
-        Animated.timing(value, { toValue: 2, duration: 360, easing: EASE_OUT, useNativeDriver: true }),
-      ]));
-
-      Animated.parallel([
-        Animated.timing(door, { toValue: 1, delay: 660, duration: 520, easing: EASE_OUT, useNativeDriver: true }),
-        Animated.timing(recipe, { toValue: 1, delay: 980, duration: 440, easing: EASE_OUT, useNativeDriver: true }),
-        Animated.timing(wordmark, { toValue: 1, delay: 1350, duration: 320, easing: EASE_OUT, useNativeDriver: true }),
-        ...ingredientAnimations,
+      // 中文：食材独立发射；第一个落轨时启动唯一的主轨道时钟，后续食材在飞行中追踪正在移动的等间隔落点。
+      // EN: Ingredients launch independently; the first landing starts one master clock, and later launches track moving, equally spaced destinations.
+      launchPhases.forEach((launchPhase, index) => {
+        const launchDelay = LAUNCH_START_DELAY + index * LAUNCH_STAGGER;
+        Animated.sequence([
+          Animated.delay(launchDelay),
+          Animated.timing(launchPhase, { toValue: 1, duration: LAUNCH_DURATION, easing: EASE_OUT, useNativeDriver: true }),
+        ]).start();
+      });
+      Animated.sequence([
+        Animated.delay(LAUNCH_START_DELAY + LAUNCH_DURATION),
+        Animated.loop(Animated.timing(orbitPhase, { toValue: 1, duration: ORBIT_DURATION, easing: Easing.linear, useNativeDriver: true })),
       ]).start();
-
-      // Arthur: NarIyirm
-      // 中文：主体动画完成后停在最终画面，通知 App 可以安全创建 3D 画布。
-      // EN: Hold the completed scene and tell the app it can safely create the 3D canvas.
-      finishTimer = setTimeout(onSequenceComplete, 1780);
+      Animated.sequence([
+        Animated.delay(1520),
+        Animated.loop(Animated.timing(loadingPhase, { toValue: 1, duration: 1050, easing: Easing.inOut(Easing.ease), useNativeDriver: true })),
+      ]).start();
+      completionTimer = setTimeout(onSequenceComplete, LAUNCH_START_DELAY + (ORBIT_ITEMS.length - 1) * LAUNCH_STAGGER + LAUNCH_DURATION + 120);
     };
 
-    start();
+    void start();
     return () => {
       cancelled = true;
-      door.stopAnimation();
-      recipe.stopAnimation();
-      wordmark.stopAnimation();
-      ingredientProgress.forEach((value) => value.stopAnimation());
-      if (finishTimer) clearTimeout(finishTimer);
+      progress.stopAnimation();
+      launchPhases.forEach((phase) => phase.stopAnimation());
+      orbitPhase.stopAnimation();
+      loadingPhase.stopAnimation();
+      if (completionTimer) clearTimeout(completionTimer);
     };
-  }, [door, ingredientProgress, onSequenceComplete, recipe, wordmark]);
+  }, [launchPhases, loadingPhase, onSequenceComplete, orbitPhase, progress]);
 
   useEffect(() => {
     if (!canReveal) return;
 
-    let isMounted = true;
     // Arthur: NarIyirm
-    // 中文：只有厨房完成首次绘制后才淡出开场层，用户进入首页时直接看到完整模型。
-    // EN: Fade the opener only after the kitchen presents its first frame so the completed model is immediately visible.
-    Animated.timing(overlay, { toValue: 0, duration: 240, easing: EASE_OUT, useNativeDriver: true }).start(({ finished }) => {
-      if (finished && isMounted) onFinish();
+    // 中文：厨房首帧就绪后才淡出橙色启动层，确保用户不会看到 3D 画布的加载空白。
+    // EN: Fade the orange opener only after the kitchen's first frame is ready, avoiding a blank 3D canvas.
+    AccessibilityInfo.isReduceMotionEnabled().then((reducedMotion) => {
+      Animated.timing(overlayOpacity, { toValue: 0, duration: reducedMotion ? 140 : 280, easing: EASE_OUT, useNativeDriver: true }).start(({ finished }) => {
+        if (finished) onFinish();
+      });
     });
 
-    return () => {
-      isMounted = false;
-      overlay.stopAnimation();
-    };
-  }, [canReveal, onFinish, overlay]);
+    return () => overlayOpacity.stopAnimation();
+  }, [canReveal, onFinish, overlayOpacity]);
 
-  const doorTranslateX = door.interpolate({ inputRange: [0, 1], outputRange: [0, -124] });
-  const recipeTranslateY = recipe.interpolate({ inputRange: [0, 1], outputRange: [24, 0] });
-  const recipeScale = recipe.interpolate({ inputRange: [0, 1], outputRange: [0.94, 1] });
-  const wordmarkTranslateY = wordmark.interpolate({ inputRange: [0, 1], outputRange: [8, 0] });
+  const emblemStyle = {
+    opacity: progress.interpolate({ inputRange: [220, 620], outputRange: [0, 1], extrapolate: 'clamp' }),
+    transform: [
+      { translateY: progress.interpolate({ inputRange: [220, 620], outputRange: [14, 0], extrapolate: 'clamp' }) },
+      { scale: progress.interpolate({ inputRange: [220, 620], outputRange: [0.93, 1], extrapolate: 'clamp' }) },
+    ],
+  };
+  const haloStyle = {
+    opacity: progress.interpolate({ inputRange: [240, 700], outputRange: [0, 0.27], extrapolate: 'clamp' }),
+    transform: [{ scale: progress.interpolate({ inputRange: [240, 700], outputRange: [0.78, 1.16], extrapolate: 'clamp' }) }],
+  };
+  const wordmarkStyle = {
+    opacity: progress.interpolate({ inputRange: [1060, 1420], outputRange: [0, 1], extrapolate: 'clamp' }),
+    transform: [{ translateY: progress.interpolate({ inputRange: [1060, 1420], outputRange: [12, 0], extrapolate: 'clamp' }) }],
+  };
 
   return (
-    <Animated.View style={[styles.overlay, { opacity: overlay }]} pointerEvents="auto">
-      <View style={styles.ambientGlow} />
-      <View style={styles.scene}>
-        <View style={styles.fridgeShell}>
-          <Animated.View style={[styles.door, { transform: [{ translateX: doorTranslateX }] }]}>
-            <View style={styles.doorInset} />
-            <View style={styles.doorHandle} />
+    <Animated.View pointerEvents="auto" style={[styles.overlay, { opacity: overlayOpacity }]}>
+      <LinearGradient colors={['#FFA832', '#FF7559']} end={{ x: 0.92, y: 1 }} start={{ x: 0.08, y: 0 }} style={StyleSheet.absoluteFill} />
+      <View accessible accessibilityLabel={`KitchMemo. ${t.opening.tagline}`} style={styles.content}>
+        <View style={styles.orbit}>
+          {ORBIT_ITEMS.map((item, index) => <OrbitIcon index={index} item={item} key={item.name} launchPhase={launchPhases[index]} orbitPhase={orbitPhase} />)}
+          <Animated.View style={[styles.halo, haloStyle]} />
+          <Animated.View style={[styles.emblem, emblemStyle]}>
+            <View style={styles.emblemInset}>
+              <MaterialCommunityIcons color="#FF8B35" name="fridge-outline" size={48} />
+              <View style={styles.emblemCheck}><MaterialCommunityIcons color="#FFFFFF" name="check" size={13} /></View>
+            </View>
           </Animated.View>
-          <View style={styles.fridgeInterior}>
-            <View style={styles.shelf} />
-            <View style={[styles.shelf, styles.secondShelf]} />
-            {ingredients.map((ingredient, index) => <Ingredient key={ingredient.emoji} {...ingredient} progress={ingredientProgress[index]} />)}
-          </View>
         </View>
-        <Animated.View style={[styles.recipeCard, { opacity: recipe, transform: [{ translateY: recipeTranslateY }, { scale: recipeScale }] }]}>
-          <View style={styles.recipeAccent} />
-          <Text style={styles.recipeEyebrow}>{t.opening.eyebrow}</Text>
-          <Text style={styles.recipeTitle}>{t.opening.title}</Text>
-          <View style={styles.recipeDetails}><Text style={styles.recipeDetail}>{t.opening.lowStock(3)}</Text><View style={styles.dot} /><Text style={styles.recipeDetail}>{t.opening.liveInventory}</Text></View>
-          <View style={styles.sparkle}><Text style={styles.sparkleText}>✓</Text></View>
+        <Animated.View style={[styles.wordmark, wordmarkStyle]}>
+          <Text style={styles.brand}>KitchMemo</Text>
+          <Text style={styles.tagline}>{t.opening.tagline}</Text>
         </Animated.View>
+        <LoadingDots phase={loadingPhase} progress={progress} />
       </View>
-      <Animated.View style={[styles.wordmark, { opacity: wordmark, transform: [{ translateY: wordmarkTranslateY }] }]}>
-        <Text style={styles.brand}>KitchMemo</Text><Text style={styles.tagline}>{t.opening.tagline}</Text>
-      </Animated.View>
     </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F7FBF8' }, ambientGlow: { position: 'absolute', top: -100, width: 360, height: 360, borderRadius: 180, backgroundColor: '#D9F0E5', opacity: 0.85 }, scene: { width: 330, height: 405, justifyContent: 'center' },
-  fridgeShell: { position: 'absolute', left: 8, top: 12, width: 190, height: 380, borderRadius: 28, backgroundColor: '#BBDCE4', shadowColor: '#1C5262', shadowOpacity: 0.16, shadowRadius: 28, shadowOffset: { width: 0, height: 14 }, elevation: 8 }, fridgeInterior: { flex: 1, overflow: 'hidden', borderRadius: 28, backgroundColor: '#E9F8F6' }, shelf: { position: 'absolute', left: 18, right: 18, top: 192, height: 5, borderRadius: 8, backgroundColor: '#B9D9D7' }, secondShelf: { top: 277 },
-  door: { ...StyleSheet.absoluteFill, zIndex: 3, padding: 13, borderRadius: 28, backgroundColor: '#78BCCD' }, doorInset: { flex: 1, borderRadius: 18, backgroundColor: '#A7D9E3', opacity: 0.78 }, doorHandle: { position: 'absolute', right: 14, top: 122, width: 8, height: 108, borderRadius: 8, backgroundColor: '#E7F5F6' }, ingredient: { position: 'absolute', width: 57, height: 57, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFFFFF', shadowColor: '#285B62', shadowOpacity: 0.12, shadowRadius: 8, shadowOffset: { width: 0, height: 5 }, elevation: 3 }, ingredientEmoji: { fontSize: 31 },
-  recipeCard: { position: 'absolute', right: 0, top: 122, width: 192, minHeight: 192, overflow: 'hidden', padding: 21, borderRadius: 24, backgroundColor: '#FFFFFF', shadowColor: '#29453C', shadowOpacity: 0.15, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 6 }, recipeAccent: { position: 'absolute', top: 0, left: 0, right: 0, height: 7, backgroundColor: '#F6B55C' }, recipeEyebrow: { marginTop: 5, color: '#6B8278', fontSize: 10, fontWeight: '700', letterSpacing: 1.1 }, recipeTitle: { marginTop: 9, color: '#173E34', fontSize: 24, fontWeight: '700', lineHeight: 27, letterSpacing: -0.6 }, recipeDetails: { flexDirection: 'row', alignItems: 'center', marginTop: 16 }, recipeDetail: { color: '#6B8278', fontSize: 10, fontWeight: '600' }, dot: { width: 3, height: 3, marginHorizontal: 7, borderRadius: 2, backgroundColor: '#92A69D' }, sparkle: { position: 'absolute', right: 16, top: 18, width: 26, height: 26, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#FFF1D8' }, sparkleText: { color: '#D78227', fontSize: 16 }, wordmark: { position: 'absolute', bottom: 68, alignItems: 'center' }, brand: { color: '#173E34', fontSize: 28, fontWeight: '700', letterSpacing: -1 }, tagline: { marginTop: 5, color: '#6B8278', fontSize: 12, fontWeight: '600', letterSpacing: 0.5 },
+  overlay: { ...StyleSheet.absoluteFill, alignItems: 'center', justifyContent: 'center' },
+  content: { alignItems: 'center', justifyContent: 'center', width: '100%', height: '100%' },
+  orbit: { width: 280, height: 250, alignItems: 'center', justifyContent: 'center' },
+  halo: { position: 'absolute', width: 122, height: 122, borderRadius: 61, backgroundColor: '#FFE8BA' },
+  emblem: { zIndex: 2, width: 94, height: 94, borderRadius: 47, padding: 5, backgroundColor: 'rgba(255, 255, 255, 0.34)' },
+  emblemInset: { flex: 1, alignItems: 'center', justifyContent: 'center', borderRadius: 42, backgroundColor: '#FFFFFF' },
+  emblemCheck: { position: 'absolute', right: 13, bottom: 14, width: 19, height: 19, alignItems: 'center', justifyContent: 'center', borderRadius: 10, backgroundColor: '#FFAA32' },
+  orbitItem: { position: 'absolute', left: 127, top: 112 },
+  wordmark: { alignItems: 'center', marginTop: 7 },
+  brand: { color: '#FFFFFF', fontSize: 34, fontWeight: '800', letterSpacing: -1.1 },
+  tagline: { marginTop: 7, color: 'rgba(255, 249, 236, 0.88)', fontSize: 13, fontWeight: '600', letterSpacing: 0.2 },
+  loadingDots: { position: 'absolute', bottom: 82, flexDirection: 'row', gap: 8 },
+  dot: { width: 6, height: 6, borderRadius: 3, backgroundColor: 'rgba(255, 255, 255, 0.94)' },
 });

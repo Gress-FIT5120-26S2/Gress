@@ -15,8 +15,8 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
 
   const deviceId = await getDeviceId();
   // Arthur: NarIyirm
-  // 中文：上传照片时让 fetch 自动设置 multipart boundary；其余有请求体的调用仍使用 JSON，并统一转换网络连接错误。
-  // EN: Let fetch set the multipart boundary for photo uploads while JSON remains the default for other bodies and network failures are normalized.
+  // 中文：上传照片时让 fetch 自动设置 multipart boundary；其余请求体仍使用 JSON，可恢复错误交给页面展示而不是触发红色开发错误屏。
+  // EN: Let fetch set multipart boundaries for photo uploads, keep JSON for other bodies, and leave recoverable errors to the screen instead of a red dev overlay.
   const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   let response: Response;
   try {
@@ -30,7 +30,7 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'network error';
-    console.error(`API unreachable at ${apiUrl}${path}: ${detail}`);
+    if (__DEV__) console.warn(`API request did not reach ${apiUrl}${path}: ${detail}`);
     throw new Error(`Cannot reach ${apiUrl}. Check that Express is running and Windows Firewall allows TCP ${new URL(apiUrl).port || '80'}.`);
   }
   const body = await response.json().catch(() => null) as T | ApiError | null;
@@ -38,7 +38,7 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!response.ok) {
     const apiError = body as ApiError | null;
     const message = apiError?.message ?? apiError?.error ?? `API request failed: ${response.status}`;
-    console.error(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
+    if (__DEV__) console.warn(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
     throw new Error(message);
   }
 
