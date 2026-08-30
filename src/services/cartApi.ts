@@ -1,3 +1,6 @@
+// src/services/cartApi.ts
+// Cart + restock endpoints. Reuses the shared requestApi client (Device-ID,
+// base URL, error handling) so every service module goes through one place.
 import { requestApi } from './apiClient';
 
 export type CartItem = {
@@ -23,9 +26,7 @@ export type RestockSuggestion = {
   preset_uid: string | null;
 };
 
-// Arthur: NarIyirm
-// 中文：购物车和库存统一通过 requestApi 进入 Express，因此测试/生产地址、Device-ID 和错误处理只维护一份。
-// EN: Cart and inventory share requestApi so environment routing, Device-ID, and error handling have one source of truth.
+// --- editable cart ---
 export const fetchCart = () => requestApi<CartItem[]>('/api/cart');
 
 export const addCartItem = (body: {
@@ -37,6 +38,12 @@ export const addCartItem = (body: {
   source?: CartItem['source'];
 }) => requestApi<CartItem>('/api/cart', { method: 'POST', body: JSON.stringify(body) });
 
+export const updateCartQuantity = (id: string, quantity: number) =>
+  requestApi<CartItem>(`/api/cart/${id}/quantity`, {
+    method: 'PATCH',
+    body: JSON.stringify({ quantity }),
+  });
+
 export const toggleCartItem = (id: string, is_checked: boolean) =>
   requestApi<CartItem>(`/api/cart/${id}/toggle`, {
     method: 'PATCH',
@@ -46,12 +53,11 @@ export const toggleCartItem = (id: string, is_checked: boolean) =>
 export const deleteCartItem = (id: string) =>
   requestApi<void>(`/api/cart/${id}`, { method: 'DELETE' });
 
+// --- derived restock suggestions ---
 export const fetchRestock = async (): Promise<RestockSuggestion[]> => {
   const rows = await requestApi<RestockSuggestion[]>('/api/restock');
-  // Arthur: NarIyirm
-  // 中文：Postgres numeric 字段可能以字符串返回，在服务边界统一转换，避免页面计算时出现字符串拼接。
-  // EN: PostgreSQL numeric fields may arrive as strings, so coerce them at the service boundary before UI arithmetic.
-  return rows.map((r) => ({
+  // numeric columns can arrive as strings from Postgres; coerce for arithmetic
+  return rows.map((r: RestockSuggestion) => ({
     ...r,
     current_quantity: Number(r.current_quantity),
     minimum_quantity: Number(r.minimum_quantity),
