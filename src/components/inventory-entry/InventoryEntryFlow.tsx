@@ -321,8 +321,10 @@ export function InventoryEntryFlow({
     try {
       await onSubmit(submission);
       onClose();
-    } catch {
-      setSaveError(copy.validation.save);
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : copy.validation.save;
+      console.error('Inventory save failed:', detail);
+      setSaveError(detail);
     } finally {
       setIsSaving(false);
     }

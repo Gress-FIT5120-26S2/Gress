@@ -188,11 +188,26 @@ const zh = {
   notifications: {
     unreadSummary: (count: number) => `${count} 条未读提醒`,
     allRead: '所有提醒都已读',
-    older: (count: number) => `另有 ${count} 条较早提醒`,
-    items: {
-      freshness: { title: '草莓还有 2 天到期', detail: '今晚使用，口感会更好' },
-      shopping: { title: '购物清单有 3 项待购买', detail: '牛奶、鸡蛋和燕麦库存偏低' },
-      shared: { title: '共享厨房有新变化', detail: '一件商品刚刚被标记为已购买' },
+    empty: '暂时没有提醒',
+    loadError: '暂时无法加载提醒',
+    markRead: '标为已读',
+    messages: {
+      expiring: {
+        title: (name: string, days: number) => (days <= 0 ? `${name} 今天到期` : `${name} 还有 ${days} 天到期`),
+        detail: '今晚使用，口感会更好',
+      },
+      expired: {
+        title: (name: string) => `${name} 已经过期`,
+        detail: '从冰箱里拿出来，避免误食',
+      },
+      restock: {
+        title: (name: string) => `${name} 库存偏低`,
+        detail: (current: number, minimum: number, unit: string) => `只剩 ${current}/${minimum} ${unit}，建议补货`,
+      },
+      system: {
+        title: () => '厨房有一条新提醒',
+        detail: () => '打开看看发生了什么',
+      },
     },
   },
   shopping: {
@@ -419,11 +434,26 @@ const en: Translation = {
   notifications: {
     unreadSummary: (count: number) => `${count} unread reminders`,
     allRead: 'You are all caught up',
-    older: (count: number) => `${count} earlier reminders`,
-    items: {
-      freshness: { title: 'Strawberries expire in 2 days', detail: 'Use them tonight for the best flavour' },
-      shopping: { title: '3 items are waiting on your list', detail: 'Milk, eggs, and oats are running low' },
-      shared: { title: 'Something changed in your shared kitchen', detail: 'One item was just marked as purchased' },
+    empty: 'No reminders right now',
+    loadError: 'Reminders could not be loaded',
+    markRead: 'Mark as read',
+    messages: {
+      expiring: {
+        title: (name: string, days: number) => (days <= 0 ? `${name} is due today` : `${name} expires in ${days} days`),
+        detail: 'Use it tonight for the best flavour',
+      },
+      expired: {
+        title: (name: string) => `${name} has expired`,
+        detail: 'Take it out of the fridge so it is not eaten by mistake',
+      },
+      restock: {
+        title: (name: string) => `${name} is running low`,
+        detail: (current: number, minimum: number, unit: string) => `${current}/${minimum} ${unit} left; consider restocking`,
+      },
+      system: {
+        title: () => 'There is a new kitchen reminder',
+        detail: () => 'Open it to see what changed',
+      },
     },
   },
     shopping: {
