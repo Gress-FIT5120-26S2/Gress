@@ -1,6 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
-import { BlurView } from 'expo-blur';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import {
   AccessibilityInfo,
@@ -12,6 +11,7 @@ import {
   Platform,
   Pressable,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Switch,
   Text,
@@ -66,21 +66,29 @@ function formatQuantity(value: number) {
 
 export function InventoryItemDetailSheet({
   batchUid,
-  blurTarget,
   onChanged,
   onClose,
   onEdit,
   visible,
 }: InventoryItemDetailSheetProps) {
-  const { height } = useWindowDimensions();
+  const { height, width } = useWindowDimensions();
   const { language, t } = useI18n();
   const copy = t.fridge.itemDetail;
-  const sheetHeight = Math.max(560, height - (Platform.OS === 'ios' ? 18 : 12));
-  const collapsedOffset = Math.max(180, sheetHeight - height * 0.58);
-  const dismissedOffset = sheetHeight + 40;
+  const expandedTopInset = Platform.OS === 'ios' ? 58 : Math.max(StatusBar.currentHeight ?? 24, 24) + 10;
+  const sheetBottomInset = Platform.OS === 'ios' ? 12 : 10;
+  const footerHeight = Platform.OS === 'ios' ? 103 : 88;
+  const sheetHeight = Math.max(440, height - expandedTopInset - sheetBottomInset);
+  // Arthur: NarIyirm
+  // 中文：半屏停靠点保留约 63% 的可视高度，让库存卡和固定操作栏在打开时完整可用，同时仍露出背景库存页。
+  // EN: The preview detent keeps about 63% visible so the stock card and fixed actions are usable on open while the inventory page remains visible behind it.
+  const previewVisibleHeight = Math.min(sheetHeight - 48, Math.max(430, height * 0.63));
+  const previewOffset = Math.max(150, sheetHeight - previewVisibleHeight);
+  const previewScaleX = Math.max(0.9, (width - 24) / width);
+  const dismissedOffset = sheetHeight + sheetBottomInset + 40;
   const translateY = useRef(new Animated.Value(dismissedOffset)).current;
-  const dragStart = useRef(collapsedOffset);
+  const dragStart = useRef(previewOffset);
   const currentTranslate = useRef(dismissedOffset);
+  const hasAutoExpandedAtContentEnd = useRef(false);
   const afterCloseRef = useRef<(() => void) | null>(null);
   const [reducedMotion, setReducedMotion] = useState(false);
   const [batch, setBatch] = useState<InventoryBatchDetail | null>(null);
@@ -109,13 +117,6 @@ export function InventoryItemDetailSheet({
       subscription.remove();
     };
   }, []);
-
-  useEffect(() => {
-    const listener = translateY.addListener(({ value }) => {
-      currentTranslate.current = value;
-    });
-    return () => translateY.removeListener(listener);
-  }, [translateY]);
 
   const applyLoadedBatch = useCallback((nextBatch: InventoryBatchDetail) => {
     setBatch(nextBatch);
@@ -147,23 +148,27 @@ export function InventoryItemDetailSheet({
     setRemoveError(null);
     setShowRemoveConfirm(false);
     setIsClosing(false);
+    hasAutoExpandedAtContentEnd.current = false;
     afterCloseRef.current = null;
     translateY.stopAnimation();
-    translateY.setValue(reducedMotion ? collapsedOffset : dismissedOffset);
+    currentTranslate.current = reducedMotion ? previewOffset : dismissedOffset;
+    translateY.setValue(currentTranslate.current);
     const frame = requestAnimationFrame(() => {
       // Arthur: NarIyirm
       // 中文：该弹窗所有动画与拖拽都固定使用同一个 JS 驱动 Animated.Value，避免在 Expo Go 中把节点先交给 native 后又从 JS 修改而崩溃。
       // EN: Every animation and drag in this sheet uses one JS-driven Animated.Value, avoiding Expo Go crashes caused by moving a node to native and later mutating it from JS.
       Animated.timing(translateY, {
-        toValue: collapsedOffset,
-        duration: reducedMotion ? 80 : 280,
+        toValue: previewOffset,
+        duration: reducedMotion ? 80 : 300,
         easing: EASE_SHEET,
         useNativeDriver: false,
-      }).start();
+      }).start(({ finished }) => {
+        if (finished) currentTranslate.current = previewOffset;
+      });
     });
     void loadBatch();
     return () => cancelAnimationFrame(frame);
-  }, [batchUid, collapsedOffset, dismissedOffset, loadBatch, reducedMotion, translateY, visible]);
+  }, [batchUid, dismissedOffset, loadBatch, previewOffset, reducedMotion, translateY, visible]);
 
   const finishClose = useCallback(() => {
     const afterClose = afterCloseRef.current;
@@ -172,24 +177,80 @@ export function InventoryItemDetailSheet({
     afterClose?.();
   }, [onClose]);
 
-  const animateClosed = useCallback(() => {
-    Animated.timing(translateY, {
-      toValue: dismissedOffset,
-      duration: reducedMotion ? 80 : 220,
-      easing: EASE_SHEET,
+  const animateToDetent = useCallback((destination: number, velocity = 0) => {
+    translateY.stopAnimation();
+    if (destination !== 0) hasAutoExpandedAtContentEnd.current = false;
+    if (reducedMotion) {
+      Animated.timing(translateY, {
+        toValue: destination,
+        duration: 80,
+        easing: EASE_SHEET,
+        useNativeDriver: false,
+      }).start(({ finished }) => {
+        if (finished) {
+          currentTranslate.current = destination;
+        }
+      });
+      return;
+    }
+
+    Animated.spring(translateY, {
+      toValue: destination,
+      stiffness: destination === 0 ? 300 : 320,
+      damping: destination === 0 ? 31 : 33,
+      mass: 0.78,
+      velocity,
+      restDisplacementThreshold: 0.5,
+      restSpeedThreshold: 0.5,
       useNativeDriver: false,
     }).start(({ finished }) => {
-      if (finished) finishClose();
+      if (finished) {
+        currentTranslate.current = destination;
+      }
     });
-  }, [dismissedOffset, finishClose, reducedMotion, translateY]);
+  }, [reducedMotion, translateY]);
 
-  const requestClose = useCallback(async (afterClose?: () => void) => {
+  const animateClosed = useCallback((velocity = 0) => new Promise<void>((resolve) => {
+    translateY.stopAnimation();
+    const finishAnimation = () => {
+      currentTranslate.current = dismissedOffset;
+      resolve();
+    };
+
+    if (reducedMotion) {
+      Animated.timing(translateY, {
+        toValue: dismissedOffset,
+        duration: 80,
+        easing: EASE_SHEET,
+        useNativeDriver: false,
+      }).start(finishAnimation);
+      return;
+    }
+
+    Animated.spring(translateY, {
+      toValue: dismissedOffset,
+      stiffness: 340,
+      damping: 36,
+      mass: 0.75,
+      velocity: Math.max(0, velocity),
+      overshootClamping: true,
+      restDisplacementThreshold: 0.5,
+      restSpeedThreshold: 0.5,
+      useNativeDriver: false,
+    }).start(finishAnimation);
+  }), [dismissedOffset, reducedMotion, translateY]);
+
+  const requestClose = useCallback(async (afterClose?: () => void, releaseVelocity = 0) => {
     if (isClosing) return;
     setIsClosing(true);
     setQuantityError(null);
     afterCloseRef.current = afterClose ?? null;
 
     try {
+      // Arthur: NarIyirm
+      // 中文：关闭动画立即跟随手指离场，同时并行保存数量；两者都完成后才卸载弹窗，避免网络延迟让拖拽在松手处停住。
+      // EN: The sheet leaves with the finger while quantity persistence runs in parallel; it unmounts only after both finish so network latency never freezes the release point.
+      const closingAnimation = animateClosed(releaseVelocity);
       if (batch && draftQuantity !== batch.remainingQuantity) {
         // Arthur: NarIyirm
         // 中文：拖动期间只更新本地草稿；关闭前一次性提交并携带版本号，避免每一帧都请求后端或覆盖共享成员的新修改。
@@ -203,70 +264,84 @@ export function InventoryItemDetailSheet({
         } : current);
         await onChanged();
       }
-      animateClosed();
+      await closingAnimation;
+      finishClose();
     } catch {
       afterCloseRef.current = null;
       setQuantityError(copy.quantitySaveError);
       setIsClosing(false);
-      Animated.spring(translateY, {
-        toValue: collapsedOffset,
-        damping: 22,
-        stiffness: 210,
-        useNativeDriver: false,
-      }).start();
+      animateToDetent(previewOffset);
     }
-  }, [animateClosed, batch, collapsedOffset, copy.quantitySaveError, draftQuantity, isClosing, onChanged, translateY]);
+  }, [animateClosed, animateToDetent, batch, copy.quantitySaveError, draftQuantity, finishClose, isClosing, onChanged, previewOffset]);
 
   const panResponder = useMemo(() => PanResponder.create({
-    onStartShouldSetPanResponder: () => false,
-    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dy) > 8 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
-    onPanResponderGrant: () => {
-      translateY.stopAnimation((value) => {
-        dragStart.current = value;
-        currentTranslate.current = value;
-      });
-    },
-    onPanResponderMove: (_event, gesture) => {
-      const next = dragStart.current + gesture.dy;
-      translateY.setValue(next < 0 ? rubberband(next, sheetHeight) : next);
-    },
-    onPanResponderRelease: (_event, gesture) => {
-      const projected = currentTranslate.current + gesture.vy * 220;
-      if (projected > collapsedOffset + sheetHeight * 0.16) {
-        Animated.spring(translateY, {
-          toValue: collapsedOffset,
-          damping: 22,
-          stiffness: 210,
-          velocity: gesture.vy,
-          useNativeDriver: false,
-        }).start();
-        void requestClose();
-        return;
-      }
+      // Arthur: NarIyirm
+      // 中文：手指在横条落下时立即由抽屉接管，避免首次移动前被系统或相邻控件截走。
+      // EN: The sheet claims the touch as it lands on the grabber, preventing the first movement from being intercepted by the system or nearby controls.
+      onStartShouldSetPanResponder: () => !isClosing,
+      onMoveShouldSetPanResponder: (_event, gesture) => !isClosing && Math.abs(gesture.dy) > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onMoveShouldSetPanResponderCapture: (_event, gesture) => !isClosing && Math.abs(gesture.dy) > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
+      onPanResponderTerminationRequest: () => false,
+      onPanResponderGrant: () => {
+        translateY.stopAnimation((value) => {
+          dragStart.current = value;
+          currentTranslate.current = value;
+        });
+      },
+      onPanResponderMove: (_event, gesture) => {
+        const next = dragStart.current + gesture.dy;
+        const resisted = next < 0
+          ? rubberband(next, sheetHeight)
+          : next > dismissedOffset
+            ? dismissedOffset + rubberband(next - dismissedOffset, sheetHeight)
+            : next;
+        currentTranslate.current = resisted;
+        translateY.setValue(resisted);
+      },
+      onPanResponderRelease: (_event, gesture) => {
+        // Arthur: NarIyirm
+        // 中文：用松手速度预测去向而不只看拖动距离；短促下甩也能关闭，轻拖则吸附到最近的预览或全屏停靠点。
+        // EN: Release velocity projects the intended destination instead of relying on distance alone; a short flick can dismiss while a gentle drag settles at the nearest preview or expanded detent.
+        const projected = currentTranslate.current + gesture.vy * 210;
+        const closeDistance = Math.max(84, sheetHeight * 0.09);
+        const hasDismissIntent = projected > previewOffset + closeDistance
+          || (gesture.vy > 1.18 && currentTranslate.current > previewOffset * 0.45);
 
-      const destination = projected < collapsedOffset * 0.55 ? 0 : collapsedOffset;
-      Animated.spring(translateY, {
-        toValue: destination,
-        damping: 22,
-        stiffness: 210,
-        velocity: gesture.vy,
-        overshootClamping: destination === 0,
-        useNativeDriver: false,
-      }).start();
-    },
-    onPanResponderTerminate: () => {
-      Animated.spring(translateY, {
-        toValue: collapsedOffset,
-        damping: 22,
-        stiffness: 210,
-        useNativeDriver: false,
-      }).start();
-    },
-  }), [collapsedOffset, requestClose, sheetHeight, translateY]);
+        if (hasDismissIntent) {
+          void requestClose(undefined, gesture.vy);
+          return;
+        }
+
+        const destination = projected < previewOffset * 0.52 || gesture.vy < -0.82 ? 0 : previewOffset;
+        animateToDetent(destination, gesture.vy);
+      },
+      onPanResponderTerminate: () => {
+        const destination = currentTranslate.current < previewOffset * 0.52 ? 0 : previewOffset;
+        animateToDetent(destination);
+      },
+    }), [animateToDetent, dismissedOffset, isClosing, previewOffset, requestClose, sheetHeight, translateY]);
 
   const backdropOpacity = translateY.interpolate({
-    inputRange: [0, dismissedOffset],
+    inputRange: [0, previewOffset, dismissedOffset],
+    outputRange: [1, 0.92, 0],
+    extrapolate: 'clamp',
+  });
+  const sheetOpacity = translateY.interpolate({
+    inputRange: [dismissedOffset - 140, dismissedOffset],
     outputRange: [1, 0],
+    extrapolate: 'clamp',
+  });
+  const sheetScaleX = translateY.interpolate({
+    inputRange: [0, previewOffset, dismissedOffset],
+    outputRange: [1, previewScaleX, previewScaleX],
+    extrapolate: 'clamp',
+  });
+  // Arthur: NarIyirm
+  // 中文：同一个抽屉容器通过可视高度切换停靠点，因此内容和底部操作栏始终一起出现、移动和裁切。
+  // EN: One sheet container changes its visible height between detents, so content and bottom actions always appear, move, and clip together.
+  const visibleSheetHeight = translateY.interpolate({
+    inputRange: [0, previewOffset, dismissedOffset],
+    outputRange: [sheetHeight, previewVisibleHeight, 0],
     extrapolate: 'clamp',
   });
 
@@ -324,13 +399,14 @@ export function InventoryItemDetailSheet({
       await archiveInventoryBatch(batch.id, batch.version);
       await onChanged();
       setShowRemoveConfirm(false);
-      animateClosed();
+      await animateClosed();
+      finishClose();
     } catch {
       setRemoveError(copy.removeError);
     } finally {
       setIsRemoving(false);
     }
-  }, [animateClosed, batch, copy.removeError, isRemoving, onChanged]);
+  }, [animateClosed, batch, copy.removeError, finishClose, isRemoving, onChanged]);
 
   const openEditor = useCallback(() => {
     if (!batch) return;
@@ -371,29 +447,27 @@ export function InventoryItemDetailSheet({
       visible={visible}
     >
       <View style={styles.modalRoot}>
-        <BlurView
-          blurMethod="dimezisBlurViewSdk31Plus"
-          blurTarget={blurTarget}
-          intensity={Platform.OS === 'ios' ? 42 : 24}
-          pointerEvents="none"
-          style={StyleSheet.absoluteFill}
-          tint="systemUltraThinMaterialLight"
-        />
         <Animated.View pointerEvents="none" style={[styles.backdropTint, { opacity: backdropOpacity }]} />
         <Pressable accessibilityLabel={copy.close} accessibilityRole="button" onPress={() => void requestClose()} style={StyleSheet.absoluteFill} />
 
-        <Animated.View style={[styles.sheet, { height: sheetHeight, transform: [{ translateY }] }]}>
-          <BlurView
-            blurMethod="dimezisBlurViewSdk31Plus"
-            blurTarget={blurTarget}
-            intensity={Platform.OS === 'ios' ? 74 : 30}
-            pointerEvents="none"
-            style={StyleSheet.absoluteFill}
-            tint="systemUltraThinMaterialLight"
-          />
-
-          <View accessibilityHint={t.fridge.addItem.dragHint} style={styles.dragArea} {...panResponder.panHandlers}>
-            <View style={styles.grabber} />
+        <Animated.View
+            style={[
+              styles.sheet,
+              {
+                bottom: sheetBottomInset,
+                height: visibleSheetHeight,
+                opacity: sheetOpacity,
+                transform: [{ scaleX: sheetScaleX }],
+              },
+            ]}
+        >
+          <View accessibilityHint={t.fridge.addItem.dragHint} style={styles.dragArea}>
+            {/* Arthur: NarIyirm
+                中文：只有顶部横条注册抽屉手势，内容区始终保留给滚动，避免阅读详情时误触改变弹窗高度。
+                EN: Only the top grabber registers sheet gestures, leaving the content area to scroll without accidental detent changes. */}
+            <View {...panResponder.panHandlers} style={styles.grabberTouchTarget}>
+              <View style={styles.grabber} />
+            </View>
             <Pressable accessibilityRole="button" disabled={isClosing} onPress={() => void requestClose()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
               <Text style={styles.closeText}>{copy.close}</Text>
             </Pressable>
@@ -413,8 +487,26 @@ export function InventoryItemDetailSheet({
               </Pressable>
             </View>
           ) : (
-            <>
-              <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
+              <ScrollView
+                style={styles.scrollView}
+                contentContainerStyle={[styles.scrollContent, { paddingBottom: footerHeight + 18 }]}
+                alwaysBounceVertical
+                bounces
+                onScroll={({ nativeEvent }) => {
+                  const reachedContentEnd = nativeEvent.contentOffset.y + nativeEvent.layoutMeasurement.height
+                    >= nativeEvent.contentSize.height - 20;
+                  if (!reachedContentEnd || currentTranslate.current <= 4 || hasAutoExpandedAtContentEnd.current || isClosing) return;
+
+                  // Arthur: NarIyirm
+                  // 中文：半屏阅读到内容末尾时自动切到全屏，确保库存提醒和补货设置不被固定操作栏截断。
+                  // EN: Reaching the end while in preview expands the sheet so restock reminders and settings are never cut off by the fixed actions.
+                  hasAutoExpandedAtContentEnd.current = true;
+                  animateToDetent(0);
+                }}
+                overScrollMode="always"
+                scrollEnabled
+                showsVerticalScrollIndicator={false}
+              >
                 <View style={styles.stockCard}>
                   <View style={styles.itemHeader}>
                     <View style={styles.emojiTile}><Text style={styles.emoji}>{emoji}</Text></View>
@@ -496,18 +588,18 @@ export function InventoryItemDetailSheet({
                   </Pressable>
                 </View>
               </ScrollView>
-
-              <View style={styles.footer}>
-                <Pressable accessibilityRole="button" disabled={isClosing} onPress={openEditor} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
-                  <Ionicons name="pencil" size={20} color="#FFFFFF" />
-                  <Text style={styles.editButtonText}>{copy.edit}</Text>
-                </Pressable>
-                <Pressable accessibilityLabel={copy.remove} accessibilityRole="button" onPress={() => setShowRemoveConfirm(true)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
-                  <Ionicons name="trash-outline" size={24} color="#F2384A" />
-                </Pressable>
-              </View>
-            </>
           )}
+          {batch && !isLoading && !loadError ? (
+          <View style={styles.footer}>
+            <Pressable accessibilityRole="button" disabled={isClosing} onPress={openEditor} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
+              <Ionicons name="pencil" size={20} color="#FFFFFF" />
+              <Text style={styles.editButtonText}>{copy.edit}</Text>
+            </Pressable>
+            <Pressable accessibilityLabel={copy.remove} accessibilityRole="button" onPress={() => setShowRemoveConfirm(true)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
+              <Ionicons name="trash-outline" size={24} color="#F2384A" />
+            </Pressable>
+          </View>
+          ) : null}
         </Animated.View>
 
         {showRemoveConfirm && batch ? (
@@ -579,16 +671,18 @@ function RestockStepper({ label, onDecrease, onIncrease, unit, value }: { label:
 
 const styles = StyleSheet.create({
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
-  backdropTint: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(27, 39, 35, 0.28)' },
-  sheet: { overflow: 'hidden', borderTopLeftRadius: 34, borderTopRightRadius: 34, borderCurve: 'continuous', backgroundColor: 'rgba(249, 251, 250, 0.91)', shadowColor: '#10271F', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.16, shadowRadius: 28, elevation: 24 },
-  dragArea: { height: 102, justifyContent: 'center', paddingHorizontal: 22, paddingTop: 17 },
-  grabber: { position: 'absolute', top: 10, alignSelf: 'center', width: 52, height: 5, borderRadius: 3, backgroundColor: '#A8ADAC' },
+  backdropTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(112, 118, 116, 0.22)' },
+  sheet: { position: 'absolute', right: 0, left: 0, overflow: 'hidden', borderWidth: 1, borderColor: '#D5DEDA', borderRadius: 34, borderCurve: 'continuous', backgroundColor: '#F7F9F8', shadowColor: '#10271F', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.14, shadowRadius: 24, elevation: 18 },
+  dragArea: { height: 66, justifyContent: 'center', paddingHorizontal: 22, paddingTop: 8 },
+  grabberTouchTarget: { position: 'absolute', zIndex: 5, top: 0, right: 0, left: 0, height: 42, alignItems: 'center', justifyContent: 'center' },
+  grabber: { width: 52, height: 5, borderRadius: 3, backgroundColor: '#929998' },
   closeButton: { width: 82, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.72)' },
   closeText: { color: '#172720', fontSize: 17, fontWeight: '700' },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
   stateText: { color: '#63726C', fontSize: 14, textAlign: 'center' },
   retryButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 22, backgroundColor: '#E9F7FB' },
   retryText: { color: '#148EAF', fontSize: 14, fontWeight: '800' },
+  scrollView: { flex: 1 },
   scrollContent: { gap: 14, paddingHorizontal: 18, paddingBottom: 122 },
   stockCard: { padding: 20, borderWidth: 1, borderColor: 'rgba(139, 205, 220, 0.42)', borderRadius: 25, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.82)' },
   itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
@@ -632,13 +726,13 @@ const styles = StyleSheet.create({
   stepperUnit: { color: '#71807B', fontSize: 12, fontWeight: '700' },
   restockSaveButton: { minHeight: 50, marginTop: 17, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 16, backgroundColor: '#12B5CD' },
   restockSaveText: { color: '#FFFFFF', fontSize: 14.5, fontWeight: '800' },
-  footer: { position: 'absolute', right: 0, bottom: 0, left: 0, minHeight: Platform.OS === 'ios' ? 103 : 88, flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 25 : 14, borderTopWidth: 1, borderTopColor: 'rgba(220,227,223,0.82)', backgroundColor: 'rgba(248,250,249,0.94)' },
+  footer: { position: 'absolute', zIndex: 8, right: 0, bottom: 0, left: 0, minHeight: Platform.OS === 'ios' ? 103 : 88, flexDirection: 'row', alignItems: 'flex-start', gap: 10, paddingHorizontal: 18, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 25 : 14, borderTopWidth: 1, borderTopColor: '#D5DEDA', backgroundColor: '#F7F9F8' },
   editButton: { flex: 1, minHeight: 58, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 9, borderRadius: 19, borderCurve: 'continuous', backgroundColor: '#FF851D' },
   editButtonText: { color: '#FFFFFF', fontSize: 17, fontWeight: '800' },
   removeButton: { width: 66, minHeight: 58, alignItems: 'center', justifyContent: 'center', borderRadius: 19, borderCurve: 'continuous', backgroundColor: '#FFECEF' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   disabled: { opacity: 0.58 },
-  confirmLayer: { ...StyleSheet.absoluteFillObject, zIndex: 20, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 28 : 18, backgroundColor: 'rgba(23,32,29,0.34)' },
+  confirmLayer: { ...StyleSheet.absoluteFill, zIndex: 20, justifyContent: 'flex-end', paddingHorizontal: 18, paddingBottom: Platform.OS === 'ios' ? 28 : 18, backgroundColor: 'rgba(23,32,29,0.34)' },
   confirmCard: { gap: 17, padding: 20, borderRadius: 28, borderCurve: 'continuous', backgroundColor: '#FBFCFB', shadowColor: '#17201D', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 24 },
   confirmHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dangerIcon: { width: 51, height: 51, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#FFE8EC' },

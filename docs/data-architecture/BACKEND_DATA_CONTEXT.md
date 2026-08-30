@@ -4,24 +4,27 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-08-30（Australia/Sydney）。
+- 最后核对日期：2026-08-31（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 已部署 migration：`20260829000000_initial_kitchmemo_schema.sql`。
-- 已有 migration 的本地与远程历史一致；新增库存写入 migration 尚未应用。
+
+- 本地 schema 历史共有 5 份 migration；本轮没有连接远程项目核对实际应用状态，部署前必须分别在测试库和生产库执行 `migration list`。
+- 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 已建立 13 张业务表、7 个枚举、1 个通用更新时间触发函数和 1 个设备初始化 RPC。
 - 已导入 9 条常见食材建议和 4 条成就定义。
 - 前端不会直连 Supabase；所有请求必须经过 Express。
-- 代码中已实现 `GET /api/health`、`POST /api/devices/bootstrap`、`GET /api/inventory`、`GET /api/food-presets/suggestion` 和 `POST /api/inventory/batches`；库存写入接口需要先应用新增 migration。共享、通知、成就及库存消耗/丢弃/调整接口尚未实现。
+- 代码中已实现设备初始化、库存读取、建议查询、批次入库、批次详情、数量调整、资料编辑、补货规则保存和软删除；对应数据库函数只有在相关 migration 已应用后才可调用。共享、通知、成就和分类管理接口尚未实现。
 
 实际实现的权威来源：
 
-- 已部署 schema migration：`supabase/migrations/20260829000000_initial_kitchmemo_schema.sql`；待应用：`supabase/migrations/20260830000000_create_inventory_batch_rpc.sql`
+- Schema 与数据库行为 migration：`supabase/migrations/` 下按时间排序的全部 SQL 文件
+
 - Seed：`supabase/seed.sql`
 - Express Supabase 客户端：`server/src/supabase.js`
 - Express 入口：`server/src/index.js`
 - Expo 设备标识：`src/services/deviceId.ts`
-- Expo API 封装：`src/api.ts`
+- Expo 通用请求层：`src/services/apiClient.ts`
+- Expo 库存业务 API：`src/services/inventoryApi.ts`
 
 本文档解释设计意图。字段或约束与本文档发生冲突时，以已部署 migration 为准，并同步更新本文档。
 
@@ -263,6 +266,13 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 
 关键规则：同名食材可以有多个批次。前端允许聚合展示，但消耗、丢弃和到期计算必须落到具体 `batch_uid`。
 
+当前详情修改约束：
+
+- 数量不能小于 0，也不能超过该批次的 `initial_quantity`。
+- 数量降到 0 时批次转为 `consumed`；从 0 增加时可恢复为 `active`。
+- 修改请求携带 `expectedVersion`；版本不一致时 Express 返回 `409`，避免共享冰箱中的并发覆盖。
+- 普通删除是软删除：批次转为 `archived`、剩余数量归零并保留流水，不物理删除历史记录。
+
 ### 7.8 `inventory_events`
 
 不可替代的库存使用与变更流水。
@@ -282,7 +292,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 建议约定：
 
 - `stock`：正数量，价值影响通常为 0。
-- `consume`：负数量，价值影响为正收益。
+- `consume`：负数量；当前详情数量 mutation 按购买价比例记录同方向的带符号价值变化，成就统计实现前需统一“收益”展示口径。
 - `discard`：负数量，价值影响为负浪费。
 - `adjust`：数量和价值根据修正方向带符号。
 - 更新 `inventory_batches` 和写入事件必须在同一事务中完成。
@@ -468,6 +478,16 @@ POST /api/devices/bootstrap
 GET /api/inventory
 GET /api/food-presets/suggestion?q=<food-name>
 POST /api/inventory/batches
+GET /api/inventory/batches/:batchUid
+PATCH /api/inventory/batches/:batchUid/quantity
+PATCH /api/inventory/batches/:batchUid
+PUT /api/inventory/batches/:batchUid/restock-rule
+DELETE /api/inventory/batches/:batchUid
+GET /api/notifications
+POST /api/notifications/:id/read
+GET /api/cart
+POST /api/cart
+GET /api/restock
 ```
 
 该接口通过 Supabase Admin API 检查服务端连接，只返回：
@@ -482,14 +502,16 @@ POST /api/inventory/batches
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
+- 通知：打开列表时按当前库存同步临期、过期、补货提醒；已读写入 `notification_reads`，按设备独立。
 
 尚未实现：
 
-- 库存消耗、丢弃和调整
-- 分类管理
-- 邀请码创建和冰箱合并
-- 通知生成与独立已读
-- 成就计算与查询
+- 明确的丢弃（`discard`）入口
+- 批次详情：返回单个活跃批次、当前版本及匹配的补货规则。
+- 数量调整：原子校验版本、更新数量/生命周期并写入 `consume` 或 `adjust` 流水。
+- 资料编辑：原子校验版本并修改名称、储存方式、分类、价格和到期等批次字段。
+- 补货规则：按当前冰箱、标准化名称和单位新增或更新规则，也可关闭规则。
+- 移出冰箱：软归档批次并写入调整流水，保留历史数据。
 
 ## 14. 建议的接口开发顺序
 
@@ -515,14 +537,27 @@ POST /api/inventory/batches
 
 储存筛选和分类筛选必须允许叠加。
 
-### 下一阶段：库存批次更新
+### 已完成：通知列表与已读
 
 ```text
-PATCH /api/inventory/batches/:batchUid
-POST  /api/inventory/batches/:batchUid/events
+GET  /api/notifications
+POST /api/notifications/:notificationUid/read
 ```
 
-数量更新和事件写入必须使用数据库事务；共享编辑必须校验 `version`。
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。
+### 已完成：库存批次详情与修改
+
+```text
+GET    /api/inventory/batches/:batchUid
+PATCH  /api/inventory/batches/:batchUid/quantity
+PATCH  /api/inventory/batches/:batchUid
+PUT    /api/inventory/batches/:batchUid/restock-rule
+DELETE /api/inventory/batches/:batchUid
+```
+
+这些接口由 `20260830010000_inventory_detail_mutations.sql` 中的数据库函数保证数量更新与事件写入处于同一事务，并通过 `version` 做共享编辑冲突检测。前端详情弹窗调用 `src/services/inventoryApi.ts`，不得绕过 Express。
+
+`20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
 ### 阶段四：共享冰箱
 
@@ -542,12 +577,10 @@ POST /api/fridges/join
 7. 重新计算冰箱成就。
 8. 标记来源冰箱为 `merged`。
 
-### 阶段五：通知与成就
+### 阶段五：成就
 
 ```text
-GET  /api/notifications
-POST /api/notifications/:notificationUid/read
-GET  /api/achievements
+GET /api/achievements
 ```
 
 ## 15. Migration 工作流

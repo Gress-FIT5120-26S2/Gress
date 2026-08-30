@@ -16,7 +16,8 @@
     },
     "android": {
       "package": "com.gressfit5120.kitchmemo",
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "usesCleartextTraffic": true
     },
     "web": {
       "favicon": "./assets/kitchmemo-icon.png"

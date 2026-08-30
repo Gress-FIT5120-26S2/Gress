@@ -14,19 +14,28 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
 
   const deviceId = await getDeviceId();
-  const response = await fetch(`${apiUrl}${path}`, {
-    ...init,
-    headers: {
-      'Device-ID': deviceId,
-      ...(init.body ? { 'Content-Type': 'application/json' } : {}),
-      ...init.headers,
-    },
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiUrl}${path}`, {
+      ...init,
+      headers: {
+        'Device-ID': deviceId,
+        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...init.headers,
+      },
+    });
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : 'network error';
+    console.error(`API unreachable at ${apiUrl}${path}: ${detail}`);
+    throw new Error(`Cannot reach ${apiUrl}. Check that Express is running and Windows Firewall allows TCP ${new URL(apiUrl).port || '80'}.`);
+  }
   const body = await response.json().catch(() => null) as T | ApiError | null;
 
   if (!response.ok) {
     const apiError = body as ApiError | null;
-    throw new Error(apiError?.message ?? apiError?.error ?? `API request failed: ${response.status}`);
+    const message = apiError?.message ?? apiError?.error ?? `API request failed: ${response.status}`;
+    console.error(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
+    throw new Error(message);
   }
 
   if (response.status === 204) return undefined as T;

@@ -4,6 +4,7 @@ import { BlurTargetView } from 'expo-blur';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { getApiHealth } from './src/services/apiClient';
+import { fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
@@ -45,11 +46,6 @@ const HOME_PREVIEW_EXPIRING_COUNT = 2;
 const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
 
 // Arthur: NarIyirm
-// 中文：未读数量同时驱动三维信箱、右上角角标和通知页；以后由 Supabase 的未读查询替换此样例值。
-// EN: One unread count drives the 3D mailbox, top-right badge, and inbox; a Supabase unread query can replace this preview value later.
-const HOME_PREVIEW_UNREAD_COUNT = 5;
-
-// Arthur: NarIyirm
 // 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
 // EN: Home currently previews a rainy night; a weather service can later feed live conditions through the same 3D scene entry point.
 const HOME_PREVIEW_WEATHER = 'rain' as const;
@@ -68,6 +64,7 @@ function KitchMemoApp() {
   const [canMountKitchen, setCanMountKitchen] = useState(false);
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
@@ -119,6 +116,16 @@ function KitchMemoApp() {
       .then(() => setConnectionState('connected'))
       .catch(() => setConnectionState('disconnected'));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'home' && activeTab !== 'notifications') return;
+    // Arthur: NarIyirm
+    // 中文：首页信箱角标和通知页共用未读数；打开这两处时再拉取，避免其它 Tab 重复请求。
+    // EN: Home mailbox badge and inbox share one unread count; refresh only when those surfaces are open.
+    fetchNotifications()
+      .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
+      .catch(() => undefined);
+  }, [activeTab]);
 
   useEffect(() => {
     let mounted = true;
@@ -269,7 +276,7 @@ function KitchMemoApp() {
                 onInteractionStart={beginCinematicFocus}
                 onNavigate={handleCinematicNavigate}
                 onReady={markKitchenReady}
-                unreadNotificationCount={HOME_PREVIEW_UNREAD_COUNT}
+                unreadNotificationCount={unreadNotificationCount}
                 weather={HOME_PREVIEW_WEATHER}
               />
             </Suspense>
@@ -287,7 +294,7 @@ function KitchMemoApp() {
                 <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
                 <Text style={styles.title}>{screen.title}</Text>
                 <Text style={styles.description}>{screen.description}</Text>
-                {activeTab === 'notifications' ? <NotificationInbox unreadCount={HOME_PREVIEW_UNREAD_COUNT} /> : null}
+                {activeTab === 'notifications' ? <NotificationInbox onUnreadCountChange={setUnreadNotificationCount} /> : null}
                 <Text style={styles.connection}>{status}</Text>
               </View>
             </>
@@ -307,7 +314,7 @@ function KitchMemoApp() {
               onOpenNotifications={openNotifications}
               phase={kitchenLighting.phase}
               showInteractionHint={showHomeInteractionHint}
-              unreadCount={HOME_PREVIEW_UNREAD_COUNT}
+              unreadCount={unreadNotificationCount}
             />
           ) : null}
           {activeTab === 'profile' ? (

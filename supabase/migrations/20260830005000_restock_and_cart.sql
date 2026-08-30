@@ -1,3 +1,8 @@
+-- Derived "need to buy" list. Nothing is stored -- this recomputes on every
+-- call from restock rules + current stock, matching section 5.1 of the doc:
+-- sum active batches per item, return those at or below the minimum quantity.
+-- Version was 20260830000000; renamed because that timestamp was already used
+-- by create_inventory_batch_rpc, which is applied on the remote project.
 -- Migration: shopping cart + restock suggestions.
 -- Later than the initial schema; do not edit the initial migration.
 -- Order: create the shopping_cart_items table, then the restock function.
