@@ -1,9 +1,8 @@
 -- Derived "need to buy" list. Nothing is stored -- this recomputes on every
 -- call from restock rules + current stock, matching section 5.1 of the doc:
 -- sum active batches per item, return those at or below the minimum quantity.
--- Put this in a NEW migration whose timestamp is later than the initial schema
--- (e.g. supabase/migrations/20260830000000_restock_and_cart.sql), together
--- with the shopping_cart_items table -- do not edit the initial migration.
+-- Version was 20260830000000; renamed because that timestamp was already used
+-- by create_inventory_batch_rpc, which is applied on the remote project.
 create or replace function public.get_restock_suggestions(p_fridge uuid)
 returns table (
   rule_uid          uuid,

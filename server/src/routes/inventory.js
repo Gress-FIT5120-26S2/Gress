@@ -418,8 +418,9 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
     const created = Array.isArray(data) ? data[0] : data;
     return response.status(201).json({ batchUid: created?.batch_uid ?? null });
   } catch (error) {
-    console.error('Inventory write failed:', error.message);
-    return response.status(503).json({ message: 'The item could not be saved.' });
+    const message = error?.message ?? 'The item could not be saved.';
+    console.error('Inventory write failed:', message);
+    return response.status(503).json({ message });
   }
 });
 

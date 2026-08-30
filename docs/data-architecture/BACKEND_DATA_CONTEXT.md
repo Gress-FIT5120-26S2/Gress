@@ -4,8 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-08-30（Australia/Sydney）。
+- 最后核对日期：2026-08-31（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
+
 - 本地 schema 历史共有 5 份 migration；本轮没有连接远程项目核对实际应用状态，部署前必须分别在测试库和生产库执行 `migration list`。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
@@ -17,6 +18,7 @@
 实际实现的权威来源：
 
 - Schema 与数据库行为 migration：`supabase/migrations/` 下按时间排序的全部 SQL 文件
+
 - Seed：`supabase/seed.sql`
 - Express Supabase 客户端：`server/src/supabase.js`
 - Express 入口：`server/src/index.js`
@@ -481,6 +483,11 @@ PATCH /api/inventory/batches/:batchUid/quantity
 PATCH /api/inventory/batches/:batchUid
 PUT /api/inventory/batches/:batchUid/restock-rule
 DELETE /api/inventory/batches/:batchUid
+GET /api/notifications
+POST /api/notifications/:id/read
+GET /api/cart
+POST /api/cart
+GET /api/restock
 ```
 
 该接口通过 Supabase Admin API 检查服务端连接，只返回：
@@ -495,19 +502,16 @@ DELETE /api/inventory/batches/:batchUid
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
+- 通知：打开列表时按当前库存同步临期、过期、补货提醒；已读写入 `notification_reads`，按设备独立。
+
+尚未实现：
+
+- 明确的丢弃（`discard`）入口
 - 批次详情：返回单个活跃批次、当前版本及匹配的补货规则。
 - 数量调整：原子校验版本、更新数量/生命周期并写入 `consume` 或 `adjust` 流水。
 - 资料编辑：原子校验版本并修改名称、储存方式、分类、价格和到期等批次字段。
 - 补货规则：按当前冰箱、标准化名称和单位新增或更新规则，也可关闭规则。
 - 移出冰箱：软归档批次并写入调整流水，保留历史数据。
-
-尚未实现：
-
-- 独立的“丢弃原因”流程与显式 `discard` 事件
-- 分类管理
-- 邀请码创建和冰箱合并
-- 通知生成与独立已读
-- 成就计算与查询
 
 ## 14. 建议的接口开发顺序
 
@@ -533,6 +537,14 @@ POST /api/inventory/batches
 
 储存筛选和分类筛选必须允许叠加。
 
+### 已完成：通知列表与已读
+
+```text
+GET  /api/notifications
+POST /api/notifications/:notificationUid/read
+```
+
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。
 ### 已完成：库存批次详情与修改
 
 ```text
@@ -565,12 +577,10 @@ POST /api/fridges/join
 7. 重新计算冰箱成就。
 8. 标记来源冰箱为 `merged`。
 
-### 阶段五：通知与成就
+### 阶段五：成就
 
 ```text
-GET  /api/notifications
-POST /api/notifications/:notificationUid/read
-GET  /api/achievements
+GET /api/achievements
 ```
 
 ## 15. Migration 工作流
