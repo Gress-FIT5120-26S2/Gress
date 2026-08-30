@@ -4,19 +4,15 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-08-30（Australia/Sydney）。
+- 最后核对日期：2026-08-31（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 已部署 migration：`20260829000000_initial_kitchmemo_schema.sql`。
-- 已有 migration 的本地与远程历史一致；新增库存写入 migration 尚未应用。
-- 远程 PostgreSQL lint 已通过，无 schema error。
-- 已建立 13 张业务表、7 个枚举、1 个通用更新时间触发函数和 1 个设备初始化 RPC。
-- 已导入 9 条常见食材建议和 4 条成就定义。
+- 已部署 migration：`20260829000000` 至 `20260830200000`（含库存写入 RPC、补货建议、批次变更、通知同步函数）。
 - 前端不会直连 Supabase；所有请求必须经过 Express。
-- 代码中已实现 `GET /api/health`、`POST /api/devices/bootstrap`、`GET /api/inventory`、`GET /api/food-presets/suggestion` 和 `POST /api/inventory/batches`；库存写入接口需要先应用新增 migration。共享、通知、成就及库存消耗/丢弃/调整接口尚未实现。
+- 代码中已实现健康检查、设备 bootstrap、库存读写、购物车、补货建议、`GET /api/notifications` 和 `POST /api/notifications/:id/read`。打开通知列表会调用 `sync_fridge_notifications`。共享冰箱邀请合并与成就查询尚未实现。
 
 实际实现的权威来源：
 
-- 已部署 schema migration：`supabase/migrations/20260829000000_initial_kitchmemo_schema.sql`；待应用：`supabase/migrations/20260830000000_create_inventory_batch_rpc.sql`
+- 已部署 schema migration：`supabase/migrations/` 下 `20260829000000` 至 `20260830200000`
 - Seed：`supabase/seed.sql`
 - Express Supabase 客户端：`server/src/supabase.js`
 - Express 入口：`server/src/index.js`
@@ -468,6 +464,11 @@ POST /api/devices/bootstrap
 GET /api/inventory
 GET /api/food-presets/suggestion?q=<food-name>
 POST /api/inventory/batches
+GET /api/notifications
+POST /api/notifications/:id/read
+GET /api/cart
+POST /api/cart
+GET /api/restock
 ```
 
 该接口通过 Supabase Admin API 检查服务端连接，只返回：
@@ -482,13 +483,13 @@ POST /api/inventory/batches
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
+- 通知：打开列表时按当前库存同步临期、过期、补货提醒；已读写入 `notification_reads`，按设备独立。
 
 尚未实现：
 
-- 库存消耗、丢弃和调整
+- 明确的丢弃（`discard`）入口
 - 分类管理
 - 邀请码创建和冰箱合并
-- 通知生成与独立已读
 - 成就计算与查询
 
 ## 14. 建议的接口开发顺序
@@ -515,14 +516,14 @@ POST /api/inventory/batches
 
 储存筛选和分类筛选必须允许叠加。
 
-### 下一阶段：库存批次更新
+### 已完成：通知列表与已读
 
 ```text
-PATCH /api/inventory/batches/:batchUid
-POST  /api/inventory/batches/:batchUid/events
+GET  /api/notifications
+POST /api/notifications/:notificationUid/read
 ```
 
-数量更新和事件写入必须使用数据库事务；共享编辑必须校验 `version`。
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。
 
 ### 阶段四：共享冰箱
 
@@ -542,12 +543,10 @@ POST /api/fridges/join
 7. 重新计算冰箱成就。
 8. 标记来源冰箱为 `merged`。
 
-### 阶段五：通知与成就
+### 阶段五：成就
 
 ```text
-GET  /api/notifications
-POST /api/notifications/:notificationUid/read
-GET  /api/achievements
+GET /api/achievements
 ```
 
 ## 15. Migration 工作流
