@@ -6,18 +6,25 @@
 
 - 最后核对日期：2026-08-31（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 已部署 migration：`20260829000000` 至 `20260830200000`（含库存写入 RPC、补货建议、批次变更、通知同步函数）。
+
+- 本地 schema 历史共有 5 份 migration；本轮没有连接远程项目核对实际应用状态，部署前必须分别在测试库和生产库执行 `migration list`。
+- 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
+- 远程 PostgreSQL lint 已通过，无 schema error。
+- 已建立 13 张业务表、7 个枚举、1 个通用更新时间触发函数和 1 个设备初始化 RPC。
+- 已导入 9 条常见食材建议和 4 条成就定义。
 - 前端不会直连 Supabase；所有请求必须经过 Express。
-- 代码中已实现健康检查、设备 bootstrap、库存读写、购物车、补货建议、`GET /api/notifications` 和 `POST /api/notifications/:id/read`。打开通知列表会调用 `sync_fridge_notifications`。共享冰箱邀请合并与成就查询尚未实现。
+- 代码中已实现设备初始化、库存读取、建议查询、批次入库、批次详情、数量调整、资料编辑、补货规则保存和软删除；对应数据库函数只有在相关 migration 已应用后才可调用。共享、通知、成就和分类管理接口尚未实现。
 
 实际实现的权威来源：
 
-- 已部署 schema migration：`supabase/migrations/` 下 `20260829000000` 至 `20260830200000`
+- Schema 与数据库行为 migration：`supabase/migrations/` 下按时间排序的全部 SQL 文件
+
 - Seed：`supabase/seed.sql`
 - Express Supabase 客户端：`server/src/supabase.js`
 - Express 入口：`server/src/index.js`
 - Expo 设备标识：`src/services/deviceId.ts`
-- Expo API 封装：`src/api.ts`
+- Expo 通用请求层：`src/services/apiClient.ts`
+- Expo 库存业务 API：`src/services/inventoryApi.ts`
 
 本文档解释设计意图。字段或约束与本文档发生冲突时，以已部署 migration 为准，并同步更新本文档。
 
@@ -259,6 +266,13 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 
 关键规则：同名食材可以有多个批次。前端允许聚合展示，但消耗、丢弃和到期计算必须落到具体 `batch_uid`。
 
+当前详情修改约束：
+
+- 数量不能小于 0，也不能超过该批次的 `initial_quantity`。
+- 数量降到 0 时批次转为 `consumed`；从 0 增加时可恢复为 `active`。
+- 修改请求携带 `expectedVersion`；版本不一致时 Express 返回 `409`，避免共享冰箱中的并发覆盖。
+- 普通删除是软删除：批次转为 `archived`、剩余数量归零并保留流水，不物理删除历史记录。
+
 ### 7.8 `inventory_events`
 
 不可替代的库存使用与变更流水。
@@ -278,7 +292,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 建议约定：
 
 - `stock`：正数量，价值影响通常为 0。
-- `consume`：负数量，价值影响为正收益。
+- `consume`：负数量；当前详情数量 mutation 按购买价比例记录同方向的带符号价值变化，成就统计实现前需统一“收益”展示口径。
 - `discard`：负数量，价值影响为负浪费。
 - `adjust`：数量和价值根据修正方向带符号。
 - 更新 `inventory_batches` 和写入事件必须在同一事务中完成。
@@ -464,6 +478,11 @@ POST /api/devices/bootstrap
 GET /api/inventory
 GET /api/food-presets/suggestion?q=<food-name>
 POST /api/inventory/batches
+GET /api/inventory/batches/:batchUid
+PATCH /api/inventory/batches/:batchUid/quantity
+PATCH /api/inventory/batches/:batchUid
+PUT /api/inventory/batches/:batchUid/restock-rule
+DELETE /api/inventory/batches/:batchUid
 GET /api/notifications
 POST /api/notifications/:id/read
 GET /api/cart
@@ -488,9 +507,11 @@ GET /api/restock
 尚未实现：
 
 - 明确的丢弃（`discard`）入口
-- 分类管理
-- 邀请码创建和冰箱合并
-- 成就计算与查询
+- 批次详情：返回单个活跃批次、当前版本及匹配的补货规则。
+- 数量调整：原子校验版本、更新数量/生命周期并写入 `consume` 或 `adjust` 流水。
+- 资料编辑：原子校验版本并修改名称、储存方式、分类、价格和到期等批次字段。
+- 补货规则：按当前冰箱、标准化名称和单位新增或更新规则，也可关闭规则。
+- 移出冰箱：软归档批次并写入调整流水，保留历史数据。
 
 ## 14. 建议的接口开发顺序
 
@@ -524,6 +545,19 @@ POST /api/notifications/:notificationUid/read
 ```
 
 打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。
+### 已完成：库存批次详情与修改
+
+```text
+GET    /api/inventory/batches/:batchUid
+PATCH  /api/inventory/batches/:batchUid/quantity
+PATCH  /api/inventory/batches/:batchUid
+PUT    /api/inventory/batches/:batchUid/restock-rule
+DELETE /api/inventory/batches/:batchUid
+```
+
+这些接口由 `20260830010000_inventory_detail_mutations.sql` 中的数据库函数保证数量更新与事件写入处于同一事务，并通过 `version` 做共享编辑冲突检测。前端详情弹窗调用 `src/services/inventoryApi.ts`，不得绕过 Express。
+
+`20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
 ### 阶段四：共享冰箱
 
