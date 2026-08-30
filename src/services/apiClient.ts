@@ -14,19 +14,23 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
 
   const deviceId = await getDeviceId();
+  // Arthur: NarIyirm
+  // 中文：上传照片时让 fetch 自动设置 multipart boundary；其余请求体仍使用 JSON，可恢复错误交给页面展示而不是触发红色开发错误屏。
+  // EN: Let fetch set multipart boundaries for photo uploads, keep JSON for other bodies, and leave recoverable errors to the screen instead of a red dev overlay.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(`${apiUrl}${path}`, {
       ...init,
       headers: {
         'Device-ID': deviceId,
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...init.headers,
       },
     });
   } catch (error) {
     const detail = error instanceof Error ? error.message : 'network error';
-    console.error(`API unreachable at ${apiUrl}${path}: ${detail}`);
+    if (__DEV__) console.warn(`API request did not reach ${apiUrl}${path}: ${detail}`);
     throw new Error(`Cannot reach ${apiUrl}. Check that Express is running and Windows Firewall allows TCP ${new URL(apiUrl).port || '80'}.`);
   }
   const body = await response.json().catch(() => null) as T | ApiError | null;
@@ -34,7 +38,7 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!response.ok) {
     const apiError = body as ApiError | null;
     const message = apiError?.message ?? apiError?.error ?? `API request failed: ${response.status}`;
-    console.error(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
+    if (__DEV__) console.warn(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
     throw new Error(message);
   }
 

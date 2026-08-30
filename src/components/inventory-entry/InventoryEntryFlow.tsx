@@ -144,8 +144,8 @@ export function InventoryEntryFlow({
     const defaultExpiry = addDays(now, 7);
 
     // Arthur: NarIyirm
-    // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和未来的识别录入因此可以复用同一套表单。
-    // EN: Each opening initialises its draft from initialValues so create, edit, and future recognition flows can share one form.
+    // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和识别录入因此可以复用同一套表单。
+    // EN: Each opening initialises its draft from initialValues so create, edit, and recognition flows can share one form.
     setName(initialValues?.name ?? '');
     setQuantity(initialValues?.quantity ?? '');
     setUnit(initialValues?.unit ?? 'item');

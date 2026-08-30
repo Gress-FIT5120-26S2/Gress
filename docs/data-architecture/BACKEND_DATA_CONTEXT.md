@@ -6,14 +6,13 @@
 
 - 最后核对日期：2026-08-31（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-
-- 本地 schema 历史共有 5 份 migration；本轮没有连接远程项目核对实际应用状态，部署前必须分别在测试库和生产库执行 `migration list`。
+- 本地 schema 历史共有 7 份 migration；本轮没有连接远程项目核对实际应用状态，部署前必须分别在测试库和生产库执行 `migration list`。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 已建立 13 张业务表、7 个枚举、1 个通用更新时间触发函数和 1 个设备初始化 RPC。
-- 已导入 9 条常见食材建议和 4 条成就定义。
+- Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端不会直连 Supabase；所有请求必须经过 Express。
-- 代码中已实现设备初始化、库存读取、建议查询、批次入库、批次详情、数量调整、资料编辑、补货规则保存和软删除；对应数据库函数只有在相关 migration 已应用后才可调用。共享、通知、成就和分类管理接口尚未实现。
+- 代码中已实现设备初始化、库存读取、建议查询、拍照识别代理、识别结果预填、批次入库、批次详情、数量调整、资料编辑、补货规则保存和软删除；对应数据库函数只有在相关 migration 已应用后才可调用。共享、通知、成就和分类管理接口尚未实现。
 
 实际实现的权威来源：
 
@@ -25,6 +24,8 @@
 - Expo 设备标识：`src/services/deviceId.ts`
 - Expo 通用请求层：`src/services/apiClient.ts`
 - Expo 库存业务 API：`src/services/inventoryApi.ts`
+- Expo 拍照识别 API：`src/services/recognitionApi.ts`
+- Express 拍照识别代理：`server/src/routes/recognition.js`
 
 本文档解释设计意图。字段或约束与本文档发生冲突时，以已部署 migration 为准，并同步更新本文档。
 
@@ -59,6 +60,7 @@ Expo App
 - Expo 的公开变量只能包含 Express API 地址；绝不能包含 Supabase URL、Secret Key 或 service-role key。
 - Expo 本地开发使用根目录 `.env.development`，生产构建使用 `.env.production`（或 EAS 的对应环境变量）；两者只设置 `EXPO_PUBLIC_API_URL`。
 - 本地 Express 默认读取 `server/.env.development`；当 `NODE_ENV=production` 时读取 `server/.env.production`。部署平台直接提供的环境变量优先于文件。
+- Express 可用 `FOOD_RECOGNITION_API_URL` 覆盖视觉模型地址；该配置只存在于服务端，App 不直接调用模型。
 - `server/.env` 仅作为旧开发机兼容回退。新配置请使用按环境命名的文件，所有真实 `.env` 文件都不得提交 Git。
 - 测试 App 必须指向测试 Express，生产 App 必须指向生产 Express；同一 `device_id` 在两个 Supabase 项目中是彼此独立的数据。
 
@@ -434,9 +436,11 @@ Device-ID: ios_... | android_...
 
 `supabase/seed.sql` 当前包含：
 
-- 9 种食材：tomato、milk、egg、blueberry、rice、peas、soy sauce、yogurt、bread。
+- 16 种食材：tomato、banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、milk、egg、blueberry、rice、peas、soy sauce、yogurt、bread。
 - 每种食材包含中英文别名、推荐储存方式、建议保质期和默认分类代码。
 - 4 个成就：`first_item`、`waste_watcher`、`fridge_regular`、`shared_kitchen`。
+
+视觉识别食材的参考值由 `20260831010000_upsert_photo_recognition_food_presets.sql` 同步到已部署项目。基础天数表示推荐储存方式下的最佳品质参考，不是食品安全保证；拍照识别会根据视觉新鲜度生成可编辑的预计到期时间，最终仍由用户确认。
 
 Seed 使用 upsert，可重复运行。它不创建个人冰箱或默认分类；这些数据由 `bootstrap_device` 按冰箱创建。
 
@@ -477,6 +481,7 @@ GET /api/health
 POST /api/devices/bootstrap
 GET /api/inventory
 GET /api/food-presets/suggestion?q=<food-name>
+POST /api/photo-recognition
 POST /api/inventory/batches
 GET /api/inventory/batches/:batchUid
 PATCH /api/inventory/batches/:batchUid/quantity
@@ -501,6 +506,8 @@ GET /api/restock
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
+- 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
+- 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
 - 通知：打开列表时按当前库存同步临期、过期、补货提醒；已读写入 `notification_reads`，按设备独立。
 
@@ -527,6 +534,15 @@ POST /api/devices/bootstrap
 GET /api/inventory
 POST /api/inventory/batches
 ```
+
+### 已完成：拍照识别与可编辑预填
+
+```text
+POST /api/photo-recognition
+GET  /api/food-presets/suggestion?q=<recognised-food>
+```
+
+识别接口只负责清洗模型响应，不把图片或新鲜度写入数据库。前端将 `fresh` 映射为完整建议保质期、`semi_fresh` 映射为向上取整的 40%、`rotten` 映射为最短复核时间，然后进入与手动添加相同的 `InventoryEntryFlow`。只有用户在共用表单中确认后，才会调用库存写入接口。
 
 库存查询应支持：
 

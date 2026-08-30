@@ -1,6 +1,7 @@
 import cors from 'cors';
 import express from 'express';
 import { inventoryRouter } from './routes/inventory.js';
+import { recognitionRouter } from './routes/recognition.js';
 import { supabase } from './supabase.js';
 import cartRouter from './routes/cart.js';
 import restockRouter from './routes/restock.js';
@@ -15,6 +16,7 @@ app.use('/api', inventoryRouter);
 app.use('/api', cartRouter);
 app.use('/api', restockRouter);
 app.use('/api', notificationsRouter);
+app.use('/api', recognitionRouter);
 
 app.get('/api/health', async (_request, response) => {
   // Arthur: NarIyirm

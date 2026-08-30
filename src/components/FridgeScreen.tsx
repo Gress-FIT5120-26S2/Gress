@@ -3,6 +3,7 @@ import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react
 import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
 import {
   createInventoryBatch,
+  getFoodPresetSuggestion,
   getInventoryBatchDetail,
   getInventorySnapshot,
   setInventoryRestockRule,
@@ -10,6 +11,7 @@ import {
   type InventoryBatchDetail,
   type InventorySnapshot,
 } from '../services/inventoryApi';
+import type { PhotoRecognitionResult } from '../services/recognitionApi';
 import { useI18n } from '../i18n';
 import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
@@ -18,10 +20,17 @@ import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard'
 import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
 import {
   InventoryEntryFlow,
+  type InventoryEntrySource,
   type InventoryEntryInitialValues,
   type InventoryEntrySubmission,
   type InventoryUnit,
 } from './inventory-entry/InventoryEntryFlow';
+import { PhotoRecognitionCamera } from './inventory-entry/PhotoRecognitionCamera';
+import {
+  buildRecognitionInitialValues,
+  RecognitionResultReview,
+  type RecognitionDraft,
+} from './inventory-entry/RecognitionResultReview';
 
 type StorageZone = FridgeStorageZone;
 type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
@@ -133,6 +142,10 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const [activeCategory, setActiveCategory] = useState<FoodCategory | null>(null);
   const [isAddSheetVisible, setIsAddSheetVisible] = useState(false);
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
+  const [isRecognitionCameraVisible, setIsRecognitionCameraVisible] = useState(false);
+  const [recognitionDraft, setRecognitionDraft] = useState<RecognitionDraft | null>(null);
+  const [recognitionInitialValues, setRecognitionInitialValues] = useState<InventoryEntryInitialValues | undefined>();
+  const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
   const [editingBatch, setEditingBatch] = useState<InventoryBatchDetail | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
@@ -219,18 +232,79 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     // EN: This callback fires only after the chooser unmounts, preventing overlap with the manual entry native Modal.
     if (method === 'manual') {
       setEditingBatch(null);
+      setRecognitionInitialValues(undefined);
+      setEntrySource('manual');
       setIsManualEntryVisible(true);
     }
+    if (method === 'camera') {
+      setEditingBatch(null);
+      setRecognitionDraft(null);
+      setRecognitionInitialValues(undefined);
+      setIsRecognitionCameraVisible(true);
+    }
+  }, []);
+
+  const openManualFallback = useCallback(() => {
+    setIsRecognitionCameraVisible(false);
+    setRecognitionDraft(null);
+    setRecognitionInitialValues(undefined);
+    setEntrySource('manual');
+    setIsManualEntryVisible(true);
+  }, []);
+
+  const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult, photoUri: string) => {
+    if (result.food === 'unknown' || result.freshness === 'unknown') return;
+    const foodName = t.fridge.photoRecognition.foodNames[result.food];
+    const { suggestion } = await getFoodPresetSuggestion(result.food);
+
+    if (!suggestion) {
+      // Arthur: NarIyirm
+      // 中文：模型已认出名称但参考库尚未迁移时，保留名称并直接进入同一手动表单，其余字段由用户确认。
+      // EN: If the model knows the name but the reference migration is missing, preserve the name and fall back to the same manual form for the remaining fields.
+      setRecognitionInitialValues({ name: foodName, quantity: '1', unit: 'item' });
+      setEntrySource('recognition');
+      setIsRecognitionCameraVisible(false);
+      setIsManualEntryVisible(true);
+      return;
+    }
+
+    const { expiryDays, initialValues } = buildRecognitionInitialValues(foodName, suggestion, result.freshness);
+    setRecognitionDraft({
+      categoryCode: suggestion.categoryCode,
+      confidence: result.confidence,
+      expiryDays,
+      food: result.food,
+      freshness: result.freshness,
+      initialValues,
+      photoUri,
+      storageZone: suggestion.storageZone,
+      unit: 'item',
+    });
+    setIsRecognitionCameraVisible(false);
+  }, [t.fridge.photoRecognition.foodNames]);
+
+  const continueRecognitionEntry = useCallback((draft: RecognitionDraft) => {
+    setRecognitionInitialValues(draft.initialValues);
+    setRecognitionDraft(null);
+    setEntrySource('recognition');
+    setIsManualEntryVisible(true);
+  }, []);
+
+  const retakeRecognitionPhoto = useCallback(() => {
+    setRecognitionDraft(null);
+    setIsRecognitionCameraVisible(true);
   }, []);
 
   const closeManualEntry = useCallback(() => {
     setIsManualEntryVisible(false);
     setEditingBatch(null);
+    setRecognitionInitialValues(undefined);
+    setEntrySource('manual');
   }, []);
   const saveInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
     // Arthur: NarIyirm
-    // 中文：手动录入和未来的识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
-    // EN: Manual and future recognition entry share this submission contract; the server chooses the target fridge from Device-ID.
+    // 中文：手动录入和识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
+    // EN: Manual and recognition entry share this submission contract; the server chooses the target fridge from Device-ID.
     await createInventoryBatch({
       categoryCode: submission.batch.categoryCode,
       expiresAt: submission.batch.expiresAt,
@@ -452,12 +526,25 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       />
       <InventoryEntryFlow
         blurTarget={blurTarget}
-        initialValues={editInitialValues}
+        initialValues={editingBatch ? editInitialValues : recognitionInitialValues}
         mode={editingBatch ? 'edit' : 'create'}
         onClose={closeManualEntry}
         onSubmit={editingBatch ? saveEditedInventoryEntry : saveInventoryEntry}
-        source="manual"
+        source={editingBatch ? 'manual' : entrySource}
         visible={isManualEntryVisible}
+      />
+      <PhotoRecognitionCamera
+        onClose={() => setIsRecognitionCameraVisible(false)}
+        onManualFallback={openManualFallback}
+        onRecognised={handlePhotoRecognised}
+        visible={isRecognitionCameraVisible}
+      />
+      <RecognitionResultReview
+        draft={recognitionDraft}
+        onClose={() => setRecognitionDraft(null)}
+        onContinue={continueRecognitionEntry}
+        onRetake={retakeRecognitionPhoto}
+        visible={recognitionDraft !== null}
       />
       <InventoryItemDetailSheet
         batchUid={selectedBatchUid}
