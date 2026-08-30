@@ -41,6 +41,24 @@ router.post('/cart', requireFridge, async (req, res) => {
   res.status(201).json(data);
 });
 
+// PATCH /api/cart/:id/quantity -- change quantity (US5.2 edit)
+router.patch('/cart/:id/quantity', requireFridge, async (req, res) => {
+  const quantity = Number(req.body?.quantity);
+  // quantity must be a positive number; to remove an item use DELETE instead
+  if (!Number.isFinite(quantity) || quantity <= 0) {
+    return res.status(400).json({ error: 'invalid_quantity' });
+  }
+  const { data, error } = await supabase
+    .from('shopping_cart_items')
+    .update({ quantity })
+    .eq('item_uid', req.params.id)
+    .eq('fridge_uid', req.fridgeUid)
+    .select()
+    .single();
+  if (error) return res.status(500).json({ error: error.message });
+  res.json(data);
+});
+
 // PATCH /api/cart/:id/toggle -- mark bought / not bought (shared)
 router.patch('/cart/:id/toggle', requireFridge, async (req, res) => {
   const isChecked = !!req.body.is_checked;

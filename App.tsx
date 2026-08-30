@@ -15,7 +15,7 @@ import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/P
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
 import { error } from 'three';
-import { ShoppingScreen } from './src/components/ShoppingScreen';
+import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
