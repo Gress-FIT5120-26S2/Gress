@@ -10,7 +10,14 @@ insert into public.food_presets (
   notes
 )
 values
-  ('tomato', array['tomato', 'tomatoes', '番茄', '西红柿'], 'chilled', 7, 'vegetables', 'Refrigerate ripe tomatoes.'),
+  ('tomato', array['tomato', 'tomatoes', '番茄', '西红柿'], 'pantry', 5, 'vegetables', 'Keep ripe whole tomatoes at room temperature away from sunlight for best flavour.'),
+  ('banana', array['banana', 'bananas', '香蕉'], 'pantry', 3, 'fruit', 'Ripen at room temperature; refrigerating ripe fruit may darken the peel.'),
+  ('bittermelon', array['bittermelon', 'bitter melon', 'bitter gourd', 'karela', '苦瓜', '凉瓜'], 'chilled', 5, 'vegetables', 'Keep dry in the crisper and use promptly; bitter melon is sensitive to prolonged chilling.'),
+  ('cucumber', array['cucumber', 'cucumbers', '黄瓜', '青瓜'], 'chilled', 5, 'vegetables', 'Keep dry in the crisper and avoid the coldest part of the refrigerator.'),
+  ('eggplant', array['eggplant', 'eggplants', 'aubergine', 'aubergines', '茄子'], 'chilled', 4, 'vegetables', 'Keep unwashed near the front of the refrigerator and use within a few days.'),
+  ('orange', array['orange', 'oranges', '橙子', '橙', '甜橙'], 'chilled', 14, 'fruit', 'Keep whole fruit in the crisper for best quality.'),
+  ('papaya', array['papaya', 'papayas', '木瓜', '番木瓜'], 'pantry', 5, 'fruit', 'Ripen at room temperature; move ripe fruit to the refrigerator if it will not be used promptly.'),
+  ('pineapple', array['pineapple', 'pineapples', '菠萝', '凤梨'], 'chilled', 5, 'fruit', 'Keep whole fruit refrigerated in a bag; cut fruit needs an airtight container.'),
   ('milk', array['milk', 'fresh milk', '牛奶', '鲜牛奶'], 'chilled', 7, 'drinks', 'Keep sealed and refrigerated.'),
   ('egg', array['egg', 'eggs', '鸡蛋'], 'chilled', 28, 'meat', 'Keep refrigerated in the original carton.'),
   ('blueberry', array['blueberry', 'blueberries', '蓝莓'], 'chilled', 7, 'fruit', 'Keep dry and wash immediately before eating.'),
@@ -47,4 +54,3 @@ set
   rule_type = excluded.rule_type,
   threshold = excluded.threshold,
   is_enabled = true;
-

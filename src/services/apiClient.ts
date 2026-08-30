@@ -14,13 +14,17 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
 
   const deviceId = await getDeviceId();
+  // Arthur: NarIyirm
+  // 中文：上传照片时让 fetch 自动设置 multipart boundary；其余有请求体的调用仍使用 JSON，并统一转换网络连接错误。
+  // EN: Let fetch set the multipart boundary for photo uploads while JSON remains the default for other bodies and network failures are normalized.
+  const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
   let response: Response;
   try {
     response = await fetch(`${apiUrl}${path}`, {
       ...init,
       headers: {
         'Device-ID': deviceId,
-        ...(init.body ? { 'Content-Type': 'application/json' } : {}),
+        ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
         ...init.headers,
       },
     });

@@ -33,10 +33,21 @@
       [
         "expo-asset",
         {
-          "assets": ["./models/Kitchen-Home-rebuilt-lighting.glb"]
+          "assets": [
+            "./models/Kitchen-Home-rebuilt-lighting.glb"
+          ]
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "expo-image",
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "允许 KitchMemo 使用相机识别食材和扫描条码 / Allow KitchMemo to use the camera for food recognition and barcode scanning.",
+          "recordAudioAndroid": false,
+          "barcodeScannerEnabled": true
+        }
+      ]
     ]
   }
 }
