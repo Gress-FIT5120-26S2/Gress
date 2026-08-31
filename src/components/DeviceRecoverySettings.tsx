@@ -9,6 +9,9 @@ type PendingAction = 'create' | 'restore' | null;
 // Arthur: NarIyirm
 // 中文：设置页只保留换机恢复能力；共享冰箱的创建、加入和管理全部由冰箱页入口承载。
 // EN: Settings retains only device recovery; creating, joining, and managing shared fridges now belongs entirely to the fridge-screen entry point.
+// Arthur: NarIyirm
+// 中文：设置页的设备恢复入口；上游由 Profile 设置挂载，下游调用 sharingApi 生成一次性码或转移旧设备身份。
+// EN: This is the settings recovery surface; Profile settings mount it and sharingApi either creates a one-time code or transfers the old device identity.
 export function DeviceRecoverySettings({ active }: { active: boolean }) {
   const { t } = useI18n();
   const copy = t.settings.sharing;
@@ -22,6 +25,9 @@ export function DeviceRecoverySettings({ active }: { active: boolean }) {
     getFridgeAccessContext().then((context) => setConfigured(context.recoveryConfigured)).catch(() => undefined);
   }, [active]);
 
+  // Arthur: NarIyirm
+  // 中文：生成和恢复共用此异步状态包装器，统一处理按钮禁用与错误展示，业务请求仍由 sharingApi 完成。
+  // EN: Code creation and recovery share this async-state wrapper for disabled buttons and errors while sharingApi performs the domain request.
   const run = useCallback(async (action: Exclude<PendingAction, null>, task: () => Promise<void>) => {
     setPending(action);
     try {

@@ -65,6 +65,9 @@ export function getDeviceId(): Promise<string> {
   return pendingDeviceId;
 }
 
+// Arthur: NarIyirm
+// 中文：普通 API 从这里读取或首次生成 256 位随机凭证；原文只保存在 SecureStore，后端只保存摘要。
+// EN: Domain APIs read or first create a 256-bit random credential here; plaintext stays in SecureStore while the backend stores only its digest.
 async function createOrReadDeviceCredential(): Promise<string> {
   const savedCredential = await SecureStore.getItemAsync(DEVICE_CREDENTIAL_KEY);
   if (savedCredential) return savedCredential;
@@ -77,6 +80,9 @@ async function createOrReadDeviceCredential(): Promise<string> {
   return credential;
 }
 
+// Arthur: NarIyirm
+// 中文：并发请求共享同一个 pending Promise，避免多个组件首次挂载时生成并覆盖不同的设备凭证。
+// EN: Concurrent requests share one pending Promise so first-mounted components cannot generate and overwrite different device credentials.
 export function getDeviceCredential(): Promise<string> {
   if (!pendingDeviceCredential) {
     pendingDeviceCredential = createOrReadDeviceCredential().catch((error) => {

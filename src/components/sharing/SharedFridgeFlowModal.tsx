@@ -55,10 +55,16 @@ function formatInviteCode(value: string) {
   return raw.length > 4 ? `${raw.slice(0, 4)}-${raw.slice(4)}` : raw;
 }
 
+// Arthur: NarIyirm
+// 中文：分享二维码只编码稳定的 kitchmemo:// 邀请载荷；Scanner 的 extractInviteCode 在接收端解析同一格式。
+// EN: Shared QR codes encode a stable kitchmemo:// invite payload that Scanner later parses through extractInviteCode.
 function invitePayload(code: string) {
   return `kitchmemo://join?code=${rawInviteCode(code)}`;
 }
 
+// Arthur: NarIyirm
+// 中文：扫码和手输都在此规范为纯邀请码，拒绝不属于 KitchMemo 的二维码内容再进入 join API。
+// EN: Scanned and typed values normalize to a plain invite code here, rejecting non-KitchMemo QR payloads before the join API.
 function extractInviteCode(value: string) {
   const trimmed = value.trim();
   try {
@@ -95,6 +101,9 @@ function InfoRow({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; text: s
 // Arthur: NarIyirm
 // 中文：创建、管理、分享、加入和扫码共用一个原生全屏流程；成功后统一把最新冰箱上下文交回库存页刷新。
 // EN: Creation, management, sharing, joining, and scanning share one native full-screen flow; every success returns fresh fridge context for inventory refresh.
+// Arthur: NarIyirm
+// 中文：共享冰箱 create/share/join/manage 四个页面的状态机；业务请求集中在 sharingApi，成功后把新上下文回传 FridgeScreen。
+// EN: This is the create/share/join/manage state machine; sharingApi owns requests and successful context flows back to FridgeScreen.
 export function SharedFridgeFlowModal({
   context,
   initialScreen,
@@ -138,12 +147,18 @@ export function SharedFridgeFlowModal({
     ? Math.max(0, Math.ceil((new Date(activeInvite.expiresAt).getTime() - Date.now()) / 86_400_000))
     : 0;
 
+  // Arthur: NarIyirm
+  // 中文：共享 mutation 成功后统一提交新上下文，并由父级触发库存重拉和同步会话探针。
+  // EN: Successful sharing mutations commit their new context here so the parent can reload inventory and probe the sync session.
   const commitContext = useCallback(async (next: FridgeAccessContext) => {
     setCurrentContext(next);
     setName(next.fridge.name);
     await onContextChanged(next);
   }, [onContextChanged]);
 
+  // Arthur: NarIyirm
+  // 中文：所有共享动作复用此执行器统一 pending 和错误状态；稳定服务端错误码可交给调用方翻译成具体提示。
+  // EN: Sharing actions reuse this runner for pending and error state while callers may translate stable server codes into precise messages.
   const run = useCallback(async (task: () => Promise<void>, errorMessage?: (error: unknown) => string) => {
     setPending(true);
     try {
@@ -155,6 +170,9 @@ export function SharedFridgeFlowModal({
     }
   }, [copy.errorBody, copy.errorTitle]);
 
+  // Arthur: NarIyirm
+  // 中文：把 Express 保留的邀请终态错误码映射为本地化文案；对应逻辑可在 server/routes/sharing.js 的 sharingError 找到。
+  // EN: This maps Express invite terminal-state codes to localized copy; matching server logic lives in server/routes/sharing.js sharingError.
   const joinErrorMessage = useCallback((error: unknown) => {
     const code = getApiErrorCode(error);
     if (code === 'invite_expired') return copy.joinErrorExpired;
@@ -194,6 +212,9 @@ export function SharedFridgeFlowModal({
     });
   }, [commitContext, name, run]);
 
+  // Arthur: NarIyirm
+  // 中文：确认后调用 sharingApi.joinSharedFridge；数据库 RPC 完成个人冰箱合并后，返回的新上下文会替换当前页面状态。
+  // EN: Confirmation calls sharingApi.joinSharedFridge; after the database RPC merges the personal fridge, returned context replaces current screen state.
   const join = useCallback(() => {
     const code = rawInviteCode(joinCode);
     if (code.length !== 8) return;
@@ -210,6 +231,9 @@ export function SharedFridgeFlowModal({
     ]);
   }, [commitContext, copy, joinCode, joinErrorMessage, onClose, run]);
 
+  // Arthur: NarIyirm
+  // 中文：确认退出后调用 sharingApi.leaveSharedFridge；数据库只迁移当前设备所有的活跃数据，再返回新的个人冰箱上下文。
+  // EN: Confirmed leave calls sharingApi.leaveSharedFridge; the database moves only current-device active data and returns the new personal context.
   const leave = useCallback(() => {
     Alert.alert(copy.leaveTitle, copy.leaveBody, [
       { text: copy.back, style: 'cancel' },

@@ -41,6 +41,9 @@ async function resolveFridge(deviceId) {
   return data;
 }
 
+// Arthur: NarIyirm
+// 中文：GET /api/inventory 和 bootstrap 共用此读取器；并行查询冰箱、分类、活跃批次与规则，再组装前端 InventorySnapshot。
+// EN: GET /api/inventory and bootstrap share this reader, which queries fridge, categories, active batches, and rules in parallel before building InventorySnapshot.
 async function getInventorySnapshot(deviceId) {
   const fridgeUid = await resolveFridge(deviceId);
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
@@ -96,6 +99,9 @@ async function getInventorySnapshot(deviceId) {
   };
 }
 
+// Arthur: NarIyirm
+// 中文：单批次详情在此补读 version、初始数量和名称级补货规则；调用方是 GET /inventory/batches/:batchUid。
+// EN: Single-batch detail adds version, initial quantity, and the name-level restock rule here for GET /inventory/batches/:batchUid.
 async function getInventoryBatchDetail(deviceId, batchUid) {
   // Arthur: NarIyirm
   // 中文：列表接口保持轻量；只有打开卡片时才读取批次版本、初始数量和名称级补货规则。
@@ -210,6 +216,9 @@ inventoryRouter.get('/inventory/batches/:batchUid', async (request, response) =>
   }
 });
 
+// Arthur: NarIyirm
+// 中文：详情弹窗关闭时进入此路由；校验数量和版本后交给 adjust_inventory_batch_quantity 原子更新批次与流水。
+// EN: Detail-sheet close enters this route; validated quantity and version flow to adjust_inventory_batch_quantity for atomic batch and event updates.
 inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, response) => {
   const deviceId = getDeviceId(request);
   const { batchUid } = request.params;
@@ -243,6 +252,9 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
   }
 });
 
+// Arthur: NarIyirm
+// 中文：编辑表单在此更新完整批次资料；expectedVersion 冲突统一转换为 409，前端需重载后重试。
+// EN: The edit form updates full batch details here; expectedVersion conflicts become 409 so the client reloads before retrying.
 inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) => {
   const deviceId = getDeviceId(request);
   const { batchUid } = request.params;
@@ -287,6 +299,9 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   }
 });
 
+// Arthur: NarIyirm
+// 中文：详情或编辑表单从此设置名称和单位级补货规则；enabled=false 会关闭规则而不删除库存。
+// EN: Detail and edit forms set a name-and-unit restock rule here; enabled=false disables the rule without deleting inventory.
 inventoryRouter.put('/inventory/batches/:batchUid/restock-rule', async (request, response) => {
   const deviceId = getDeviceId(request);
   const { batchUid } = request.params;
@@ -316,6 +331,9 @@ inventoryRouter.put('/inventory/batches/:batchUid/restock-rule', async (request,
   }
 });
 
+// Arthur: NarIyirm
+// 中文：前端“移出冰箱”进入此路由；archive_inventory_batch 执行软归档并保留历史事件。
+// EN: The remove action enters this route; archive_inventory_batch soft-archives the row and preserves history events.
 inventoryRouter.delete('/inventory/batches/:batchUid', async (request, response) => {
   const deviceId = getDeviceId(request);
   const { batchUid } = request.params;
@@ -337,6 +355,9 @@ inventoryRouter.delete('/inventory/batches/:batchUid', async (request, response)
   }
 });
 
+// Arthur: NarIyirm
+// 中文：InventoryEntryFlow 的防抖查询进入此路由；只返回参考建议，不创建批次或修改用户数据。
+// EN: InventoryEntryFlow's debounced lookup enters here and returns guidance without creating a batch or mutating user data.
 inventoryRouter.get('/food-presets/suggestion', async (request, response) => {
   const deviceId = getDeviceId(request);
   const query = typeof request.query.q === 'string' ? request.query.q.trim() : '';
@@ -371,6 +392,9 @@ inventoryRouter.get('/food-presets/suggestion', async (request, response) => {
   }
 });
 
+// Arthur: NarIyirm
+// 中文：手动与识别录入共用此创建路由；输入校验后由 create_inventory_batch RPC 原子写批次、stock 流水和规则。
+// EN: Manual and recognition entry share this create route; after validation, create_inventory_batch atomically writes the batch, stock event, and rule.
 inventoryRouter.post('/inventory/batches', async (request, response) => {
   const deviceId = getDeviceId(request);
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');

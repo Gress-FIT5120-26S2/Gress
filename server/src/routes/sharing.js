@@ -27,6 +27,9 @@ function normaliseCode(value) {
   return typeof value === 'string' ? value.trim().toUpperCase() : '';
 }
 
+// Arthur: NarIyirm
+// 中文：数据库 RPC 的稳定异常在此转换为 HTTP 状态和错误码；前端 SharedFridgeFlowModal 再负责本地化展示。
+// EN: Stable database RPC exceptions become HTTP statuses and codes here before SharedFridgeFlowModal localizes them.
 function sharingError(response, error) {
   const message = error?.message ?? 'sharing_failed';
   if (message.includes('invalid_fridge_name')) return response.status(400).json({ error: 'invalid_fridge_name' });
@@ -47,6 +50,9 @@ function sharingError(response, error) {
   return response.status(503).json({ error: 'sharing_unavailable' });
 }
 
+// Arthur: NarIyirm
+// 中文：所有共享成功响应复用此读取器，返回冰箱、有效邀请、匿名成员顺序和当前设备恢复配置。
+// EN: Sharing success responses reuse this reader for fridge, active invite, anonymous member order, and current-device recovery configuration.
 async function readContext(deviceId, fridgeUid) {
   const now = new Date().toISOString();
   const [fridgeResult, membersResult, inviteResult, recoveryResult] = await Promise.all([
@@ -76,6 +82,9 @@ async function readContext(deviceId, fridgeUid) {
   };
 }
 
+// Arthur: NarIyirm
+// 中文：创建家庭冰箱和轮换邀请码共用此流程；随机码冲突最多重试四次，事务 RPC 会撤销旧码。
+// EN: Family-fridge creation and invite rotation share this flow; random-code collisions retry four times and the transactional RPC revokes the old code.
 async function issueInvite(response, deviceId, fridgeName = null) {
   const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
 
@@ -140,6 +149,9 @@ router.patch('/fridges/current', async (request, response) => {
   }
 });
 
+// Arthur: NarIyirm
+// 中文：前端输入或扫码后进入此路由；join_shared_fridge RPC 锁定邀请和冰箱，在一个事务中完成数据合并与成员切换。
+// EN: Typed or scanned invites enter here; join_shared_fridge locks invite and fridges and completes data merge plus membership switch in one transaction.
 router.post('/fridges/join', async (request, response) => {
   const code = normaliseCode(request.body?.code).replaceAll('-', '');
   if (code.length < 6 || code.length > 64) return response.status(400).json({ error: 'invalid_invite_code' });
@@ -158,6 +170,9 @@ router.post('/fridges/join', async (request, response) => {
   }
 });
 
+// Arthur: NarIyirm
+// 中文：共享管理页确认退出后进入此路由；leave_shared_fridge 创建个人容器并按 owner_device_id 迁移当前设备数据。
+// EN: Confirmed leave enters here; leave_shared_fridge creates a personal container and moves current-device data by owner_device_id.
 router.post('/fridges/leave', async (request, response) => {
   const name = typeof request.body?.name === 'string' ? request.body.name.trim() : 'My Fridge';
   const { data: fridgeUid, error } = await supabase.rpc('leave_shared_fridge', {
@@ -184,6 +199,9 @@ router.post('/devices/recovery-code', async (request, response) => {
   return response.status(201).json({ recoveryCode });
 });
 
+// Arthur: NarIyirm
+// 中文：这是唯一在 requireDevice 前挂载的恢复入口；用一次性码和速率限制自鉴权，成功后撤销旧设备凭证。
+// EN: This is the only recovery route mounted before requireDevice; a one-time code and rate limit self-authenticate before revoking the old credential.
 export async function recoverDeviceRoute(request, response) {
   const deviceId = request.get('Device-ID')?.trim();
   const deviceCredential = request.get('Device-Credential')?.trim();

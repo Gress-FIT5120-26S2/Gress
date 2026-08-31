@@ -25,6 +25,9 @@ export function getApiErrorCode(error: unknown) {
   return error instanceof ApiRequestError ? error.code : null;
 }
 
+// Arthur: NarIyirm
+// 中文：所有业务 service 最终汇入此函数；上游见 inventoryApi/sharingApi 等，下游是 EXPO_PUBLIC_API_URL 指向的 Express。
+// EN: Every domain service converges here; upstream callers live in inventoryApi/sharingApi and downstream is the Express server at EXPO_PUBLIC_API_URL.
 export async function requestApi<T>(path: string, init: RequestInit = {}): Promise<T> {
   // Arthur: NarIyirm
   // 中文：所有前端业务请求都通过同一入口携带 Device-ID 访问 Express，避免各业务模块重复处理环境地址、请求头和错误。
@@ -65,6 +68,9 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   return body as T;
 }
 
+// Arthur: NarIyirm
+// 中文：App 启动时用此函数检查 Express 是否能以管理权限连接 Supabase；它不下载任何业务记录。
+// EN: App startup uses this to verify Express can reach Supabase with admin credentials without downloading domain records.
 export async function getApiHealth(): Promise<void> {
   const result = await requestApi<{ database?: string }>('/api/health');
   if (result.database !== 'connected') throw new Error('Supabase is not connected');

@@ -27,6 +27,9 @@ const upload = multer({
   },
 });
 
+// Arthur: NarIyirm
+// 中文：photo-recognition 路由的上传边界；multer 只在内存保留一张受大小和 MIME 限制的图片，再交给模型代理。
+// EN: This is the photo-recognition upload boundary; multer keeps one size- and MIME-limited image in memory before model proxying.
 function readSingleImage(request, response, next) {
   upload.single('file')(request, response, (error) => {
     if (!error) return next();
@@ -37,6 +40,9 @@ function readSingleImage(request, response, next) {
   });
 }
 
+// Arthur: NarIyirm
+// 中文：recognitionApi 的上传在此转发到 FOOD_RECOGNITION_API_URL；响应经食材、freshness 和 confidence 白名单清洗后返回。
+// EN: recognitionApi uploads arrive here and proxy to FOOD_RECOGNITION_API_URL; food, freshness, and confidence are allow-list normalized before returning.
 recognitionRouter.post('/photo-recognition', requireFridge, readSingleImage, async (request, response) => {
   if (!request.file) return response.status(400).json({ message: 'An image is required.' });
 

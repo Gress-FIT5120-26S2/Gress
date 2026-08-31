@@ -8,6 +8,9 @@ import { requireFridge } from '../middleware/requireFridge.js';
 const router = express.Router();
 
 // GET /api/cart -- the whole shared list, unchecked items first
+// Arthur: NarIyirm
+// 中文：ShoppingScreen 的 CartView 从此读取整个 fridgeUid 共享清单；未购买项优先返回。
+// EN: ShoppingScreen's CartView reads the entire fridgeUid-shared list here, with unchecked items returned first.
 router.get('/cart', requireFridge, async (req, res) => {
   const { data, error } = await supabase
     .from('shopping_cart_items')
@@ -20,6 +23,9 @@ router.get('/cart', requireFridge, async (req, res) => {
 });
 
 // POST /api/cart -- add an item
+// Arthur: NarIyirm
+// 中文：手动和补货建议都从此添加购物项；手动来源保存 owner_device_id，派生来源保持冰箱共同所有。
+// EN: Manual and restock suggestions add items here; manual sources keep owner_device_id while derived sources remain fridge-owned.
 router.post('/cart', requireFridge, async (req, res) => {
   const { name, category_uid, preset_uid, quantity, unit, source } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'name_required' });
@@ -61,6 +67,9 @@ router.patch('/cart/:id/quantity', requireFridge, async (req, res) => {
 });
 
 // PATCH /api/cart/:id/toggle -- mark bought / not bought (shared)
+// Arthur: NarIyirm
+// 中文：购物完成状态属于共享行；此路由同时记录 checked_by_device_id 和 checked_at 供审计。
+// EN: Purchase completion belongs to the shared row, and this route records checked_by_device_id plus checked_at for audit.
 router.patch('/cart/:id/toggle', requireFridge, async (req, res) => {
   const isChecked = !!req.body.is_checked;
   const { data, error } = await supabase

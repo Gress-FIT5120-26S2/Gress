@@ -140,6 +140,9 @@ type FridgeScreenProps = {
   blurTarget?: RefObject<View | null>;
 };
 
+// Arthur: NarIyirm
+// 中文：冰箱功能的页面编排入口；上游由 App.tsx 的 fridge Tab 挂载，下游通过 inventoryApi、sharingApi 和同步订阅读写权威数据。
+// EN: This orchestrates the fridge feature; App.tsx mounts it for the fridge tab and it reaches authoritative data through inventoryApi, sharingApi, and sync subscriptions.
 export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
@@ -163,6 +166,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
 
+  // Arthur: NarIyirm
+  // 中文：初次进入、下拉刷新和后台同步共用此加载器；最终调用 inventoryApi.getInventorySnapshot 并替换页面 snapshot。
+  // EN: Initial entry, pull-to-refresh, and background sync share this loader, which calls inventoryApi.getInventorySnapshot and replaces the screen snapshot.
   const loadInventory = useCallback(async (mode: InventoryLoadMode = 'background') => {
     if (mode === 'initial') setIsLoadingInventory(true);
     if (mode === 'manual') setIsRefreshingInventory(true);
@@ -309,6 +315,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     setIsManualEntryVisible(true);
   }, []);
 
+  // Arthur: NarIyirm
+  // 中文：识别相机成功后在此补查 food preset，并把模型结果转换为 RecognitionResultReview 或共用手动表单的初值。
+  // EN: After camera recognition, this enriches the model result with a food preset and builds either RecognitionResultReview or shared manual-form values.
   const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult, photoUri: string) => {
     if (result.food === 'unknown' || result.freshness === 'unknown') return;
     const foodName = t.fridge.photoRecognition.foodNames[result.food];
@@ -358,6 +367,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     setRecognitionInitialValues(undefined);
     setEntrySource('manual');
   }, []);
+  // Arthur: NarIyirm
+  // 中文：新增表单的提交终点；调用 inventoryApi.createInventoryBatch，成功后重新读取 GET /api/inventory 更新页面。
+  // EN: This is the create-form endpoint; it calls inventoryApi.createInventoryBatch and then rereads GET /api/inventory to refresh the screen.
   const saveInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
     // Arthur: NarIyirm
     // 中文：手动录入和识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
@@ -381,6 +393,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     await loadInventory();
   }, [loadInventory]);
 
+  // Arthur: NarIyirm
+  // 中文：从详情页进入编辑前重新获取批次和最新 version，避免共享场景用过期快照打开表单。
+  // EN: Before editing from detail, this reloads the batch and latest version so shared-fridge edits never start from a stale snapshot.
   const openBatchEditor = useCallback(async (batchUid: string) => {
     // Arthur: NarIyirm
     // 中文：详情窗关闭后重新获取最新版本再编辑，避免共享冰箱中用旧 version 覆盖其他设备刚完成的修改。
@@ -394,6 +409,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     }
   }, []);
 
+  // Arthur: NarIyirm
+  // 中文：编辑表单先提交带 expectedVersion 的批次资料，再保存名称级补货规则，最后重拉库存快照。
+  // EN: The edit form first submits versioned batch details, then saves the name-level restock rule, and finally reloads the snapshot.
   const saveEditedInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
     if (!editingBatch) return;
     await updateInventoryBatch(editingBatch.id, {

@@ -37,6 +37,9 @@ type SyncDomain = keyof SyncState['versions'];
 let pendingTopics = new Set<SyncTopic>();
 let dispatchTimer: ReturnType<typeof setTimeout> | null = null;
 
+// Arthur: NarIyirm
+// 中文：Broadcast 或版本探针先进入 180ms 合并窗口，再只通知相关页面，避免一笔事务触发重复重拉。
+// EN: Broadcasts and probes enter a 180ms window before notifying relevant screens, preventing duplicate reloads from one transaction.
 function dispatchTopics(topics: SyncTopic[]) {
   for (const topic of topics) pendingTopics.add(topic);
   if (dispatchTimer) return;
@@ -50,6 +53,9 @@ function dispatchTopics(topics: SyncTopic[]) {
   }, EVENT_COALESCE_MS);
 }
 
+// Arthur: NarIyirm
+// 中文：页面在这里声明同步主题；回调只重跑原业务 API，不直接把 Broadcast payload 当成业务数据。
+// EN: Screens declare sync topics here; callbacks rerun domain APIs instead of treating Broadcast payloads as business data.
 export function subscribeToSync(topics: SyncTopic[], listener: SyncListener) {
   const subscription = { listener, topics: new Set(topics) };
   listeners.add(subscription);
@@ -58,6 +64,9 @@ export function subscribeToSync(topics: SyncTopic[], listener: SyncListener) {
   };
 }
 
+// Arthur: NarIyirm
+// 中文：数据库四个版本域映射到页面主题；inventory 变化还需要刷新补货、通知和首页摘要。
+// EN: Four database version domains map to screen topics; inventory changes also refresh restock, notifications, and home summaries.
 function topicsForDomain(domain: SyncDomain): SyncTopic[] {
   if (domain === 'inventory') return ['inventory', 'restock', 'notifications', 'home'];
   if (domain === 'cart') return ['cart'];
@@ -65,6 +74,9 @@ function topicsForDomain(domain: SyncDomain): SyncTopic[] {
   return ['fridge', 'members'];
 }
 
+// Arthur: NarIyirm
+// 中文：版本以字符串传输以避开安全整数上限；优先用 BigInt 判断是否确实出现更高版本。
+// EN: Versions travel as strings to avoid safe-integer limits; BigInt is preferred when deciding whether an incoming version is newer.
 function isNewerVersion(current: string, incoming: string) {
   try {
     return BigInt(incoming) > BigInt(current);
@@ -219,10 +231,16 @@ class SyncHeartbeat {
 
 const heartbeat = new SyncHeartbeat();
 
+// Arthur: NarIyirm
+// 中文：共享操作后立即重新读取 /api/sync/state，用于切换 fridgeUid 或频道能力值。
+// EN: Sharing operations immediately reread /api/sync/state here when fridgeUid or the channel capability may have changed.
 export function requestImmediateSyncProbe() {
   heartbeat.probeNow();
 }
 
+// Arthur: NarIyirm
+// 中文：App 根节点挂载此 Provider；前台维护心跳和共享频道，后台断开，恢复时主动全域对账。
+// EN: The app root mounts this Provider to keep a foreground heartbeat and shared channel, disconnect in background, and reconcile on resume.
 export function RealtimeSyncProvider({ children }: PropsWithChildren) {
   useEffect(() => {
     let previousState: AppStateStatus = AppState.currentState;

@@ -31,6 +31,9 @@ type ShoppingCheckoutReviewProps = {
   onAllStocked: (stockedItemUids: string[]) => void | Promise<void>;
 };
 
+// Arthur: NarIyirm
+// 中文：结账复核把选中的购物项逐条调用 createInventoryBatch 转为库存；当前是多次请求，不是单个批量事务。
+// EN: Checkout review converts selected cart items through repeated createInventoryBatch calls; it is multiple requests rather than one batch transaction.
 export function ShoppingCheckoutReview({
   visible,
   items,
