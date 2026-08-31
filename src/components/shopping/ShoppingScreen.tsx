@@ -15,6 +15,7 @@ import {
   FlatList,
   Pressable,
   ActivityIndicator,
+  RefreshControl,
   StyleSheet,
 } from 'react-native';
 import { useI18n } from '../../i18n';
@@ -29,6 +30,7 @@ import {
   RestockSuggestion,
 } from '../../services/cartApi';
 import { getInventorySnapshot } from '../../services/inventoryApi';
+import { subscribeToSync } from '../../services/realtimeSync';
 import { ShoppingAddSheet } from './ShoppingAddSheet';
 import { ShoppingCheckoutReview } from './ShoppingCheckoutReview';
 
@@ -46,8 +48,11 @@ function useInventoryNames() {
     }
   }, []);
   useEffect(() => {
-    reload();
+    void reload();
   }, [reload]);
+  useEffect(() => subscribeToSync(['inventory', 'fridge'], () => {
+    void reload();
+  }), [reload]);
   return { names, reload };
 }
 
@@ -85,18 +90,23 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
   const { t } = useI18n();
   const [items, setItems] = useState<RestockSuggestion[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true);
     try {
       setItems(await fetchRestock());
     } finally {
       setLoading(false);
+      if (manual) setRefreshing(false);
     }
   }, []);
   useEffect(() => {
-    load();
+    void load().catch(() => undefined);
   }, [load]);
+  useEffect(() => subscribeToSync(['inventory', 'restock', 'fridge'], () => {
+    void load().catch(() => undefined);
+  }), [load]);
 
   const add = async (s: RestockSuggestion) => {
     const qty = Math.max(s.target_quantity - s.current_quantity, 0) || undefined;
@@ -110,6 +120,7 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
       data={items}
       keyExtractor={(i) => i.rule_uid}
       contentContainerStyle={styles.listContent}
+      refreshControl={<RefreshControl colors={['#168ACB']} onRefresh={() => { void load(true).catch(() => undefined); }} refreshing={refreshing} tintColor="#168ACB" />}
       renderItem={({ item }) => (
         <View style={styles.row}>
           <View style={styles.grow}>
@@ -134,20 +145,25 @@ function CartView() {
   const { names: inventoryNames } = useInventoryNames();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (manual = false) => {
+    if (manual) setRefreshing(true);
     try {
       setItems(await fetchCart());
     } finally {
       setLoading(false);
+      if (manual) setRefreshing(false);
     }
   }, []);
   useEffect(() => {
-    load();
+    void load().catch(() => undefined);
   }, [load]);
+  useEffect(() => subscribeToSync(['cart', 'fridge'], () => {
+    void load().catch(() => undefined);
+  }), [load]);
 
   const handleAdd = async (item: { name: string; quantity: number; unit: string }) => {
     const created = await addCartItem({
@@ -167,7 +183,7 @@ function CartView() {
     try {
       await updateCartQuantity(item.item_uid, next);
     } catch {
-      load();
+      void load().catch(() => undefined);
     }
   };
 
@@ -180,7 +196,7 @@ function CartView() {
     try {
       await updateCartQuantity(item.item_uid, next);
     } catch {
-      load();
+      void load().catch(() => undefined);
     }
   };
 
@@ -192,7 +208,7 @@ function CartView() {
     try {
       await toggleCartItem(item.item_uid, next);
     } catch {
-      load();
+      void load().catch(() => undefined);
     }
   };
 
@@ -201,7 +217,7 @@ function CartView() {
     try {
       await deleteCartItem(item.item_uid);
     } catch {
-      load();
+      void load().catch(() => undefined);
     }
   };
 
@@ -235,6 +251,7 @@ function CartView() {
         data={items}
         keyExtractor={(i) => i.item_uid}
         contentContainerStyle={styles.listContent}
+        refreshControl={<RefreshControl colors={['#168ACB']} onRefresh={() => { void load(true).catch(() => undefined); }} refreshing={refreshing} tintColor="#168ACB" />}
         renderItem={({ item }) => (
           <View style={styles.row}>
             <Pressable style={styles.check} onPress={() => onToggle(item)}>

@@ -1,6 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
-import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
 import {
   createInventoryBatch,
   getFoodPresetSuggestion,
@@ -12,6 +12,8 @@ import {
   type InventorySnapshot,
 } from '../services/inventoryApi';
 import type { PhotoRecognitionResult } from '../services/recognitionApi';
+import { getFridgeAccessContext, type FridgeAccessContext } from '../services/sharingApi';
+import { requestImmediateSyncProbe, subscribeToSync } from '../services/realtimeSync';
 import { useI18n } from '../i18n';
 import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
@@ -31,10 +33,13 @@ import {
   RecognitionResultReview,
   type RecognitionDraft,
 } from './inventory-entry/RecognitionResultReview';
+import { FridgeSpaceMenu } from './sharing/FridgeSpaceMenu';
+import { SharedFridgeFlowModal, type SharedFridgeFlowScreen } from './sharing/SharedFridgeFlowModal';
 
 type StorageZone = FridgeStorageZone;
 type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
 type FoodCategory = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
+type InventoryLoadMode = 'background' | 'initial' | 'manual';
 
 type InventoryItem = {
   id: string;
@@ -150,10 +155,17 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const [editingBatch, setEditingBatch] = useState<InventoryBatchDetail | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  const [isRefreshingInventory, setIsRefreshingInventory] = useState(false);
   const [hasInventoryLoadError, setHasInventoryLoadError] = useState(false);
+  const [isSpaceMenuVisible, setIsSpaceMenuVisible] = useState(false);
+  const [sharingContext, setSharingContext] = useState<FridgeAccessContext | null>(null);
+  const [isSharingContextLoading, setIsSharingContextLoading] = useState(false);
+  const [hasSharingContextError, setHasSharingContextError] = useState(false);
+  const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
 
-  const loadInventory = useCallback(async () => {
-    setIsLoadingInventory(true);
+  const loadInventory = useCallback(async (mode: InventoryLoadMode = 'background') => {
+    if (mode === 'initial') setIsLoadingInventory(true);
+    if (mode === 'manual') setIsRefreshingInventory(true);
     try {
       const nextSnapshot = await getInventorySnapshot();
       setSnapshot(nextSnapshot);
@@ -162,7 +174,8 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       setHasInventoryLoadError(true);
       throw error;
     } finally {
-      setIsLoadingInventory(false);
+      if (mode === 'initial') setIsLoadingInventory(false);
+      if (mode === 'manual') setIsRefreshingInventory(false);
     }
   }, []);
 
@@ -170,7 +183,49 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     // Arthur: NarIyirm
     // 中文：进入冰箱页后用当前设备对应的真实冰箱替换演示数据；失败时保留空状态，不显示过期缓存数据。
     // EN: Opening the fridge loads the real fridge for this device; failures keep an empty state instead of showing stale mock data.
-    void loadInventory().catch(() => undefined);
+    void loadInventory('initial').catch(() => undefined);
+  }, [loadInventory]);
+
+  useEffect(() => subscribeToSync(['inventory', 'restock', 'fridge'], () => {
+    // Arthur: NarIyirm
+    // 中文：实时事件只触发静默对账，保留当前筛选和滚动状态，不用全屏加载态打断用户操作。
+    // EN: Realtime events trigger silent reconciliation, preserving filters and scroll state without interrupting the user with a full-screen loader.
+    void loadInventory('background').catch(() => undefined);
+  }), [loadInventory]);
+
+  const loadSharingContext = useCallback(async () => {
+    setIsSharingContextLoading(true);
+    setHasSharingContextError(false);
+    try {
+      setSharingContext(await getFridgeAccessContext());
+    } catch {
+      setHasSharingContextError(true);
+    } finally {
+      setIsSharingContextLoading(false);
+    }
+  }, []);
+
+  useEffect(() => subscribeToSync(['fridge', 'members'], () => {
+    void loadSharingContext();
+  }), [loadSharingContext]);
+
+  const openSpaceMenu = useCallback(() => {
+    setIsSpaceMenuVisible(true);
+    void loadSharingContext();
+  }, [loadSharingContext]);
+
+  const openSharingFlow = useCallback((screen: SharedFridgeFlowScreen) => {
+    setIsSpaceMenuVisible(false);
+    setSharingFlow(screen);
+  }, []);
+
+  const handleSharingContextChanged = useCallback(async (nextContext: FridgeAccessContext) => {
+    // Arthur: NarIyirm
+    // 中文：共享操作成功后同时更新入口状态与库存快照，名称、模式和数据合并结果会在同一页面周期内可见。
+    // EN: After sharing succeeds, refresh both access state and inventory so name, mode, and merged data become visible in the same screen cycle.
+    setSharingContext(nextContext);
+    requestImmediateSyncProbe();
+    await loadInventory();
   }, [loadInventory]);
 
   const inventory = useMemo<InventoryItem[]>(() => (snapshot?.batches ?? []).map((batch) => {
@@ -187,7 +242,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       storage: batch.storageZone,
     };
   }), [snapshot, t.fridge.manualEntry.units]);
-  const currentScopeLabel = snapshot?.fridge.name ?? t.fridge.scopes.personal;
+  const currentScopeLabel = snapshot?.fridge.mode === 'shared'
+    ? snapshot.fridge.name
+    : t.fridge.scopes.personal;
 
   // Arthur: NarIyirm
   // 中文：界面语言只改变展示文案，筛选始终使用稳定的内部键，避免切换语言时丢失当前条件。
@@ -408,10 +465,11 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
     <View style={styles.screen}>
       <View style={styles.topArea}>
         <View style={styles.toolbar}>
-          <View accessibilityLabel={currentScopeLabel} style={styles.fridgeSwitcher}>
-            <MaterialCommunityIcons name="fridge-outline" size={20} color="#496A61" />
+          <Pressable accessibilityLabel={t.fridge.switchA11y(currentScopeLabel)} accessibilityRole="button" onPress={openSpaceMenu} style={({ pressed }) => [styles.fridgeSwitcher, pressed ? styles.pressed : null]}>
+            <MaterialCommunityIcons name="fridge-outline" size={20} color="#168ACB" />
             <Text numberOfLines={1} style={styles.fridgeSwitcherText}>{currentScopeLabel}</Text>
-          </View>
+            <Ionicons name="chevron-down" size={15} color="#168ACB" />
+          </Pressable>
           <View style={styles.searchField}>
             <Ionicons name="search-outline" size={21} color="#6E817A" />
             <TextInput
@@ -505,13 +563,21 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
             columnWrapperStyle={styles.cardRow}
             contentContainerStyle={visibleItems.length > 0 ? styles.cardGrid : styles.emptyList}
             renderItem={renderInventoryItem}
+            refreshControl={(
+              <RefreshControl
+                colors={['#168ACB']}
+                onRefresh={() => { void loadInventory('manual').catch(() => undefined); }}
+                refreshing={isRefreshingInventory}
+                tintColor="#168ACB"
+              />
+            )}
             ListEmptyComponent={isLoadingInventory ? (
               <View style={styles.loadingState}><ActivityIndicator color="#168ACB" /></View>
             ) : (
               <EmptyInventory
                 buttonLabel={hasInventoryLoadError ? t.fridge.reloadInventory : t.fridge.clearFilters}
                 description={hasInventoryLoadError ? t.status.disconnected : t.fridge.emptyDescription}
-                onClear={hasInventoryLoadError ? () => { void loadInventory().catch(() => undefined); } : clearFilters}
+                onClear={hasInventoryLoadError ? () => { void loadInventory('initial').catch(() => undefined); } : clearFilters}
                 title={t.fridge.emptyTitle(sectionTitle)}
               />
             )}
@@ -554,6 +620,24 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
         onEdit={(batchUid) => { setSelectedBatchUid(null); void openBatchEditor(batchUid); }}
         visible={selectedBatchUid !== null}
       />
+      <FridgeSpaceMenu
+        context={sharingContext}
+        failed={hasSharingContextError}
+        loading={isSharingContextLoading}
+        onClose={() => setIsSpaceMenuVisible(false)}
+        onCreate={() => openSharingFlow('create')}
+        onJoin={() => openSharingFlow('join')}
+        onManage={() => openSharingFlow('manage')}
+        onRetry={() => { void loadSharingContext(); }}
+        visible={isSpaceMenuVisible}
+      />
+      <SharedFridgeFlowModal
+        context={sharingContext}
+        initialScreen={sharingFlow ?? 'create'}
+        onClose={() => setSharingFlow(null)}
+        onContextChanged={handleSharingContextChanged}
+        visible={sharingFlow !== null}
+      />
     </View>
   );
 }
@@ -576,8 +660,8 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FBFA' },
   topArea: { paddingTop: 64, paddingBottom: 12, backgroundColor: '#F3F8F7' },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 16 },
-  fridgeSwitcher: { width: 132, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: '#D8E5E0', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#EAF2EF' },
-  fridgeSwitcherText: { flex: 1, color: '#305D51', fontSize: 13, fontWeight: '800' },
+  fridgeSwitcher: { width: 142, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: '#BFE3F3', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#EAF7FD' },
+  fridgeSwitcherText: { flex: 1, color: '#24566E', fontSize: 13, fontWeight: '800' },
   searchField: { flex: 1, minWidth: 0, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 0, color: '#203C33', fontSize: 14, fontWeight: '600' },
   filterRow: { gap: 8, paddingTop: 13, paddingHorizontal: 16, paddingRight: 30 },

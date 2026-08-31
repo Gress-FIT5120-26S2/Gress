@@ -1,8 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
-import { Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type AppLanguage, useI18n } from '../i18n';
+import { DeviceRecoverySettings } from './DeviceRecoverySettings';
 
 export function ProfileSettingsButton({ blurTarget, onPress }: { blurTarget: RefObject<View | null>; onPress: () => void }) {
   const { t } = useI18n();
@@ -60,25 +61,28 @@ export function LanguageSettingsModal({ onClose, visible }: { onClose: () => voi
         <Pressable accessibilityLabel={t.settings.close} onPress={onClose} style={StyleSheet.absoluteFill} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
-          <View style={styles.header}>
-            <View style={styles.headerCopy}>
-              <Text style={styles.title}>{t.settings.title}</Text>
-              <Text style={styles.subtitle}>{t.settings.subtitle}</Text>
+          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
+            <View style={styles.header}>
+              <View style={styles.headerCopy}>
+                <Text style={styles.title}>{t.settings.title}</Text>
+                <Text style={styles.subtitle}>{t.settings.subtitle}</Text>
+              </View>
+              <Pressable accessibilityLabel={t.settings.close} accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}>
+                <Ionicons name="close" size={22} color="#365048" />
+              </Pressable>
             </View>
-            <Pressable accessibilityLabel={t.settings.close} accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}>
-              <Ionicons name="close" size={22} color="#365048" />
-            </Pressable>
-          </View>
 
-          <Text style={styles.sectionLabel}>{t.settings.language}</Text>
-          <Text style={styles.sectionDescription}>{t.settings.languageDescription}</Text>
-          {/* Arthur: NarIyirm
-              中文：两个选项直接更新全局语言状态，同一渲染帧内所有已接入文案都会同步切换。
-              EN: Both options update global language state so every connected string switches within the same render frame. */}
-          <View accessibilityRole="radiogroup" style={styles.languageGroup}>
-            <LanguageOption language="zh" label={t.settings.chinese} detail={t.settings.chineseDetail} />
-            <LanguageOption language="en" label={t.settings.english} detail={t.settings.englishDetail} />
-          </View>
+            <Text style={styles.sectionLabel}>{t.settings.language}</Text>
+            <Text style={styles.sectionDescription}>{t.settings.languageDescription}</Text>
+            {/* Arthur: NarIyirm
+                中文：两个选项直接更新全局语言状态，同一渲染帧内所有已接入文案都会同步切换。
+                EN: Both options update global language state so every connected string switches within the same render frame. */}
+            <View accessibilityRole="radiogroup" style={styles.languageGroup}>
+              <LanguageOption language="zh" label={t.settings.chinese} detail={t.settings.chineseDetail} />
+              <LanguageOption language="en" label={t.settings.english} detail={t.settings.englishDetail} />
+            </View>
+            <DeviceRecoverySettings active={visible} />
+          </ScrollView>
         </View>
       </View>
     </Modal>
@@ -90,7 +94,8 @@ const styles = StyleSheet.create({
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.97 }] },
   settingsGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)', backgroundColor: 'rgba(255,255,255,0.30)' },
   modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,38,32,0.32)' },
-  sheet: { paddingHorizontal: 22, paddingTop: 10, paddingBottom: 40, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#F8F7F1', shadowColor: '#183D32', shadowOpacity: 0.2, shadowRadius: 26, shadowOffset: { width: 0, height: -8 }, elevation: 18 },
+  sheet: { maxHeight: '92%', paddingHorizontal: 22, paddingTop: 10, paddingBottom: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#F8F7F1', shadowColor: '#183D32', shadowOpacity: 0.2, shadowRadius: 26, shadowOffset: { width: 0, height: -8 }, elevation: 18 },
+  scrollContent: { paddingBottom: 24 },
   handle: { width: 38, height: 5, alignSelf: 'center', borderRadius: 3, backgroundColor: '#CDD5D0' },
   header: { marginTop: 20, flexDirection: 'row', alignItems: 'flex-start' },
   headerCopy: { flex: 1, paddingRight: 16 },

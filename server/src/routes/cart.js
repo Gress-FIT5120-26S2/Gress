@@ -34,6 +34,7 @@ router.post('/cart', requireFridge, async (req, res) => {
       unit: unit ?? null,
       source: source ?? 'manual',
       added_by_device_id: req.deviceId,
+      owner_device_id: (source ?? 'manual') === 'manual' ? req.deviceId : null,
     })
     .select()
     .single();

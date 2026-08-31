@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "dev": "node src/index.js",
-    "start": "node src/index.js"
+    "start": "node src/index.js",
+    "verify:sharing": "node scripts/verify-sharing.js",
+    "verify:sync": "node scripts/verify-sync.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",

@@ -17,6 +17,7 @@ import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
 import { error } from 'three';
 import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
+import { RealtimeSyncProvider, subscribeToSync } from './src/services/realtimeSync';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -126,6 +127,13 @@ function KitchMemoApp() {
       .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
       .catch(() => undefined);
   }, [activeTab]);
+
+  useEffect(() => subscribeToSync(['notifications', 'home'], () => {
+    if (activeTab !== 'home' && activeTab !== 'notifications') return;
+    void fetchNotifications()
+      .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
+      .catch(() => undefined);
+  }), [activeTab]);
 
   useEffect(() => {
     let mounted = true;
@@ -344,9 +352,11 @@ function KitchMemoApp() {
 
 export default function App() {
   return (
-    <I18nProvider>
-      <KitchMemoApp />
-    </I18nProvider>
+    <RealtimeSyncProvider>
+      <I18nProvider>
+        <KitchMemoApp />
+      </I18nProvider>
+    </RealtimeSyncProvider>
   );
 }
 
