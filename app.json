@@ -16,8 +16,7 @@
     },
     "android": {
       "package": "com.gressfit5120.kitchmemo",
-      "predictiveBackGestureEnabled": false,
-      "usesCleartextTraffic": true
+      "predictiveBackGestureEnabled": false
     },
     "web": {
       "favicon": "./assets/kitchmemo-icon.png"
@@ -53,7 +52,16 @@
           "recordAudioAndroid": false,
           "barcodeScannerEnabled": true
         }
-      ]
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      "expo-sharing"
     ]
   }
 }

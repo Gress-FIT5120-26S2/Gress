@@ -8,6 +8,7 @@ import {
   type KitchenNotification,
   type NotificationType,
 } from '../services/notificationApi';
+import { subscribeToSync } from '../services/realtimeSync';
 
 const APPEARANCE: Record<NotificationType, { icon: keyof typeof Ionicons.glyphMap; tone: string }> = {
   expiring: { icon: 'time-outline', tone: '#E8774C' },
@@ -47,8 +48,8 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  const load = useCallback(async (silent = false) => {
+    if (!silent) setLoading(true);
     setFailed(false);
     try {
       const snapshot = await fetchNotifications();
@@ -58,13 +59,17 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
     } catch {
       setFailed(true);
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   }, [onUnreadCountChange]);
 
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => subscribeToSync(['notifications', 'inventory', 'fridge'], () => {
+    void load(true);
+  }), [load]);
 
   const onPress = useCallback(async (item: KitchenNotification) => {
     // Arthur: NarIyirm
@@ -87,8 +92,13 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
   return (
     <View style={styles.container}>
       <View style={styles.summaryRow}>
-        <Text style={styles.summary}>{unreadCount > 0 ? t.notifications.unreadSummary(unreadCount) : t.notifications.allRead}</Text>
-        <View style={[styles.statusDot, unreadCount === 0 && styles.statusDotRead]} />
+        <View style={styles.summaryCopy}>
+          <Text style={styles.summary}>{unreadCount > 0 ? t.notifications.unreadSummary(unreadCount) : t.notifications.allRead}</Text>
+          <View style={[styles.statusDot, unreadCount === 0 && styles.statusDotRead]} />
+        </View>
+        <Pressable accessibilityLabel={t.notifications.refresh} accessibilityRole="button" hitSlop={8} onPress={() => { void load(); }} style={styles.refreshButton}>
+          <Ionicons color="#5E9686" name="refresh-outline" size={18} />
+        </Pressable>
       </View>
 
       {loading ? (
@@ -133,10 +143,12 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
 
 const styles = StyleSheet.create({
   container: { marginTop: 30 },
-  summaryRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  summaryCopy: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   summary: { color: '#53665D', fontSize: 13, fontWeight: '700' },
   statusDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#E8774C' },
   statusDotRead: { backgroundColor: '#83A398' },
+  refreshButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: 'rgba(255,255,255,0.62)' },
   spinner: { marginTop: 28 },
   emptyBox: { marginTop: 14, minHeight: 82, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: 'rgba(255,255,255,0.62)' },
   emptyText: { color: '#718078', fontSize: 13, fontWeight: '600' },
