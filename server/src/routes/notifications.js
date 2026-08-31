@@ -15,6 +15,9 @@ function daysLeftFrom(expiresAt) {
   return Math.max(0, Math.ceil(remaining / 86_400_000));
 }
 
+// Arthur: NarIyirm
+// 中文：NotificationInbox 和首页角标共用此读取；先从实时库存同步派生通知，再合并当前设备 notification_reads。
+// EN: NotificationInbox and the home badge share this read; it first derives notifications from live stock, then merges current-device notification_reads.
 router.get('/notifications', requireFridge, async (req, res) => {
     // Refresh notifications from live stock, then assemble the inbox with this device's read state.
   const { error: syncError } = await supabase.rpc('sync_fridge_notifications', {
@@ -70,6 +73,9 @@ router.get('/notifications', requireFridge, async (req, res) => {
   });
 });
 
+// Arthur: NarIyirm
+// 中文：标记已读前先确认通知属于当前 fridgeUid，再 upsert 当前 deviceId 的阅读记录。
+// EN: Before marking read, this verifies the notification belongs to the current fridgeUid and upserts the current deviceId's read record.
 router.post('/notifications/:id/read', requireFridge, async (req, res) => {
   const { data: notification, error: lookupError } = await supabase
     .from('notifications')

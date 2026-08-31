@@ -101,6 +101,9 @@ function parseLocalDateTime(date: string, time: string) {
   return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
+// Arthur: NarIyirm
+// 中文：手动录入、识别预填和资料编辑共用此两步表单；父级 FridgeScreen 通过 onSubmit 决定创建还是更新请求。
+// EN: Manual entry, recognition-prefill, and detail editing share this two-step form; FridgeScreen chooses create or update through onSubmit.
 export function InventoryEntryFlow({
   blurTarget,
   initialValues,
@@ -250,6 +253,9 @@ export function InventoryEntryFlow({
     void Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(searchTerms)}`).catch(() => undefined);
   }, [language, name]);
 
+  // Arthur: NarIyirm
+  // 中文：只把 food preset 的储存区、分类和参考天数复制到本地表单；用户仍可修改，数据库此时没有写入。
+  // EN: This only copies food-preset storage, category, and shelf-life guidance into local form state; it remains editable and writes no database data yet.
   const applySuggestion = useCallback(() => {
     if (!suggestion) return;
     const now = new Date();
@@ -279,6 +285,9 @@ export function InventoryEntryFlow({
     setRestockError(null);
   }, []);
 
+  // Arthur: NarIyirm
+  // 中文：保存按钮在此完成前端校验并组装 InventoryEntrySubmission；真正 HTTP 请求由父组件传入的 onSubmit 发起。
+  // EN: The save button validates and builds InventoryEntrySubmission here; the parent-provided onSubmit performs the actual HTTP request.
   const handleSubmit = useCallback(async () => {
     const expiry = expiryEnabled ? parseLocalDateTime(expiryDate, expiryTime) : null;
     const nextExpiryError = expiryEnabled && (!expiry || expiry.getTime() < Date.now()) ? copy.validation.expiry : null;

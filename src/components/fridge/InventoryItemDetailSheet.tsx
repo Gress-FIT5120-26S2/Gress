@@ -64,6 +64,9 @@ function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(roundQuantity(value));
 }
 
+// Arthur: NarIyirm
+// 中文：库存卡片的详情与快捷 mutation 入口；上游由 FridgeScreen 传 batchUid，下游调用 inventoryApi 的详情、数量、补货和归档接口。
+// EN: This is the inventory card's detail and quick-mutation surface; FridgeScreen supplies batchUid and inventoryApi handles detail, quantity, restock, and archive calls.
 export function InventoryItemDetailSheet({
   batchUid,
   onChanged,
@@ -126,6 +129,9 @@ export function InventoryItemDetailSheet({
     setTargetQuantity(nextBatch.restockRule?.targetQuantity ?? Math.max(2, Math.min(nextBatch.initialQuantity, 2)));
   }, []);
 
+  // Arthur: NarIyirm
+  // 中文：弹窗打开时按 batchUid 延迟加载完整批次和 version；列表快照因此可以保持轻量。
+  // EN: Opening the sheet lazily loads the full batch and version by batchUid, keeping the list snapshot lightweight.
   const loadBatch = useCallback(async () => {
     if (!batchUid) return;
     setIsLoading(true);
@@ -240,6 +246,9 @@ export function InventoryItemDetailSheet({
     }).start(finishAnimation);
   }), [dismissedOffset, reducedMotion, translateY]);
 
+  // Arthur: NarIyirm
+  // 中文：关闭动画与数量保存并行执行；仅在草稿变化时提交一次 expectedVersion，失败则弹窗回到可操作位置。
+  // EN: Closing animation and quantity persistence run together; a changed draft submits expectedVersion once, and failures return the sheet to an interactive position.
   const requestClose = useCallback(async (afterClose?: () => void, releaseVelocity = 0) => {
     if (isClosing) return;
     setIsClosing(true);
@@ -372,6 +381,9 @@ export function InventoryItemDetailSheet({
     setRestockError(null);
   }, [batch, minimumQuantity]);
 
+  // Arthur: NarIyirm
+  // 中文：把弹窗内阈值保存到名称和单位级补货规则；完成后通过 onChanged 让 FridgeScreen 重拉快照。
+  // EN: This saves sheet thresholds to a name-and-unit restock rule, then asks FridgeScreen through onChanged to reload its snapshot.
   const saveRestock = useCallback(async () => {
     if (!batch || isSavingRestock) return;
     setIsSavingRestock(true);
@@ -391,6 +403,9 @@ export function InventoryItemDetailSheet({
     }
   }, [batch, copy.restock.error, isSavingRestock, minimumQuantity, onChanged, restockEnabled, targetQuantity]);
 
+  // Arthur: NarIyirm
+  // 中文：确认移除后调用 archiveInventoryBatch；后端软归档并保留历史，成功后再通知父页面刷新。
+  // EN: Confirmed removal calls archiveInventoryBatch; the backend soft-archives history and the parent refreshes after success.
   const removeBatch = useCallback(async () => {
     if (!batch || isRemoving) return;
     setIsRemoving(true);

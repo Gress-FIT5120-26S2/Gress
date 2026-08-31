@@ -43,12 +43,18 @@ const FRESHNESS_TONES: Record<RecognitionFreshness, { accent: string; text: stri
   rotten: { accent: '#D06A5F', text: '#933E37', tint: '#FCE8E5' },
 };
 
+// Arthur: NarIyirm
+// 中文：把模型 freshness 与 food preset 基准天数组合为可编辑预计天数；这里只生成建议，不是食品安全结论。
+// EN: This combines model freshness with the food-preset baseline into editable estimated days, not a food-safety decision.
 export function getEstimatedShelfLifeDays(freshness: RecognitionFreshness, baselineDays: number) {
   if (freshness === 'rotten') return 0;
   if (freshness === 'semi_fresh') return Math.max(1, Math.ceil(baselineDays * 0.4));
   return baselineDays;
 }
 
+// Arthur: NarIyirm
+// 中文：FridgeScreen 用此函数把识别结果转换为 InventoryEntryFlow 初值，最终仍走普通库存创建请求。
+// EN: FridgeScreen uses this to convert recognition into InventoryEntryFlow values, which still submit through the normal inventory-create path.
 export function buildRecognitionInitialValues(
   foodName: string,
   suggestion: FoodPresetSuggestion,

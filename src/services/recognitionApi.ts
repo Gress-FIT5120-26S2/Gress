@@ -21,6 +21,9 @@ export type PhotoRecognitionResult = {
   reason: string | null;
 };
 
+// Arthur: NarIyirm
+// 中文：相机页从这里上传单张缓存图片；requestApi 负责设备凭证，Express recognition.js 只在内存中代理到模型服务。
+// EN: The camera uploads one cached image here; requestApi adds device credentials while Express recognition.js proxies it to the model entirely in memory.
 export function recogniseFoodPhoto(uri: string): Promise<PhotoRecognitionResult> {
   const form = new FormData();
   const photo = new File(uri);

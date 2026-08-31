@@ -37,6 +37,9 @@ import { ShoppingCheckoutReview } from './ShoppingCheckoutReview';
 type Tab = 'restock' | 'cart';
 
 // Shared hook: load current inventory names once, for duplicate detection (US5.3).
+// Arthur: NarIyirm
+// 中文：购物手动录入复用库存快照中的名称做“可能已有”提示；只读 inventoryApi，不改变库存。
+// EN: Manual cart entry reuses inventory snapshot names for possible-duplicate hints and never mutates inventory here.
 function useInventoryNames() {
   const [names, setNames] = useState<Set<string>>(new Set());
   const reload = useCallback(async () => {
@@ -56,6 +59,9 @@ function useInventoryNames() {
   return { names, reload };
 }
 
+// Arthur: NarIyirm
+// 中文：购物功能的页面入口；在派生补货建议与 fridgeUid 共享购物车两个视图之间切换。
+// EN: This is the shopping feature entry, switching between derived restock suggestions and the fridgeUid-shared cart.
 export function ShoppingScreen() {
   const { t } = useI18n();
   const screen = t.screens.shopping;
@@ -86,6 +92,9 @@ export function ShoppingScreen() {
 }
 
 // ---- 建议购物 / 需补货 (derived, read-only + "add to cart") ----
+// Arthur: NarIyirm
+// 中文：补货视图读取 get_restock_suggestions 的派生结果，加入购物车后通知父级切换或刷新。
+// EN: The restock view reads derived get_restock_suggestions results and notifies its parent after adding one to the cart.
 function RestockView({ onAdded }: { onAdded: () => void }) {
   const { t } = useI18n();
   const [items, setItems] = useState<RestockSuggestion[]>([]);
@@ -140,6 +149,9 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
 }
 
 // ---- 购物车 (editable list: add, quantity edit, delete, checkout) ----
+// Arthur: NarIyirm
+// 中文：共享购物车视图集中处理列表读取、数量、勾选和删除；每个 mutation 都通过 cartApi 回到 Express。
+// EN: The shared cart view handles loading, quantity, checking, and deletion, with every mutation returning to Express through cartApi.
 function CartView() {
   const { t } = useI18n();
   const { names: inventoryNames } = useInventoryNames();

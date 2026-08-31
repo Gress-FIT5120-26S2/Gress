@@ -28,6 +28,9 @@ type PhotoRecognitionCameraProps = {
 
 const FLASH_SEQUENCE: FlashMode[] = ['auto', 'on', 'off'];
 
+// Arthur: NarIyirm
+// 中文：拍照识别流程入口；负责相机/相册与图片规范化，识别请求在 recognitionApi，结果交回 FridgeScreen 继续预填。
+// EN: This starts photo recognition, handling camera/gallery and image normalization while recognitionApi sends the request and FridgeScreen receives the prefill result.
 export function PhotoRecognitionCamera({
   onClose,
   onManualFallback,
@@ -53,6 +56,9 @@ export function PhotoRecognitionCamera({
     setShowSupportedFoods(false);
   }, [visible]);
 
+  // Arthur: NarIyirm
+  // 中文：相机和相册统一汇入此函数；先压缩/规范化缓存文件，再调用 recogniseFoodPhoto，失败保留手动录入退路。
+  // EN: Camera and gallery converge here; the cached file is normalized before recogniseFoodPhoto, with manual entry retained as the failure fallback.
   const recogniseUri = useCallback(async (sourceUri: string, sourceWidth?: number) => {
     try {
       setStage('recognising');

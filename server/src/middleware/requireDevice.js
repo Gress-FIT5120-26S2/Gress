@@ -8,6 +8,9 @@ function digestCredential(credential) {
   return createHash('sha256').update(credential, 'utf8').digest('hex');
 }
 
+// Arthur: NarIyirm
+// 中文：普通业务请求的统一信任入口；凭证做 SHA-256 后交给 authenticate_device RPC，并返回设备唯一 fridgeUid。
+// EN: This is the trust entry for normal domain requests; it hashes the credential, calls authenticate_device, and returns the device's unique fridgeUid.
 export async function authenticateDeviceCredentials(deviceId, credential) {
   if (!deviceId || !DEVICE_ID_PATTERN.test(deviceId) || !credential || !DEVICE_CREDENTIAL_PATTERN.test(credential)) {
     return { error: 'invalid_device', fridgeUid: null };
@@ -31,6 +34,9 @@ export async function authenticateDeviceCredentials(deviceId, credential) {
   return { error: null, fridgeUid };
 }
 
+// Arthur: NarIyirm
+// 中文：server/src/index.js 在所有普通 /api 路由前挂载此中间件；成功后下游只使用 request.deviceId 和 request.fridgeUid。
+// EN: server/src/index.js mounts this before normal /api routes; downstream handlers consume request.deviceId and request.fridgeUid only after success.
 export async function requireDevice(request, response, next) {
   const deviceId = request.get('Device-ID')?.trim();
   const credential = request.get('Device-Credential')?.trim();

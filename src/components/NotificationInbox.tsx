@@ -17,6 +17,9 @@ const APPEARANCE: Record<NotificationType, { icon: keyof typeof Ionicons.glyphMa
   system: { icon: 'mail-outline', tone: '#5E9686' },
 };
 
+// Arthur: NarIyirm
+// 中文：数据库只保存 messageKey 和 payload；此函数在前端按当前语言把通知映射为标题与说明。
+// EN: The database stores only messageKey and payload; this maps each notification to localized title and detail text on the client.
 function copyForItem(t: Translation, item: KitchenNotification) {
   const name = item.payload.name?.trim() || t.notifications.messages.system.title();
   if (item.type === 'expired') {
@@ -41,6 +44,9 @@ function copyForItem(t: Translation, item: KitchenNotification) {
   };
 }
 
+// Arthur: NarIyirm
+// 中文：通知页面入口；通过 notificationApi 读取冰箱共享通知，并把当前设备未读数回传给 App.tsx 的首页角标。
+// EN: This is the inbox entry; notificationApi loads fridge-shared events while the current device's unread count flows back to the App.tsx home badge.
 export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange?: (count: number) => void }) {
   const { t } = useI18n();
   const [items, setItems] = useState<KitchenNotification[]>([]);
@@ -48,6 +54,9 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
 
+  // Arthur: NarIyirm
+  // 中文：首次、手动和同步刷新共用此加载器；silent 模式保留现有列表，避免 Broadcast 触发全屏 loading。
+  // EN: Initial, manual, and sync refreshes share this loader; silent mode keeps the current list so Broadcast never causes a full-screen loader.
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setFailed(false);
@@ -71,6 +80,9 @@ export function NotificationInbox({ onUnreadCountChange }: { onUnreadCountChange
     void load(true);
   }), [load]);
 
+  // Arthur: NarIyirm
+  // 中文：点击未读项后调用 markNotificationRead，并只更新本地对应记录与未读数，不影响其他成员。
+  // EN: Pressing an unread item calls markNotificationRead and updates only the local row and count, without affecting other members.
   const onPress = useCallback(async (item: KitchenNotification) => {
     // Arthur: NarIyirm
     // 中文：先更新本地已读和角标，失败再整表重拉，避免点按后角标还停在旧数字。

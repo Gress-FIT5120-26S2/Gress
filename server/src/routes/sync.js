@@ -4,6 +4,9 @@ import { supabase } from '../supabase.js';
 
 const router = express.Router();
 
+// Arthur: NarIyirm
+// 中文：同步会话只允许返回 publishable/anon key；此守卫防止误把 secret 或 service-role key 下发到 App。
+// EN: Sync sessions may return only publishable or anon keys; this guard prevents accidentally exposing a secret or service-role key to the app.
 function isSafePublishableKey(key) {
   if (!key) return false;
   if (key.startsWith('sb_publishable_')) return true;
@@ -21,6 +24,9 @@ function realtimeEndpoint() {
   return url ? `${url}/realtime/v1` : null;
 }
 
+// Arthur: NarIyirm
+// 中文：RealtimeSyncProvider 的轻量探针进入此路由；只返回领域版本和可选频道能力值，不返回业务记录。
+// EN: RealtimeSyncProvider's lightweight probe enters here and returns only domain versions plus an optional channel capability, never business records.
 router.get('/sync/state', requireFridge, async (request, response) => {
   const [fridgeResult, versionsResult] = await Promise.all([
     supabase.from('fridges').select('mode').eq('fridge_uid', request.fridgeUid).single(),
