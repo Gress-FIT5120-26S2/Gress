@@ -26,6 +26,40 @@ const zh = {
     liveInventory: '实时库存',
     tagline: '从冰箱到更聪明的购物',
   },
+  onboarding: {
+    progress: (current: number, total: number) => `第 ${current} 站，共 ${total} 站`,
+    back: '上一页',
+    next: '下一页',
+    enter: '进入我的厨房',
+    features: { inventory: '记住库存', useFirst: '先用快到期的', restock: '只补真正需要的' },
+    pages: {
+      problem: {
+        eyebrow: '为什么做 KitchMemo',
+        title: '食材不是突然浪费的，它只是被忘记了。',
+        body: '买回家、放进冰箱，然后在下次清理时才被发现。我们想在丢掉之前，给你一次看见它的机会。',
+        sceneLabel: '“我明明记得，家里还有的…”',
+      },
+      identity: {
+        eyebrow: '我们是谁',
+        title: '这是 KitchMemo，这位是勺勺。',
+        body: '我们不替你决定吃什么。我们把冰箱里的信息讲清楚，让每一次决定都更容易。',
+        prompt: '勺勺，我今天该先用什么？',
+        reply: '先看看番茄吧。它的记录日期最早。',
+      },
+      features: {
+        eyebrow: '它能做什么',
+        title: '从放进冰箱，到下一次购物。',
+        body: '记录现有食材，按日期安排优先使用，检查需要关注的食材，并在数量不足时帮你准备购物。',
+        sceneLabel: '',
+      },
+      purpose: {
+        eyebrow: '我们为什么在这里',
+        title: '少忘一点，少丢一点。',
+        body: '我们相信，减少食物浪费不必从巨大的改变开始。只要在做饭和购物前，先看一眼家里还有什么。',
+        sceneLabel: '',
+      },
+    },
+  },
   home: {
     period: { night: '今晚的厨房', dawn: '清晨的厨房', day: '今天的厨房', sunset: '傍晚的厨房' },
     expiring: (count: number) => `${count} 件食材值得先用`,
@@ -574,6 +608,40 @@ const en: Translation = {
     lowStock: (count: number) => `${count} items low`,
     liveInventory: 'live inventory',
     tagline: 'from fridge to smarter shopping',
+  },
+  onboarding: {
+    progress: (current: number, total: number) => `Stop ${current} of ${total}`,
+    back: 'Back',
+    next: 'Next',
+    enter: 'Enter my kitchen',
+    features: { inventory: 'Remember inventory', useFirst: 'Use dated food first', restock: 'Restock only what is needed' },
+    pages: {
+      problem: {
+        eyebrow: 'WHY KITCHMEMO EXISTS',
+        title: 'Food is not suddenly wasted. It is simply forgotten.',
+        body: 'It comes home, goes into the fridge, and is found again during the next clean-out. We want to help you see it one more time before it is thrown away.',
+        sceneLabel: '“I was sure we still had some…”',
+      },
+      identity: {
+        eyebrow: 'WHO WE ARE',
+        title: 'This is KitchMemo. Meet Spoonie.',
+        body: 'We do not decide what you should eat. We make the information in your fridge easier to understand, so everyday decisions take less effort.',
+        prompt: 'Spoonie, what should I use first?',
+        reply: 'Start with the tomatoes. Their recorded date comes first.',
+      },
+      features: {
+        eyebrow: 'WHAT IT DOES',
+        title: 'From putting food away to the next shop.',
+        body: 'Record what is at home, order food by date, review items that need attention, and prepare the next shop when quantities run low.',
+        sceneLabel: '',
+      },
+      purpose: {
+        eyebrow: 'WHY WE ARE HERE',
+        title: 'Forget less. Throw away less.',
+        body: 'Reducing food waste does not need to begin with a dramatic change. It can begin by checking what is already at home before cooking or shopping.',
+        sceneLabel: '',
+      },
+    },
   },
   home: {
     period: { night: 'Tonight in your kitchen', dawn: 'This morning in your kitchen', day: 'Today in your kitchen', sunset: 'This evening in your kitchen' },
