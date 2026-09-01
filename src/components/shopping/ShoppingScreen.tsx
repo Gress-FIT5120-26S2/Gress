@@ -33,6 +33,7 @@ import { getInventorySnapshot } from '../../services/inventoryApi';
 import { subscribeToSync } from '../../services/realtimeSync';
 import { ShoppingAddSheet } from './ShoppingAddSheet';
 import { ShoppingCheckoutReview } from './ShoppingCheckoutReview';
+import { ShoppingInventoryPeek } from './ShoppingInventoryPeek';
 
 type Tab = 'restock' | 'cart';
 
@@ -160,6 +161,7 @@ function CartView() {
   const [refreshing, setRefreshing] = useState(false);
   const [addVisible, setAddVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
+  const [peekVisible, setPeekVisible] = useState(false);
 
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
@@ -178,15 +180,30 @@ function CartView() {
   }), [load]);
 
   const handleAdd = async (item: { name: string; quantity: number; unit: string }) => {
-    const created = await addCartItem({
-      name: item.name,
-      quantity: item.quantity,
-      unit: item.unit,
-      source: 'manual',
-    });
-    setItems((prev) => [created, ...prev]);
-  };
-
+  // merge into an existing same-name item instead of adding a duplicate row
+  const existing = items.find(
+    (i) => i.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+  );
+  if (existing) {
+    const next = (existing.quantity ?? 1) + item.quantity;
+    setItems((prev) =>
+      prev.map((i) => (i.item_uid === existing.item_uid ? { ...i, quantity: next } : i)),
+    );
+    try {
+      await updateCartQuantity(existing.item_uid, next);
+    } catch {
+      void load().catch(() => undefined);
+    }
+    return;
+  }
+  const created = await addCartItem({
+    name: item.name,
+    quantity: item.quantity,
+    unit: item.unit,
+    source: 'manual',
+  });
+  setItems((prev) => [created, ...prev]);
+};
   const changeQty = async (item: CartItem, delta: number) => {
     const next = Math.max((item.quantity ?? 1) + delta, 1);
     setItems((prev) =>
@@ -249,6 +266,9 @@ function CartView() {
   return (
     <View style={styles.grow}>
       <View style={styles.cartActions}>
+        <Pressable style={styles.peekBtn} onPress={() => setPeekVisible(true)}>
+          <Text style={styles.peekText}>{t.shopping.peek.open}</Text>
+        </Pressable>
         <Pressable style={styles.addBtn} onPress={() => setAddVisible(true)}>
           <Text style={styles.addBtnText}>+ {t.shopping.add}</Text>
         </Pressable>
@@ -307,6 +327,10 @@ function CartView() {
         inventoryNames={inventoryNames}
         onClose={() => setCheckoutVisible(false)}
         onAllStocked={handleStocked}
+      />
+      <ShoppingInventoryPeek 
+        visible={peekVisible} 
+        onClose={() => setPeekVisible(false)} 
       />
     </View>
   );
@@ -392,4 +416,9 @@ const styles = StyleSheet.create({
   },
   smallBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   empty: { textAlign: 'center', color: '#718078', marginTop: 40 },
+  peekBtn: {
+  flex: 1, height: 44, justifyContent: 'center', alignItems: 'center',
+  backgroundColor: '#168ACB', borderRadius: 10,
+  },
+  peekText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });
