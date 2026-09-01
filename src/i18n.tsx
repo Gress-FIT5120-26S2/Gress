@@ -386,6 +386,13 @@ const zh = {
       duplicate: '家里可能已经有这个了',
       add: '加入购物车',
       saving: '正在添加',
+      dupQuantity: '数量',
+      dupStorage: '储存位置',
+      dupExpiry: '到期',
+      dupNoExpiry: '无到期',
+      dupExpired: '已过期',
+      dupDaysLeft: (days: number) => `剩 ${days} 天`,
+      dupLow: '· 库存偏低',
     },
     method: {
       picker: {
@@ -880,6 +887,13 @@ const en: Translation = {
       duplicate: 'You may already have this at home',
       add: 'Add to cart',
       saving: 'Adding',
+      dupQuantity: 'Quantity',
+      dupStorage: 'Storage',
+      dupExpiry: 'Expiry',
+      dupNoExpiry: 'No expiry',
+      dupExpired: 'Expired',
+      dupDaysLeft: (days: number) => `${days}d left`,
+      dupLow: '· Low stock',
     },
     method: {
       picker: {

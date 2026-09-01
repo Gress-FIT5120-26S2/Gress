@@ -1,0 +1,114 @@
+# Shopping Mode (Epic E5)
+
+> Branch: `jingduo-develop` ｜ Author: Jingduo Zhang (jzha0609)
+> Scope: KitchMemo shopping cart feature (Epic E5 — Shopping Assistant & Smart Cart)
+
+Brings household inventory into the shopping journey: review what's at home, build a cart, warn about possible duplicate purchases, review at checkout, and turn completed purchases into inventory records.
+
+---
+
+## Feature overview (against the backlog)
+
+| User Story | Feature | Status |
+|---|---|---|
+| US5.1 | Review household stock before shopping (read-only peek) | ✅ |
+| US5.2 | Build a cart: add (manual / photo), edit quantity, delete | ✅ |
+| US5.3 | Duplicate-purchase warning (expandable, per-batch quantity/storage/expiry) | ✅ |
+| US5.4 | Checkout review: list all items, highlight duplicate warnings | ✅ |
+| US5.5 | Turn purchases into inventory drafts, edit-and-confirm, leave prompt | ✅ |
+| — | Photo recognition into the cart (reuses the team model, Plan A) | ✅ |
+
+**Not done / notes**: the recognition model itself is built by the team (recognises 8 fruit/veg only); units are not localised (the stored string is shown as-is); full inventory browsing (US5.1.2) stays on the Fridge tab — Shopping Mode only provides a read-only peek.
+
+---
+
+## Files I own
+
+### Frontend UI (`src/components/shopping/`)
+| File | Responsibility |
+|---|---|
+| `ShoppingScreen.tsx` | Main screen; toggle between "Suggested" and "Cart" views |
+| `ShoppingAddSheet.tsx` | Add-to-cart entry; reuses `AddItemMethodSheet` (manual / photo) |
+| `ShoppingManualEntry.tsx` | Lightweight manual entry form + duplicate warning |
+| `ShoppingCheckoutReview.tsx` | Checkout review + batch inventory add + leave prompt |
+| `ShoppingInventoryPeek.tsx` | Read-only view of current inventory |
+
+### Frontend services (`src/services/`)
+| File | Responsibility |
+|---|---|
+| `cartApi.ts` | Wraps cart / restock endpoints; goes through the shared `apiClient` |
+
+### Backend (`server/src/`)
+| File | Responsibility |
+|---|---|
+| `routes/cart.js` | Cart CRUD (`/api/cart`) |
+| `routes/restock.js` | Restock suggestions (`/api/restock`) |
+| `middleware/requireFridge.js` | Resolves device + fridge ownership from `Device-ID` |
+
+### Database (`supabase/migrations/`)
+| File | Responsibility |
+|---|---|
+| `…_restock_and_cart.sql` | Creates `shopping_cart_items` table + `get_restock_suggestions()` function |
+
+---
+
+## Architecture & data flow
+
+```
+Frontend UI  (components/shopping/*)
+   │  calls
+Frontend svc (services/cartApi.ts) → shared apiClient (adds Device-ID)
+   │  HTTP
+Backend      (routes/cart.js, restock.js) → requireFridge checks ownership
+   │  reads/writes
+Database     (Supabase / PostgreSQL)
+             - table  shopping_cart_items
+             - function get_restock_suggestions()
+```
+
+**Example — "add milk from Suggested":**
+`get_restock_suggestions` (DB computes restock) → `GET /api/restock` → `fetchRestock` → RestockView shows it → tap "Add to cart" → `addCartItem` → `POST /api/cart` → row inserted → CartView shows it.
+
+---
+
+## Key design decisions
+
+1. **Owned by `fridge_uid`**: cart and restock are isolated per fridge; the `fridge_uid` is resolved server-side from `Device-ID`, so the client can't forge it.
+2. **Restock is a derived query**: nothing is stored — a DB function recomputes it live (stays accurate as stock changes).
+3. **Two kinds of "add"**: add-to-cart is lightweight (name/qty/unit → `shopping_cart_items`); add-to-inventory is full (category/storage/expiry → `inventory_batches`).
+4. **Reuse over rebuild**: photo recognition, the inventory entry form, and inventory reads all reuse existing team capabilities; the cart just wires them into the shopping context.
+5. **Optimistic updates**: quantity edits etc. update the UI first, sync in the background, and roll back on failure.
+
+---
+
+## Running locally
+
+```powershell
+# from the repo root — starts backend + Expo together
+npm start
+```
+
+**Prerequisites:**
+- `server/.env`: `SUPABASE_URL` + service role key (DB connection).
+- root `.env`: `EXPO_PUBLIC_API_URL=http://<your-LAN-IP>:3001` (use the LAN IP on a physical device; restart Expo after changing it).
+- Dependencies: after a merge, run `npm install` and `npm --prefix server install` if packages are missing.
+
+Install Expo Go, put the phone on the same Wi-Fi as the computer, and scan the QR code.
+
+---
+
+## Database migration
+
+The cart structures live in the migration `…_restock_and_cart.sql` (table + function).
+- Verified on the dev database (`Gress-development`).
+- production needs to be applied by the agreed owner via `supabase db push`.
+- Schema changes go through migration files + PR — not ad-hoc edits in the console.
+
+---
+
+## Known limitations / TODO
+
+- Photo recognition supports 8 fruit/veg + freshness only (team model); the cart takes just the recognised food name.
+- Batch inventory add loops `createInventoryBatch` on the client — not a single transaction; a batch endpoint could optimise this.
+- Units are not localised (inventory / cart / notifications share the same data; this is a team-wide decision).
+- `shopping_cart_items` is a new table outside the data-structure design baseline; ownership and the dedupe index should be confirmed at review.

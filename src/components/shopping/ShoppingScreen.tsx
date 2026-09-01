@@ -29,7 +29,7 @@ import {
   CartItem,
   RestockSuggestion,
 } from '../../services/cartApi';
-import { getInventorySnapshot } from '../../services/inventoryApi';
+import { getInventorySnapshot, type InventoryBatch } from '../../services/inventoryApi';
 import { subscribeToSync } from '../../services/realtimeSync';
 import { ShoppingAddSheet } from './ShoppingAddSheet';
 import { ShoppingCheckoutReview } from './ShoppingCheckoutReview';
@@ -41,14 +41,29 @@ type Tab = 'restock' | 'cart';
 // Arthur: NarIyirm
 // 中文：购物手动录入复用库存快照中的名称做“可能已有”提示；只读 inventoryApi，不改变库存。
 // EN: Manual cart entry reuses inventory snapshot names for possible-duplicate hints and never mutates inventory here.
+// Shared hook: load current inventory for duplicate detection (US5.3).
+// Returns a name Set (fast "is duplicate" check) and a name→batches map
+// (all matching batches, for showing per-batch details in US5.3.2).
 function useInventoryNames() {
   const [names, setNames] = useState<Set<string>>(new Set());
+  const [byName, setByName] = useState<Map<string, InventoryBatch[]>>(new Map());
   const reload = useCallback(async () => {
     try {
       const snap = await getInventorySnapshot();
-      setNames(new Set(snap.batches.map((b) => b.name.trim().toLowerCase())));
+      const nameSet = new Set<string>();
+      const map = new Map<string, InventoryBatch[]>();
+      for (const b of snap.batches) {
+        const key = b.name.trim().toLowerCase();
+        nameSet.add(key);
+        const arr = map.get(key) ?? [];
+        arr.push(b);
+        map.set(key, arr);
+      }
+      setNames(nameSet);
+      setByName(map);
     } catch {
-      setNames(new Set()); // inventory unavailable -> no warnings, cart still works
+      setNames(new Set());
+      setByName(new Map());
     }
   }, []);
   useEffect(() => {
@@ -57,7 +72,7 @@ function useInventoryNames() {
   useEffect(() => subscribeToSync(['inventory', 'fridge'], () => {
     void reload();
   }), [reload]);
-  return { names, reload };
+  return { names, byName, reload };
 }
 
 // Arthur: NarIyirm
@@ -155,7 +170,7 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
 // EN: The shared cart view handles loading, quantity, checking, and deletion, with every mutation returning to Express through cartApi.
 function CartView() {
   const { t } = useI18n();
-  const { names: inventoryNames } = useInventoryNames();
+  const { names: inventoryNames, byName: inventoryByName } = useInventoryNames();
   const [items, setItems] = useState<CartItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -318,6 +333,7 @@ function CartView() {
       <ShoppingAddSheet
         visible={addVisible}
         inventoryNames={inventoryNames}
+        inventoryByName={inventoryByName}
         onClose={() => setAddVisible(false)}
         onAdd={handleAdd}
       />
