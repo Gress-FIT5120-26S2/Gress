@@ -6,13 +6,13 @@
 
 - 最后核对日期：2026-09-02（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 13 份 migration；`20260902000000_ai_food_presets_and_icons.sql` 已于 2026-09-02 在开发项目应用并通过远程 lint。生产项目必须按 migration 顺序部署后，才能上线依赖 AI preset 契约的 Express 与 App。生产项目的最新状态仍需在部署前远程核对。CLI 当前链接开发项目。
+- 本地 schema 历史共有 13 份 migration；截至 2026-09-02，开发与生产项目均已按顺序应用至 `20260902000000_ai_food_presets_and_icons.sql`，两端 migration history 一致且生产项目已通过远程 lint。CLI 当前链接开发项目。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 应用最新本地 migration 后共有 17 张业务/安全表、7 个枚举，并新增设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
-- 代码中已实现设备凭证验证、设备初始化、库存读写、通知、购物清单、共享命名/开启、邀请码轮换、成员设备摘要、加入、退出和设备恢复；共享管理页面依赖 `20260831030000_manage_shared_fridges.sql`，必须先迁移数据库再部署新服务端。成就和分类管理接口尚未实现。
+- 代码中已实现设备凭证验证、设备初始化、库存读写、通知、购物清单、共享命名/开启、邀请码轮换、成员设备摘要、加入、退出和设备恢复；共享管理页面依赖的 `20260831030000_manage_shared_fridges.sql` 已在开发与生产项目应用。成就和分类管理接口尚未实现。
 
 实际实现的权威来源：
 
