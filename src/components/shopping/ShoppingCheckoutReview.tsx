@@ -1,10 +1,8 @@
 // src/components/shopping/ShoppingCheckoutReview.tsx
 // US5.4 checkout review + US5.5 add purchases to inventory (B1 draft flow).
 // Shows all cart items, highlights unresolved duplicate warnings, then lets the
-// user turn them into inventory one at a time: each draft opens the shared
-// InventoryEntryFlow (prefilled with name/quantity/unit; the user completes
-// category/storage/expiry), and confirmed drafts are written via
-// createInventoryBatch. Batching = looping createInventoryBatch (no batch API).
+// user turn them into inventory one at a time via the shared InventoryEntryFlow.
+// US5.5.3: when leaving with checked-but-not-yet-stocked items, prompt first.
 import React, { useMemo, useState } from 'react';
 import {
   Modal,
@@ -27,13 +25,9 @@ type ShoppingCheckoutReviewProps = {
   items: CartItem[];
   inventoryNames: Set<string>;
   onClose: () => void;
-  // called after all drafts are saved; parent clears those cart items
   onAllStocked: (stockedItemUids: string[]) => void | Promise<void>;
 };
 
-// Arthur: NarIyirm
-// 中文：结账复核把选中的购物项逐条调用 createInventoryBatch 转为库存；当前是多次请求，不是单个批量事务。
-// EN: Checkout review converts selected cart items through repeated createInventoryBatch calls; it is multiple requests rather than one batch transaction.
 export function ShoppingCheckoutReview({
   visible,
   items,
@@ -44,10 +38,10 @@ export function ShoppingCheckoutReview({
   const { t } = useI18n();
   const copy = t.shopping.checkout;
 
-  // local per-item draft status; starts fresh each time the review opens
   const [status, setStatus] = useState<Record<string, DraftStatus>>({});
   const [editing, setEditing] = useState<CartItem | null>(null);
   const [busy, setBusy] = useState(false);
+  const [leaveConfirm, setLeaveConfirm] = useState(false);
 
   const remaining = useMemo(
     () => items.filter((i) => status[i.item_uid] !== 'done'),
@@ -58,9 +52,14 @@ export function ShoppingCheckoutReview({
     [items, status],
   );
 
+  // US5.5.3: checked (confirmed to buy) but not yet added to inventory
+  const checkedNotStocked = useMemo(
+    () => items.filter((i) => i.is_checked && status[i.item_uid] !== 'done'),
+    [items, status],
+  );
+
   const isDuplicate = (item: CartItem) => inventoryNames.has(item.name.trim().toLowerCase());
 
-  // Save one confirmed draft to inventory, then mark it done.
   const handleDraftSubmit = async (item: CartItem, submission: InventoryEntrySubmission) => {
     setBusy(true);
     try {
@@ -81,18 +80,28 @@ export function ShoppingCheckoutReview({
     }
   };
 
-  const finish = async () => {
-    // remove the successfully-stocked items from the cart via the parent
+  // clear stocked items from the cart, reset, and close
+  const doClose = async () => {
     await onAllStocked(stockedUids);
     setStatus({});
+    setLeaveConfirm(false);
     onClose();
   };
 
+  // US5.5.3: intercept close -- if there are checked items not stocked, ask first
+  const requestClose = () => {
+    if (checkedNotStocked.length > 0) {
+      setLeaveConfirm(true);
+      return;
+    }
+    void doClose();
+  };
+
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={requestClose}>
       <View style={styles.container}>
         <View style={styles.header}>
-          <Pressable hitSlop={8} onPress={onClose}>
+          <Pressable hitSlop={8} onPress={requestClose}>
             <Text style={styles.headerBtn}>{copy.close}</Text>
           </Pressable>
           <Text style={styles.headerTitle}>{copy.title}</Text>
@@ -133,7 +142,7 @@ export function ShoppingCheckoutReview({
           <Text style={styles.footerHint}>
             {copy.progress(stockedUids.length, items.length)}
           </Text>
-          <Pressable style={styles.doneBtn} onPress={finish}>
+          <Pressable style={styles.doneBtn} onPress={requestClose}>
             <Text style={styles.doneText}>
               {remaining.length === 0 ? copy.finishAll : copy.finishSome}
             </Text>
@@ -149,12 +158,31 @@ export function ShoppingCheckoutReview({
           initialValues={{
             name: editing.name,
             quantity: editing.quantity ? String(editing.quantity) : '1',
-            // unit from the cart may not map 1:1 to inventory units; the form
-            // defaults it and the user can adjust before saving
           }}
           onClose={() => setEditing(null)}
           onSubmit={(submission) => handleDraftSubmit(editing, submission)}
         />
+      ) : null}
+
+      {/* US5.5.3: leave prompt when checked items are not yet stocked */}
+      {leaveConfirm ? (
+        <View style={styles.confirmLayer}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setLeaveConfirm(false)} />
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{copy.leaveTitle}</Text>
+            <Text style={styles.confirmBody}>
+              {copy.leaveBody(checkedNotStocked.length)}
+            </Text>
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.keepBtn} onPress={() => setLeaveConfirm(false)}>
+                <Text style={styles.keepText}>{copy.leaveStay}</Text>
+              </Pressable>
+              <Pressable style={styles.leaveBtn} onPress={() => void doClose()}>
+                <Text style={styles.leaveText}>{copy.leaveAnyway}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
       ) : null}
     </Modal>
   );
@@ -204,4 +232,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   doneText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  confirmLayer: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    backgroundColor: 'rgba(23,32,29,0.4)',
+  },
+  confirmCard: {
+    width: '100%',
+    borderRadius: 22,
+    backgroundColor: '#FBFCFA',
+    padding: 22,
+    gap: 10,
+  },
+  confirmTitle: { fontSize: 18, fontWeight: '800', color: '#173D31' },
+  confirmBody: { fontSize: 14, color: '#5A6E66', lineHeight: 20 },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  keepBtn: {
+    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EDF1EF',
+  },
+  keepText: { color: '#315C51', fontSize: 15, fontWeight: '800' },
+  leaveBtn: {
+    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#C62828',
+  },
+  leaveText: { color: '#fff', fontSize: 15, fontWeight: '800' },
 });
