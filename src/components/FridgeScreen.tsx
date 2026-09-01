@@ -19,6 +19,8 @@ import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
 import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
+import { FridgeAssistantButton } from './fridge/FridgeAssistantButton';
+import { FridgeAssistantScreen } from './fridge/FridgeAssistantScreen';
 import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
 import {
   InventoryEntryFlow,
@@ -46,6 +48,7 @@ type InventoryItem = {
   category: FoodCategory;
   storage: StorageZone;
   emoji: string;
+  iconUrl: string | null;
   daysLeft: number | null;
   isExpired: boolean;
   amount: string;
@@ -165,6 +168,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
   const [isSharingContextLoading, setIsSharingContextLoading] = useState(false);
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
+  const [isAssistantVisible, setIsAssistantVisible] = useState(false);
 
   // Arthur: NarIyirm
   // 中文：初次进入、下拉刷新和后台同步共用此加载器；最终调用 inventoryApi.getInventorySnapshot 并替换页面 snapshot。
@@ -240,8 +244,9 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       amount: `${formatQuantity(batch.remainingQuantity)} ${t.fridge.manualEntry.units[batch.unit as keyof typeof t.fridge.manualEntry.units] ?? batch.unit}`,
       category,
       daysLeft: getDaysLeft(batch.expiresAt),
-      emoji: CATEGORY_EMOJI[category],
+      emoji: batch.iconEmoji ?? CATEGORY_EMOJI[category],
       id: batch.id,
+      iconUrl: batch.iconUrl ?? null,
       isExpired: isExpiredAt(batch.expiresAt),
       name: batch.name,
       needsRestock: batch.needsRestock,
@@ -379,6 +384,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
       expiresAt: submission.batch.expiresAt,
       initialQuantity: submission.batch.initialQuantity,
       name: submission.batch.name,
+      presetUid: submission.batch.matchedPresetUid,
       purchasePrice: submission.batch.purchasePrice,
       restockRule: submission.restockRule
         ? {
@@ -468,6 +474,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
         categoryTone={categoryStyle.tone}
         daysLeft={item.daysLeft}
         emoji={item.emoji}
+        iconUrl={item.iconUrl}
         freshnessText={freshnessText}
         isExpired={item.isExpired}
         name={item.name}
@@ -505,6 +512,7 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
               </Pressable>
             ) : null}
           </View>
+          <FridgeAssistantButton onPress={() => setIsAssistantVisible(true)} />
         </View>
 
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
@@ -656,6 +664,13 @@ export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
         onContextChanged={handleSharingContextChanged}
         visible={sharingFlow !== null}
       />
+      <FridgeAssistantScreen
+        batches={snapshot?.batches ?? []}
+        onAddItem={openAddSheet}
+        onClose={() => setIsAssistantVisible(false)}
+        onOpenItem={setSelectedBatchUid}
+        visible={isAssistantVisible}
+      />
     </View>
   );
 }
@@ -677,7 +692,7 @@ function EmptyInventory({ buttonLabel, description, onClear, title }: { buttonLa
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FBFA' },
   topArea: { paddingTop: 64, paddingBottom: 12, backgroundColor: '#F3F8F7' },
-  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 9, paddingHorizontal: 16 },
+  toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16 },
   fridgeSwitcher: { width: 142, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: '#BFE3F3', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#EAF7FD' },
   fridgeSwitcherText: { flex: 1, color: '#24566E', fontSize: 13, fontWeight: '800' },
   searchField: { flex: 1, minWidth: 0, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },

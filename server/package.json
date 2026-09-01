@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "backfill:preset-icons": "node scripts/backfill-preset-icons.js",
     "dev": "node src/index.js",
     "start": "node src/index.js",
     "verify:sharing": "node scripts/verify-sharing.js",
@@ -14,6 +15,7 @@
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
-    "multer": "^2.3.0"
+    "multer": "^2.3.0",
+    "sharp": "^0.35.4"
   }
 }

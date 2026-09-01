@@ -27,6 +27,7 @@ import {
   type InventoryBatchDetail,
   type InventoryCategoryCode,
 } from '../../services/inventoryApi';
+import { PresetFoodIcon } from './PresetFoodIcon';
 
 type InventoryItemDetailSheetProps = {
   batchUid: string | null;
@@ -436,7 +437,7 @@ export function InventoryItemDetailSheet({
     ? t.fridge.categories[batch.categoryCode as keyof typeof t.fridge.categories] ?? batch.categoryName
     : '';
   const storageLabel = batch ? t.fridge.manualEntry.storage[batch.storageZone] : '';
-  const emoji = batch ? CATEGORY_EMOJI[batch.categoryCode] ?? CATEGORY_EMOJI.other : '📦';
+  const emoji = batch ? batch.iconEmoji ?? CATEGORY_EMOJI[batch.categoryCode] ?? CATEGORY_EMOJI.other : '📦';
   const locale = language === 'zh' ? 'zh-CN' : 'en-AU';
   const formatDateTime = useCallback((value: string | null) => {
     if (!value) return copy.noExpiry;
@@ -524,7 +525,7 @@ export function InventoryItemDetailSheet({
               >
                 <View style={styles.stockCard}>
                   <View style={styles.itemHeader}>
-                    <View style={styles.emojiTile}><Text style={styles.emoji}>{emoji}</Text></View>
+                    <View style={styles.emojiTile}><PresetFoodIcon emoji={emoji} iconUrl={batch.iconUrl} size="detail" /></View>
                     <View style={styles.itemTitleWrap}>
                       <Text numberOfLines={2} style={styles.itemName}>{batch.name}</Text>
                       <View style={styles.badgeRow}>
@@ -630,7 +631,7 @@ export function InventoryItemDetailSheet({
                 <Pressable accessibilityRole="button" onPress={() => setShowRemoveConfirm(false)} style={styles.confirmClose}><Ionicons name="close" size={23} color="#75807D" /></Pressable>
               </View>
               <View style={styles.confirmItem}>
-                <View style={styles.emojiTile}><Text style={styles.emoji}>{emoji}</Text></View>
+                <View style={styles.emojiTile}><PresetFoodIcon emoji={emoji} iconUrl={batch.iconUrl} size="detail" /></View>
                 <View style={styles.confirmItemCopy}>
                   <Text style={styles.confirmItemName}>{batch.name}</Text>
                   <Text style={styles.confirmItemQuantity}>{formatQuantity(batch.remainingQuantity)} {unitLabel}</Text>
@@ -702,7 +703,6 @@ const styles = StyleSheet.create({
   stockCard: { padding: 20, borderWidth: 1, borderColor: 'rgba(139, 205, 220, 0.42)', borderRadius: 25, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.82)' },
   itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },
   emojiTile: { width: 72, height: 72, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 22, borderCurve: 'continuous', backgroundColor: 'rgba(241,246,249,0.9)' },
-  emoji: { fontSize: 40 },
   itemTitleWrap: { flex: 1, gap: 9 },
   itemName: { color: '#102C23', fontSize: 25, fontWeight: '800', lineHeight: 30 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },

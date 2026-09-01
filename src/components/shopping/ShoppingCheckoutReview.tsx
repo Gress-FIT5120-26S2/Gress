@@ -71,6 +71,7 @@ export function ShoppingCheckoutReview({
         storageZone: submission.batch.storageZone,
         expiresAt: submission.batch.expiresAt,
         purchasePrice: submission.batch.purchasePrice,
+        presetUid: submission.batch.matchedPresetUid ?? item.preset_uid,
         restockRule: submission.restockRule,
       });
       setStatus((prev) => ({ ...prev, [item.item_uid]: 'done' }));
