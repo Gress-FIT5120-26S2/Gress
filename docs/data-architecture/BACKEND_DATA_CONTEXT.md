@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-01（Australia/Sydney）。
+- 最后核对日期：2026-09-02（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 12 份 migration。2026-09-01 开发项目已应用全部 12 份；生产项目的最新状态需在部署前远程核对。如果前三份共享同步 migration 已手动执行，继续应用 `20260901020000_shared_invite_join_errors.sql`；否则必须从缺失项开始严格按时间戳顺序部署。CLI 当前链接开发项目。
+- 本地 schema 历史共有 13 份 migration；`20260902000000_ai_food_presets_and_icons.sql` 已于 2026-09-02 在开发项目应用并通过远程 lint。生产项目必须按 migration 顺序部署后，才能上线依赖 AI preset 契约的 Express 与 App。生产项目的最新状态仍需在部署前远程核对。CLI 当前链接开发项目。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 应用最新本地 migration 后共有 17 张业务/安全表、7 个枚举，并新增设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
@@ -66,6 +66,7 @@ Expo App
 - Expo 本地开发使用根目录 `.env.development`，生产构建使用 `.env.production`（或 EAS 的对应环境变量）；两者只设置 `EXPO_PUBLIC_API_URL`。
 - 本地 Express 默认读取 `server/.env.development`；当 `NODE_ENV=production` 时读取 `server/.env.production`。部署平台直接提供的环境变量优先于文件。
 - Express 可用 `FOOD_RECOGNITION_API_URL` 覆盖视觉模型地址；该配置只存在于服务端，App 不直接调用模型。
+- AI 预设生成只从 Express 读取 `GEMINI_API_KEY`、`GEMINI_PRESET_MODEL`、`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_AI_API_TOKEN` 和 `CLOUDFLARE_ICON_MODEL`。当前默认文本模型为稳定版 `gemini-3.5-flash-lite`，继续通过受支持的 GenerateContent API 请求结构化输出；这些值不得使用 `EXPO_PUBLIC_` 前缀，App 只调用已鉴权的 Express 接口。
 - `server/.env` 仅作为旧开发机兼容回退。新配置请使用按环境命名的文件，所有真实 `.env` 文件都不得提交 Git。
 - 测试 App 必须指向测试 Express，生产 App 必须指向生产 Express；同一 `device_id` 在两个 Supabase 项目中是彼此独立的数据。
 
@@ -247,6 +248,12 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `suggested_shelf_life_days` | `integer` | 必须大于 0 |
 | `suggested_category_code` | `text` | 映射默认分类 |
 | `notes` | `text` | 储藏说明 |
+| `icon_path` | `text` | 可空；`food-preset-icons` Storage bucket 内的标准化 PNG 路径 |
+| `icon_emoji` | `text` | 图片缺失或加载失败时的稳定回退图标 |
+| `icon_source` | `text` | `emoji`、`ai_generated` 或 `open_data` |
+| `source_type` | `text` | `curated`、`seed`、`ai` 或 `open_data`，避免 AI 覆盖人工/开放数据来源 |
+| `generation_model` | `text` | 可空；AI 模型审计信息 |
+| `generation_prompt_version` | `integer` | 可空；图标提示词与后处理版本 |
 | `is_enabled` | `boolean` | 是否继续提供建议 |
 | `created_at` / `updated_at` | `timestamptz` | 审计时间 |
 
@@ -468,7 +475,7 @@ Device-ID: ios_... | android_...
 `supabase/seed.sql` 当前包含：
 
 - 16 种食材：tomato、banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、milk、egg、blueberry、rice、peas、soy sauce、yogurt、bread。
-- 每种食材包含中英文别名、推荐储存方式、建议保质期和默认分类代码。
+- 每种食材包含中英文别名、推荐储存方式、建议保质期、默认分类代码和产品级 Emoji 回退图标。
 - 4 个成就：`first_item`、`waste_watcher`、`fridge_regular`、`shared_kitchen`。
 
 视觉识别食材的参考值由 `20260831010000_upsert_photo_recognition_food_presets.sql` 同步到已部署项目。基础天数表示推荐储存方式下的最佳品质参考，不是食品安全保证；拍照识别会根据视觉新鲜度生成可编辑的预计到期时间，最终仍由用户确认。
@@ -523,6 +530,7 @@ POST /api/devices/recovery-code
 POST /api/devices/recover
 GET /api/inventory
 GET /api/food-presets/suggestion?q=<food-name>
+POST /api/food-presets/generate
 POST /api/photo-recognition
 POST /api/inventory/batches
 GET /api/inventory/batches/:batchUid
@@ -548,6 +556,8 @@ GET /api/restock
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
+- AI 预设兜底：只有用户明确点击后，`POST /api/food-presets/generate` 才调用 Gemini 生成标准名、双语别名、分类、储存区、参考天数和说明；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
+- 新增库存：表单会提交命中的 `presetUid`，新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`；历史无法可靠匹配的批次继续保留 null。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
@@ -559,11 +569,6 @@ GET /api/restock
 尚未实现：
 
 - 明确的丢弃（`discard`）入口
-- 批次详情：返回单个活跃批次、当前版本及匹配的补货规则。
-- 数量调整：原子校验版本、更新数量/生命周期并写入 `consume` 或 `adjust` 流水。
-- 资料编辑：原子校验版本并修改名称、储存方式、分类、价格和到期等批次字段。
-- 补货规则：按当前冰箱、标准化名称和单位新增或更新规则，也可关闭规则。
-- 移出冰箱：软归档批次并写入调整流水，保留历史数据。
 
 ## 14. 建议的接口开发顺序
 
@@ -585,9 +590,14 @@ POST /api/inventory/batches
 ```text
 POST /api/photo-recognition
 GET  /api/food-presets/suggestion?q=<recognised-food>
+POST /api/food-presets/generate
 ```
 
 识别接口只负责清洗模型响应，不把图片或新鲜度写入数据库。前端将 `fresh` 映射为完整建议保质期、`semi_fresh` 映射为向上取整的 40%、`rotten` 映射为最短复核时间，然后进入与手动添加相同的 `InventoryEntryFlow`。只有用户在共用表单中确认后，才会调用库存写入接口。
+
+手动名称未命中时不再打开浏览器搜索，而显示“AI 一键生成”。生成接口会立即缓存可复用的全局 preset 与图标；用户仍需在表单中采用或修改建议并保存库存。服务端进程对每台设备暂限每小时 5 次新食材生成，生产入口还应配置跨实例网关限流。生成结果只是可编辑的最佳品质参考，不是食品安全保证。
+
+现有 seed/open-data preset 初始使用产品级 Emoji，配置 Cloudflare 凭证后可执行 `npm --prefix server run backfill:preset-icons`。脚本只处理 `icon_path is null` 的启用预设，逐条使用与在线生成相同的提示词和 Sharp 标准化流程，成功一条即持久化，因此中断后可安全续跑。
 
 库存查询应支持：
 
@@ -617,6 +627,8 @@ DELETE /api/inventory/batches/:batchUid
 ```
 
 这些接口由 `20260830010000_inventory_detail_mutations.sql` 中的数据库函数保证数量更新与事件写入处于同一事务，并通过 `version` 做共享编辑冲突检测。前端详情弹窗调用 `src/services/inventoryApi.ts`，不得绕过 Express。
+
+批次详情还会按 `preset_uid` 返回与库存列表一致的远程 icon URL 和 Emoji fallback；列表卡片、详情顶部及删除确认框共用 `PresetFoodIcon` 渲染与失败回退逻辑。
 
 `20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
@@ -694,6 +706,7 @@ npx supabase db push --include-seed
 9. 通知事件按冰箱共享，已读状态按设备保存。
 10. 库存所有权使用 `owner_device_id`，创建和操作审计字段不可因退出或恢复而改写。
 11. 服务端部署依赖 `20260831020000`；数据库 migration 必须先在测试环境应用验证，再部署依赖新 RPC 的 Express 与 App。
-12. 同步版本与 Broadcast 只做页面失效通知，业务记录仍从 HTTP API 读取；不得把 `fridge_sync_versions` 或 Broadcast payload 当作业务缓存。
-13. 成就按冰箱保存。
-14. Schema 变化使用新 migration，并同步更新本文档。
+12. AI preset 与图标链路依赖 `20260902000000`、公开 `food-preset-icons` bucket 以及仅服务端可见的 Gemini/Cloudflare 凭证；缺少任一配置时前端必须保留手动填写能力。
+13. 同步版本与 Broadcast 只做页面失效通知，业务记录仍从 HTTP API 读取；不得把 `fridge_sync_versions` 或 Broadcast payload 当作业务缓存。
+14. 成就按冰箱保存。
+15. Schema 变化使用新 migration，并同步更新本文档。
