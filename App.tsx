@@ -1,6 +1,7 @@
 import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
 import { BlurTargetView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { getApiHealth } from './src/services/apiClient';
@@ -12,6 +13,7 @@ import { FridgeScreen } from './src/components/FridgeScreen';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
+import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/ProfileSettings';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
@@ -52,6 +54,9 @@ const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
 const HOME_PREVIEW_WEATHER = 'rain' as const;
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected';
+type FirstUseJourneyState = 'checking' | 'pending' | 'complete';
+
+const FIRST_USE_JOURNEY_KEY = 'kitchmemo:first-use-journey:v1';
 
 function KitchMemoApp() {
   const { t } = useI18n();
@@ -72,6 +77,7 @@ function KitchMemoApp() {
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
+  const [firstUseJourneyState, setFirstUseJourneyState] = useState<FirstUseJourneyState>('checking');
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
@@ -86,6 +92,7 @@ function KitchMemoApp() {
   const kitchenLighting = useKitchenTimeLighting();
   const screen = t.screens[activeTab];
   const status = t.status[connectionState];
+  const isFirstUseJourneyVisible = !isOpening && firstUseJourneyState === 'pending';
 
   useEffect(() => {
     let mounted = true;
@@ -97,6 +104,23 @@ function KitchMemoApp() {
     }).catch (error => {
       console.error('Failed to get device ID:', error);
     });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+    // Arthur: NarIyirm
+    // 中文：首次使用标记与设备本地存储绑定；启动动画结束后才根据读取结果显示引导。
+    // EN: The first-use flag is device-local; its result gates the journey only after the opening animation finishes.
+    AsyncStorage.getItem(FIRST_USE_JOURNEY_KEY)
+      .then((value) => {
+        if (mounted) setFirstUseJourneyState(value === 'complete' ? 'complete' : 'pending');
+      })
+      .catch(() => {
+        if (mounted) setFirstUseJourneyState('pending');
+      });
     return () => {
       mounted = false;
     };
@@ -261,6 +285,11 @@ function KitchMemoApp() {
     handleCinematicNavigate('notifications');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
+  const completeFirstUseJourney = useCallback(() => {
+    setFirstUseJourneyState('complete');
+    void AsyncStorage.setItem(FIRST_USE_JOURNEY_KEY, 'complete').catch(() => undefined);
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Arthur: NarIyirm
@@ -309,7 +338,7 @@ function KitchMemoApp() {
           ) : null}
         </Animated.View>
       </BlurTargetView>
-      {!isOpening && (
+      {!isOpening && firstUseJourneyState === 'complete' && (
         <Animated.View
           pointerEvents={isCinematicActive ? 'none' : 'box-none'}
           style={[styles.chromeLayer, { opacity: chromeOpacity }]}
@@ -337,7 +366,7 @@ function KitchMemoApp() {
           style={[styles.transitionOverlay, { backgroundColor: transitionTone, opacity: transitionOverlayOpacity }]}
         />
       ) : null}
-      <StatusBar style={activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
+      <StatusBar style={!isFirstUseJourneyVisible && activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
           canReveal={canRevealKitchen}
@@ -345,6 +374,7 @@ function KitchMemoApp() {
           onFinish={finishOpening}
         />
       )}
+      <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
       <LanguageSettingsModal onClose={() => setIsSettingsVisible(false)} visible={isSettingsVisible} />
     </View>
   );
