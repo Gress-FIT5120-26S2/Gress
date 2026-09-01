@@ -1,10 +1,9 @@
 // src/components/shopping/ShoppingManualEntry.tsx
 // Lightweight "add to cart" form (US5.2.1). Name + quantity + unit only.
-// Surfaces a possible-duplicate warning (US5.3) against current inventory.
-// - Only the ✕ closes the sheet (tapping the dimmed backdrop does nothing),
-//   so a half-filled form is never dismissed by accident.
-// - KeyboardAvoidingView + ScrollView keep every field reachable when the
-//   keyboard is up; the numeric field also gets an iOS "Done" bar.
+// US5.3.1/5.3.2/5.3.3: shows a possible-duplicate warning when the typed name
+// matches inventory, and lets the user tap it open to see EVERY matching batch
+// (each with its own quantity, storage, and expiry -- these can differ per
+// batch), without blocking the purchase.
 import React, { useMemo, useState } from 'react';
 import {
   Modal,
@@ -20,6 +19,7 @@ import {
   Platform,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import type { InventoryBatch } from '../../services/inventoryApi';
 
 const UNIT_OPTIONS = ['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box'] as const;
 const QTY_ACCESSORY_ID = 'shoppingQtyDone';
@@ -27,6 +27,7 @@ const QTY_ACCESSORY_ID = 'shoppingQtyDone';
 type ShoppingManualEntryProps = {
   visible: boolean;
   inventoryNames: Set<string>;
+  inventoryByName: Map<string, InventoryBatch[]>;
   onClose: () => void;
   onSubmit: (item: { name: string; quantity: number; unit: string }) => void | Promise<void>;
 };
@@ -34,6 +35,7 @@ type ShoppingManualEntryProps = {
 export function ShoppingManualEntry({
   visible,
   inventoryNames,
+  inventoryByName,
   onClose,
   onSubmit,
 }: ShoppingManualEntryProps) {
@@ -43,17 +45,34 @@ export function ShoppingManualEntry({
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<string>('item');
   const [saving, setSaving] = useState(false);
+  const [dupExpanded, setDupExpanded] = useState(false);
 
+  const key = name.trim().toLowerCase();
   const isDuplicate = useMemo(
-    () => name.trim().length > 0 && inventoryNames.has(name.trim().toLowerCase()),
-    [name, inventoryNames],
+    () => key.length > 0 && inventoryNames.has(key),
+    [key, inventoryNames],
   );
+  // all matching batches (a food can have several batches with different
+  // storage / expiry, so we show each one rather than a single summary)
+  const matches = isDuplicate ? inventoryByName.get(key) ?? [] : [];
+
+  const storageLabel = (zone: InventoryBatch['storageZone']) =>
+    t.fridge.manualEntry.storage[zone];
+
+  const expiryLabel = (iso: string | null) => {
+    if (!iso) return copy.dupNoExpiry;
+    const ms = new Date(iso).getTime() - Date.now();
+    if (ms < 0) return copy.dupExpired;
+    const days = Math.ceil(ms / 86_400_000);
+    return copy.dupDaysLeft(days);
+  };
 
   const reset = () => {
     setName('');
     setQuantity('1');
     setUnit('item');
     setSaving(false);
+    setDupExpanded(false);
   };
 
   const handleSubmit = async () => {
@@ -76,7 +95,6 @@ export function ShoppingManualEntry({
         style={styles.root}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
-        {/* dimmed backdrop: blocks touches to the screen behind, but does NOT close */}
         <View style={styles.backdrop} pointerEvents="none" />
 
         <View style={styles.sheet}>
@@ -96,12 +114,31 @@ export function ShoppingManualEntry({
             <TextInput
               style={styles.input}
               value={name}
-              onChangeText={setName}
+              onChangeText={(v) => { setName(v); setDupExpanded(false); }}
               placeholder={copy.namePlaceholder}
               returnKeyType="next"
             />
-            {isDuplicate ? (
-              <Text style={styles.dupWarning}>⚠️ {copy.duplicate}</Text>
+
+            {/* US5.3.2: tap the warning to reveal every matching batch */}
+            {matches.length > 0 ? (
+              <Pressable style={styles.dupCard} onPress={() => setDupExpanded((e) => !e)}>
+                <Text style={styles.dupWarning}>
+                  ⚠️ {copy.duplicate}  ({matches.length})  {dupExpanded ? '▲' : '▼'}
+                </Text>
+                {dupExpanded ? (
+                  <View style={styles.dupDetails}>
+                    {matches.map((m, idx) => (
+                      <Text
+                        key={m.id}
+                        style={[styles.dupRow, idx > 0 && styles.dupBatchGap]}
+                      >
+                        {m.remainingQuantity} {m.unit} · {storageLabel(m.storageZone)} · {expiryLabel(m.expiresAt)}
+                        {m.needsRestock ? <Text style={styles.dupLow}>  {copy.dupLow}</Text> : null}
+                      </Text>
+                    ))}
+                  </View>
+                ) : null}
+              </Pressable>
             ) : null}
 
             <Text style={styles.label}>{copy.quantityLabel}</Text>
@@ -180,7 +217,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAF9',
     color: '#173D31',
   },
-  dupWarning: { marginTop: 8, color: '#C96E1A', fontSize: 13, fontWeight: '700' },
+  dupCard: {
+    marginTop: 8,
+    padding: 12,
+    borderRadius: 12,
+    backgroundColor: '#FFF3E3',
+  },
+  dupWarning: { color: '#C96E1A', fontSize: 13, fontWeight: '700' },
+  dupDetails: { marginTop: 8 },
+  dupRow: { color: '#8A5A22', fontSize: 12.5, fontWeight: '600' },
+  dupBatchGap: { marginTop: 5 },
+  dupLow: { color: '#C62828', fontWeight: '800' },
   chips: { gap: 8, paddingVertical: 4 },
   chip: {
     paddingHorizontal: 14,
