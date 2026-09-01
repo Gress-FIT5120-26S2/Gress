@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { Image } from 'expo-image';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
@@ -7,14 +8,19 @@ import { WavePhysicsLoader } from './WavePhysicsLoader';
 export type StorageSuggestion = {
   category: 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
   canonicalName: string;
+  iconEmoji: string;
+  iconUrl: string | null;
+  presetUid: string;
   shelfLifeDays: number;
   storageZone: 'chilled' | 'frozen' | 'pantry';
 };
 
 type StorageSuggestionCardProps = {
   applied: boolean;
+  generationError: boolean;
+  isGenerating: boolean;
   onApply: () => void;
-  onSearchOnline: () => void;
+  onGenerate: () => void;
   query: string;
   isLoading: boolean;
   lookupFinished: boolean;
@@ -23,8 +29,10 @@ type StorageSuggestionCardProps = {
 
 export const StorageSuggestionCard = memo(function StorageSuggestionCard({
   applied,
+  generationError,
+  isGenerating,
   onApply,
-  onSearchOnline,
+  onGenerate,
   query,
   isLoading,
   lookupFinished,
@@ -35,11 +43,11 @@ export const StorageSuggestionCard = memo(function StorageSuggestionCard({
 
   if (!query || (!isLoading && !lookupFinished && !suggestion)) return null;
 
-  if (isLoading) {
+  if (isLoading || isGenerating) {
     return (
       <View style={[styles.card, styles.statusCard]}>
         <WavePhysicsLoader />
-        <Text style={styles.statusText}>{copy.loading}</Text>
+        <Text style={styles.statusText}>{isGenerating ? copy.generating : copy.loading}</Text>
       </View>
     );
   }
@@ -52,11 +60,11 @@ export const StorageSuggestionCard = memo(function StorageSuggestionCard({
         </View>
         <View style={styles.copy}>
           <Text style={styles.title}>{copy.title}</Text>
-          <Text style={styles.description}>{copy.unavailable}</Text>
+          <Text style={styles.description}>{generationError ? copy.generateFailed : copy.unavailable}</Text>
         </View>
-        <Pressable accessibilityRole="link" onPress={onSearchOnline} style={({ pressed }) => [styles.searchButton, pressed ? styles.pressed : null]}>
-          <Text style={styles.searchText}>{copy.searchOnline}</Text>
-          <Ionicons name="open-outline" size={12} color="#147B89" />
+        <Pressable accessibilityRole="button" onPress={onGenerate} style={({ pressed }) => [styles.searchButton, pressed ? styles.pressed : null]}>
+          <Text style={styles.searchText}>{copy.generate}</Text>
+          <Ionicons name="sparkles" size={12} color="#147B89" />
         </Pressable>
       </View>
     );
@@ -66,7 +74,11 @@ export const StorageSuggestionCard = memo(function StorageSuggestionCard({
     <View style={styles.card}>
       <View style={styles.cardTop}>
         <View style={styles.iconBox}>
-          <Ionicons name="sparkles" size={16} color="#1595A5" />
+          {suggestion.iconUrl ? (
+            <Image cachePolicy="memory-disk" contentFit="contain" source={{ uri: suggestion.iconUrl }} style={styles.iconPreview} />
+          ) : (
+            <Text style={styles.emojiPreview}>{suggestion.iconEmoji}</Text>
+          )}
         </View>
         <View style={styles.copy}>
           <Text style={styles.title}>{copy.title}</Text>
@@ -96,6 +108,8 @@ const styles = StyleSheet.create({
   cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: 9 },
   statusCard: { minHeight: 58, flexDirection: 'row', alignItems: 'center' },
   iconBox: { width: 29, height: 29, alignItems: 'center', justifyContent: 'center', borderRadius: 9, borderCurve: 'continuous', backgroundColor: '#DDF5F3' },
+  iconPreview: { width: 25, height: 25 },
+  emojiPreview: { fontSize: 17 },
   copy: { flex: 1, minWidth: 0, gap: 2 },
   title: { color: '#147B89', fontSize: 12, fontWeight: '800' },
   description: { color: '#258B89', fontSize: 11.5, fontWeight: '700', lineHeight: 17 },

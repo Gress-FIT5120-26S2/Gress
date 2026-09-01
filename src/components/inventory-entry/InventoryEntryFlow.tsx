@@ -1,10 +1,9 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useCallback, useEffect, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
-  Linking,
   Modal,
   Platform,
   Pressable,
@@ -15,7 +14,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { getFoodPresetSuggestion } from '../../services/inventoryApi';
+import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inventoryApi';
 import { useI18n } from '../../i18n';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
@@ -46,7 +45,7 @@ export type InventoryEntrySubmission = {
     currency: 'AUD';
     expiresAt: string | null;
     initialQuantity: number;
-    matchedPresetName: string | null;
+    matchedPresetUid: string | null;
     name: string;
     purchasePrice: number | null;
     remainingQuantity: number;
@@ -113,7 +112,7 @@ export function InventoryEntryFlow({
   source = 'manual',
   visible,
 }: InventoryEntryFlowProps) {
-  const { language, t } = useI18n();
+  const { t } = useI18n();
   const copy = t.fridge.manualEntry;
   const [reduceMotion, setReduceMotion] = useState(false);
   const [name, setName] = useState('');
@@ -126,6 +125,8 @@ export function InventoryEntryFlow({
   const [suggestionApplied, setSuggestionApplied] = useState(false);
   const [suggestionLoading, setSuggestionLoading] = useState(false);
   const [suggestionLookupFinished, setSuggestionLookupFinished] = useState(false);
+  const [suggestionGenerating, setSuggestionGenerating] = useState(false);
+  const [suggestionGenerationError, setSuggestionGenerationError] = useState(false);
   const [expiryEnabled, setExpiryEnabled] = useState(true);
   const [expiryDate, setExpiryDate] = useState('');
   const [expiryTime, setExpiryTime] = useState('');
@@ -140,6 +141,7 @@ export function InventoryEntryFlow({
   const [restockError, setRestockError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const latestNameRef = useRef('');
 
   useEffect(() => {
     if (!visible) return;
@@ -150,6 +152,7 @@ export function InventoryEntryFlow({
     // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和识别录入因此可以复用同一套表单。
     // EN: Each opening initialises its draft from initialValues so create, edit, and recognition flows can share one form.
     setName(initialValues?.name ?? '');
+    latestNameRef.current = initialValues?.name ?? '';
     setQuantity(initialValues?.quantity ?? '');
     setUnit(initialValues?.unit ?? 'item');
     setPrice(initialValues?.price ?? '');
@@ -159,6 +162,8 @@ export function InventoryEntryFlow({
     setSuggestionApplied(false);
     setSuggestionLoading(false);
     setSuggestionLookupFinished(false);
+    setSuggestionGenerating(false);
+    setSuggestionGenerationError(false);
     setExpiryEnabled(initialValues?.expiryEnabled ?? true);
     setExpiryDate(initialValues?.expiryDate ?? formatDate(defaultExpiry));
     setExpiryTime(initialValues?.expiryTime ?? formatTime(now));
@@ -189,11 +194,14 @@ export function InventoryEntryFlow({
 
   const handleNameChange = useCallback((value: string) => {
     setName(value);
+    latestNameRef.current = value;
     setNameError(null);
     setSuggestion(null);
     setSuggestionApplied(false);
     setSuggestionLoading(false);
     setSuggestionLookupFinished(false);
+    setSuggestionGenerating(false);
+    setSuggestionGenerationError(false);
   }, []);
 
   useEffect(() => {
@@ -219,6 +227,9 @@ export function InventoryEntryFlow({
           setSuggestion(nextSuggestion ? {
             canonicalName: nextSuggestion.canonicalName,
             category: nextSuggestion.categoryCode,
+            iconEmoji: nextSuggestion.iconEmoji,
+            iconUrl: nextSuggestion.iconUrl,
+            presetUid: nextSuggestion.presetUid,
             shelfLifeDays: nextSuggestion.shelfLifeDays,
             storageZone: nextSuggestion.storageZone,
           } : null);
@@ -241,17 +252,34 @@ export function InventoryEntryFlow({
     };
   }, [name, visible]);
 
-  const searchStorageAdvice = useCallback(() => {
+  const generateStorageAdvice = useCallback(async () => {
     const query = name.trim();
     if (!query) return;
-    const searchTerms = language === 'zh'
-      ? `${query} 保存方法 保质期`
-      : `${query} storage advice shelf life`;
-    // Arthur: NarIyirm
-    // 中文：预设库没有命中时，把当前名称带到系统浏览器检索，不把外部网页嵌进应用或把数据误当成官方建议。
-    // EN: When no preset matches, pass the current name to the system browser instead of embedding an external page or presenting it as official guidance.
-    void Linking.openURL(`https://www.google.com/search?q=${encodeURIComponent(searchTerms)}`).catch(() => undefined);
-  }, [language, name]);
+    setSuggestionGenerating(true);
+    setSuggestionGenerationError(false);
+    try {
+      const { suggestion: generatedSuggestion } = await generateFoodPreset(query);
+      if (latestNameRef.current.trim() !== query) return;
+      // Arthur: NarIyirm
+      // 中文：生成接口已经完成别名去重、图标标准化和 preset 缓存；这里只把可编辑结果带回当前表单。
+      // EN: The generation endpoint already deduplicates aliases, normalises the icon, and caches the preset; this only brings its editable result into the current form.
+      setSuggestion({
+        canonicalName: generatedSuggestion.canonicalName,
+        category: generatedSuggestion.categoryCode,
+        iconEmoji: generatedSuggestion.iconEmoji,
+        iconUrl: generatedSuggestion.iconUrl,
+        presetUid: generatedSuggestion.presetUid,
+        shelfLifeDays: generatedSuggestion.shelfLifeDays,
+        storageZone: generatedSuggestion.storageZone,
+      });
+      setSuggestionApplied(false);
+      setSuggestionLookupFinished(true);
+    } catch {
+      if (latestNameRef.current.trim() === query) setSuggestionGenerationError(true);
+    } finally {
+      if (latestNameRef.current.trim() === query) setSuggestionGenerating(false);
+    }
+  }, [name]);
 
   // Arthur: NarIyirm
   // 中文：只把 food preset 的储存区、分类和参考天数复制到本地表单；用户仍可修改，数据库此时没有写入。
@@ -306,7 +334,7 @@ export function InventoryEntryFlow({
         currency: 'AUD',
         expiresAt: expiry?.toISOString() ?? null,
         initialQuantity: numericQuantity,
-        matchedPresetName: suggestion?.canonicalName ?? null,
+        matchedPresetUid: suggestion?.presetUid ?? null,
         name: name.trim(),
         purchasePrice: numericPrice,
         remainingQuantity: numericQuantity,
@@ -397,7 +425,9 @@ export function InventoryEntryFlow({
                 isLoading={suggestionLoading}
                 lookupFinished={suggestionLookupFinished}
                 onApply={applySuggestion}
-                onSearchOnline={searchStorageAdvice}
+                generationError={suggestionGenerationError}
+                isGenerating={suggestionGenerating}
+                onGenerate={() => { void generateStorageAdvice(); }}
                 query={name.trim()}
                 suggestion={suggestion}
               />

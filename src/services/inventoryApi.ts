@@ -15,8 +15,11 @@ export type InventoryBatch = {
   currency: string;
   expiresAt: string | null;
   id: string;
+  iconEmoji?: string | null;
+  iconUrl?: string | null;
   name: string;
   needsRestock: boolean;
+  presetUid?: string | null;
   purchasePrice: number | null;
   remainingQuantity: number;
   stockedAt: string;
@@ -62,6 +65,7 @@ export type CreateInventoryBatchInput = {
   expiresAt: string | null;
   initialQuantity: number;
   name: string;
+  presetUid: string | null;
   purchasePrice: number | null;
   restockRule: {
     enabled: true;
@@ -84,9 +88,15 @@ export type UpdateInventoryBatchInput = {
 };
 
 export type FoodPresetSuggestion = {
+  aliases: string[];
   canonicalName: string;
   categoryCode: InventoryCategoryCode;
+  iconEmoji: string;
+  iconUrl: string | null;
+  notes: string | null;
+  presetUid: string;
   shelfLifeDays: number;
+  source: 'curated' | 'seed' | 'ai' | 'open_data';
   storageZone: InventoryStorageZone;
 };
 
@@ -111,6 +121,16 @@ export function getFoodPresetSuggestion(query: string): Promise<{ suggestion: Fo
   return requestApi<{ suggestion: FoodPresetSuggestion | null }>(
     `/api/food-presets/suggestion?q=${encodeURIComponent(query)}`,
   );
+}
+
+// Arthur: NarIyirm
+// 中文：只有预设查询未命中且用户明确点击后才调用生成接口；服务端负责 Gemini、Cloudflare、去背景和全局 preset 缓存。
+// EN: Call generation only after a preset miss and an explicit user action; the server owns Gemini, Cloudflare, background removal, and global preset caching.
+export function generateFoodPreset(query: string): Promise<{ generated: boolean; suggestion: FoodPresetSuggestion }> {
+  return requestApi<{ generated: boolean; suggestion: FoodPresetSuggestion }>('/api/food-presets/generate', {
+    body: JSON.stringify({ name: query }),
+    method: 'POST',
+  });
 }
 
 // Arthur: NarIyirm

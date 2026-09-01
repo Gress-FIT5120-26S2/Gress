@@ -1,6 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { memo } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { PresetFoodIcon } from './PresetFoodIcon';
 
 export type FridgeStorageZone = 'chilled' | 'frozen' | 'pantry';
 
@@ -10,6 +11,7 @@ type FridgeFoodCardProps = {
   categoryTone: string;
   daysLeft: number | null;
   emoji: string;
+  iconUrl: string | null;
   freshnessText: string | null;
   isExpired: boolean;
   name: string;
@@ -28,6 +30,7 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
   categoryTone,
   daysLeft,
   emoji,
+  iconUrl,
   freshnessText,
   isExpired,
   name,
@@ -53,7 +56,9 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
       style={({ pressed }) => [styles.card, { backgroundColor: categoryTint, borderColor: `${categoryTone}20` }, pressed && styles.pressed]}
     >
       <View style={styles.top}>
-        <View style={styles.emojiTile}><Text style={styles.emoji}>{emoji}</Text></View>
+        <View style={styles.emojiTile}>
+          <PresetFoodIcon emoji={emoji} iconUrl={iconUrl} size="card" />
+        </View>
         <Text numberOfLines={2} style={styles.name}>{name}</Text>
       </View>
       <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.amount}>{amount}</Text>
@@ -77,7 +82,6 @@ const styles = StyleSheet.create({
   card: { position: 'relative', width: '48%', minHeight: 145, padding: 11, borderWidth: 1, borderRadius: 15, borderCurve: 'continuous' },
   top: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emojiTile: { width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.68)' },
-  emoji: { fontSize: 24 },
   name: { flex: 1, minWidth: 0, color: '#183B30', fontSize: 15, fontWeight: '800', lineHeight: 18 },
   amount: { marginTop: 9, color: '#24483B', fontSize: 20, fontWeight: '800', letterSpacing: -0.3 },
   meta: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginTop: 10 },

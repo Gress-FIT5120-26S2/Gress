@@ -121,8 +121,8 @@ function KitchMemoApp() {
   useEffect(() => {
     if (activeTab !== 'home' && activeTab !== 'notifications') return;
     // Arthur: NarIyirm
-    // 中文：首页信箱角标和通知页共用未读数；打开这两处时再拉取，避免其它 Tab 重复请求。
-    // EN: Home mailbox badge and inbox share one unread count; refresh only when those surfaces are open.
+    // 中文：提醒与冰箱助手已解耦；未读数只供首页信箱和独立通知页使用。
+    // EN: Reminders are decoupled from the fridge assistant; unread state now serves only the home mailbox and standalone inbox.
     fetchNotifications()
       .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
       .catch(() => undefined);
