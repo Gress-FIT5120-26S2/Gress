@@ -1,6 +1,6 @@
 import { requestApi } from './apiClient';
 
-export type NotificationType = 'expiring' | 'expired' | 'restock' | 'system';
+export type NotificationType = 'expiring' | 'expired' | 'restock' | 'shared' | 'system';
 
 export type KitchenNotification = {
   id: string;
@@ -12,14 +12,34 @@ export type KitchenNotification = {
     unit?: string;
     currentQuantity?: number;
     minimumQuantity?: number;
+    actorName?: string | null;
+    action?: 'stocked' | 'updated' | 'removed';
+    quantity?: number;
   };
+  relatedBatchUid: string | null;
   createdAt: string;
   isRead: boolean;
 };
 
 export type NotificationInboxSnapshot = {
   unreadCount: number;
+  badgeCount: number;
   items: KitchenNotification[];
+};
+
+export type NotificationPreferences = {
+  notificationsEnabled: boolean;
+  badgesEnabled: boolean;
+  quietHoursEnabled: boolean;
+  quietHoursStart: string;
+  quietHoursEnd: string;
+  expiringEnabled: boolean;
+  restockEnabled: boolean;
+  sharedEnabled: boolean;
+  systemEnabled: boolean;
+  systemDeliveryEnabled: boolean;
+  timeZone: string;
+  updatedAt: string | null;
 };
 
 // Arthur: NarIyirm
@@ -33,5 +53,23 @@ export const fetchNotifications = () =>
 // EN: Opening a notification writes notification_reads only for the current deviceId, leaving other fridge members unread.
 export const markNotificationRead = (id: string) =>
   requestApi<void>(`/api/notifications/${encodeURIComponent(id)}/read`, {
+    method: 'POST',
+  });
+
+export const fetchNotificationPreferences = () =>
+  requestApi<NotificationPreferences>('/api/notification-preferences');
+
+// Arthur: NarIyirm
+// 中文：设置页按单个开关局部保存，避免快速调整多个选项时用旧快照覆盖其他偏好。
+// EN: The settings screen saves one partial change at a time so rapid adjustments never overwrite other preferences with a stale snapshot.
+export const updateNotificationPreferences = (patch: Partial<Omit<NotificationPreferences, 'updatedAt'>>) =>
+  requestApi<NotificationPreferences>('/api/notification-preferences', {
+    body: JSON.stringify(patch),
+    method: 'PATCH',
+  });
+
+export const registerNotificationDelivery = (expoPushToken: string, platform: 'android' | 'ios', locale: 'en' | 'zh') =>
+  requestApi<void>('/api/notification-delivery/register', {
+    body: JSON.stringify({ expoPushToken, locale, platform }),
     method: 'POST',
   });

@@ -13,14 +13,15 @@ type FloatingTabBarProps = {
 };
 
 // Arthur: NarIyirm
-// 中文：MVP 底部导航只暴露已完成的核心流程；成就和个人页保留代码，但不向用户提供入口。
-// EN: The MVP tab bar exposes only completed core flows; achievements and profile remain implemented but have no user-facing entry.
-type BottomTab = Exclude<AppTab, 'notifications' | 'achievements' | 'profile'>;
+// 中文：个人身份功能完成后重新开放“我的”；成就仍等真实统计接口完成后再进入主导航。
+// EN: Reopen Me now that device identity is implemented; Wins stays hidden until its real metrics API is ready.
+type BottomTab = Exclude<AppTab, 'notifications' | 'achievements'>;
 
 const tabs: Array<{ key: BottomTab; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: 'home', icon: 'home-outline' },
   { key: 'shopping', icon: 'cart-outline' },
   { key: 'fridge', icon: 'cube-outline' },
+  { key: 'profile', icon: 'person-outline' },
 ];
 
 export function FloatingTabBar({ activeTab, onChange, blurTarget }: FloatingTabBarProps) {

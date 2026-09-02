@@ -7,6 +7,7 @@ import {
   generateFoodPresetIcon,
   generateFoodPresetMetadata,
 } from '../services/foodPresetAi.js';
+import { deliverSharedNotification } from '../services/pushNotifications.js';
 
 const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
@@ -29,6 +30,22 @@ function normaliseName(value) {
 function asNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+// Arthur: NarIyirm
+// 中文：库存写入成功后创建共享事件并等待系统通知投递；通知失败不会把已提交的库存操作伪装成失败。
+// EN: After a successful inventory write, create the shared event and await system delivery; notification failure never misrepresents the committed inventory action as failed.
+async function notifySharedInventory(deviceId, batchUid, action) {
+  const { data: notificationUid, error } = await supabase.rpc('record_shared_inventory_notification', {
+    p_action: action,
+    p_batch_uid: batchUid,
+    p_device_id: deviceId,
+  });
+  if (error) {
+    console.error('Shared inventory notification could not be recorded:', error.message);
+    return;
+  }
+  await deliverSharedNotification(notificationUid, deviceId);
 }
 
 function findPresetMatch(presets, query) {
@@ -319,6 +336,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
     });
     if (error) throw error;
     const updated = Array.isArray(data) ? data[0] : data;
+    await notifySharedInventory(deviceId, batchUid, 'updated');
     return response.json({
       batch: {
         id: updated.batch_uid,
@@ -373,6 +391,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
     if (error) throw error;
 
     const batch = await getInventoryBatchDetail(deviceId, batchUid);
+    await notifySharedInventory(deviceId, batchUid, 'updated');
     return response.json({ batch });
   } catch (error) {
     return sendInventoryMutationError(response, error);
@@ -429,6 +448,7 @@ inventoryRouter.delete('/inventory/batches/:batchUid', async (request, response)
       p_expected_version: expectedVersion,
     });
     if (error) throw error;
+    await notifySharedInventory(deviceId, batchUid, 'removed');
     return response.status(204).send();
   } catch (error) {
     return sendInventoryMutationError(response, error);
@@ -583,6 +603,7 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
     if (error) throw error;
 
     const created = Array.isArray(data) ? data[0] : data;
+    if (created?.batch_uid) await notifySharedInventory(deviceId, created.batch_uid, 'stocked');
     return response.status(201).json({ batchUid: created?.batch_uid ?? null });
   } catch (error) {
     const message = error?.message ?? 'The item could not be saved.';

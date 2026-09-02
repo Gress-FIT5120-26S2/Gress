@@ -10,7 +10,8 @@
     "ios": {
       "bundleIdentifier": "com.gressfit5120.kitchmemo",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CADisableMinimumFrameDurationOnPhone": true
       },
       "supportsTablet": true
     },
@@ -61,7 +62,14 @@
           }
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-notifications",
+        {
+          "color": "#F58220",
+          "defaultChannel": "kitchmemo-reminders"
+        }
+      ]
     ]
   }
 }

@@ -1,33 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
-import { BlurView } from 'expo-blur';
-import type { RefObject } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type AppLanguage, useI18n } from '../i18n';
-import { DeviceRecoverySettings } from './DeviceRecoverySettings';
-
-export function ProfileSettingsButton({ blurTarget, onPress }: { blurTarget: RefObject<View | null>; onPress: () => void }) {
-  const { t } = useI18n();
-
-  return (
-    <Pressable
-      accessibilityLabel={t.settings.open}
-      accessibilityRole="button"
-      hitSlop={8}
-      onPress={onPress}
-      style={({ pressed }) => [styles.settingsButton, pressed && styles.buttonPressed]}
-    >
-      <BlurView
-        blurMethod="dimezisBlurViewSdk31Plus"
-        blurTarget={blurTarget}
-        intensity={48}
-        tint="systemUltraThinMaterialLight"
-        style={styles.settingsGlass}
-      >
-        <Ionicons name="settings-outline" size={24} color="#365048" />
-      </BlurView>
-    </Pressable>
-  );
-}
 
 function LanguageOption({ language, label, detail }: { language: AppLanguage; label: string; detail: string }) {
   const { language: selectedLanguage, setLanguage, t } = useI18n();
@@ -81,7 +54,6 @@ export function LanguageSettingsModal({ onClose, visible }: { onClose: () => voi
               <LanguageOption language="zh" label={t.settings.chinese} detail={t.settings.chineseDetail} />
               <LanguageOption language="en" label={t.settings.english} detail={t.settings.englishDetail} />
             </View>
-            <DeviceRecoverySettings active={visible} />
           </ScrollView>
         </View>
       </View>
@@ -90,9 +62,7 @@ export function LanguageSettingsModal({ onClose, visible }: { onClose: () => voi
 }
 
 const styles = StyleSheet.create({
-  settingsButton: { position: 'absolute', top: 72, right: 22, width: 52, height: 52 },
   buttonPressed: { opacity: 0.78, transform: [{ scale: 0.97 }] },
-  settingsGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1, borderColor: 'rgba(255,255,255,0.72)', backgroundColor: 'rgba(255,255,255,0.30)' },
   modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,38,32,0.32)' },
   sheet: { maxHeight: '92%', paddingHorizontal: 22, paddingTop: 10, paddingBottom: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#F8F7F1', shadowColor: '#183D32', shadowOpacity: 0.2, shadowRadius: 26, shadowOffset: { width: 0, height: -8 }, elevation: 18 },
   scrollContent: { paddingBottom: 24 },

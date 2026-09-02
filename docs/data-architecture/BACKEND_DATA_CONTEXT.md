@@ -4,15 +4,15 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-02（Australia/Sydney）。
+- 最后核对日期：2026-09-03（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 13 份 migration；截至 2026-09-02，开发与生产项目均已按顺序应用至 `20260902000000_ai_food_presets_and_icons.sql`，两端 migration history 一致且生产项目已通过远程 lint。CLI 当前链接开发项目。
+- 本地 schema 历史共有 17 份 migration；截至 2026-09-03，开发与生产项目均已应用并通过远程 lint 至 `20260902031000_notification_delivery.sql`，CLI 当前链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续两份迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
-- 应用最新本地 migration 后共有 17 张业务/安全表、7 个枚举，并新增设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
+- 应用最新本地 migration 后共有 20 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
-- 代码中已实现设备凭证验证、设备初始化、库存读写、通知、购物清单、共享命名/开启、邀请码轮换、成员设备摘要、加入、退出和设备恢复；共享管理页面依赖的 `20260831030000_manage_shared_fridges.sql` 已在开发与生产项目应用。成就和分类管理接口尚未实现。
+- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出和设备恢复；这些功能依赖的 migration 当前已在开发与生产项目同步应用。成就和分类管理接口尚未实现。
 
 实际实现的权威来源：
 
@@ -47,6 +47,10 @@ Expo App
   │                   └─ Supabase PostgreSQL
   └─ Supabase Realtime（Publishable key + 256 位频道能力值）
        └─ 只接收领域和版本号，收到后回到 Express 读取权威数据
+
+Express API
+  └─ Expo Push Service
+       └─ 只向已授权且启用系统投递的成员设备发送系统通知
 ```
 
 必须保持的规则：
@@ -67,6 +71,7 @@ Expo App
 - 本地 Express 默认读取 `server/.env.development`；当 `NODE_ENV=production` 时读取 `server/.env.production`。部署平台直接提供的环境变量优先于文件。
 - Express 可用 `FOOD_RECOGNITION_API_URL` 覆盖视觉模型地址；该配置只存在于服务端，App 不直接调用模型。
 - AI 预设生成只从 Express 读取 `GEMINI_API_KEY`、`GEMINI_PRESET_MODEL`、`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_AI_API_TOKEN` 和 `CLOUDFLARE_ICON_MODEL`。当前默认文本模型为稳定版 `gemini-3.5-flash-lite`，继续通过受支持的 GenerateContent API 请求结构化输出；这些值不得使用 `EXPO_PUBLIC_` 前缀，App 只调用已鉴权的 Express 接口。
+- Expo Push Token 只由 App 在系统授权后交给 Express，并只保存在 `device_push_tokens`。启用 Expo Push Access Token 安全时，`EXPO_ACCESS_TOKEN` 只配置在 Express；不得返回给 App、成员接口或日志。
 - `server/.env` 仅作为旧开发机兼容回退。新配置请使用按环境命名的文件，所有真实 `.env` 文件都不得提交 Git。
 - 测试 App 必须指向测试 Express，生产 App 必须指向生产 Express；同一 `device_id` 在两个 Supabase 项目中是彼此独立的数据。
 
@@ -111,8 +116,10 @@ Expo App
 ```mermaid
 erDiagram
     DEVICES ||--o| FRIDGE_MEMBERS : joins
+    DEVICES ||--o| DEVICE_PROFILES : personalizes
     DEVICES ||--o| DEVICE_CREDENTIALS : authenticates
     DEVICES ||--o| DEVICE_RECOVERY_CREDENTIALS : recovers
+    DEVICES ||--o| DEVICE_PUSH_TOKENS : registers
     FRIDGES ||--o{ FRIDGE_MEMBERS : contains
     DEVICES ||--o{ FRIDGES : creates
     FRIDGES ||--o{ FRIDGE_INVITES : issues
@@ -127,6 +134,8 @@ erDiagram
     INVENTORY_BATCHES o|--o{ NOTIFICATIONS : triggers
     NOTIFICATIONS ||--o{ NOTIFICATION_READS : read_by
     DEVICES ||--o{ NOTIFICATION_READS : reads
+    NOTIFICATIONS ||--o{ NOTIFICATION_DELIVERIES : delivers
+    DEVICES ||--o{ NOTIFICATION_DELIVERIES : receives
     FRIDGES ||--o{ FRIDGE_ACHIEVEMENTS : earns
     ACHIEVEMENTS ||--o{ FRIDGE_ACHIEVEMENTS : defines
 ```
@@ -141,7 +150,7 @@ erDiagram
 | `storage_zone` | `chilled`, `frozen`, `pantry` | 实际储存方式 |
 | `inventory_lifecycle` | `active`, `consumed`, `discarded`, `archived` | 库存批次生命周期 |
 | `inventory_event_type` | `stock`, `consume`, `discard`, `adjust`, `merge` | 库存流水类型 |
-| `notification_type` | `expiring`, `expired`, `restock`, `system` | 通知类型 |
+| `notification_type` | `expiring`, `expired`, `restock`, `shared`, `system` | 通知类型 |
 
 ## 7. 表结构
 
@@ -344,7 +353,8 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `notification_uid` | `uuid` | 主键 |
 | `fridge_uid` | `uuid` | 所属冰箱 |
 | `related_batch_uid` | `uuid` | 可空；必须属于同一冰箱 |
-| `notification_type` | `notification_type` | 临期、过期、补货或系统通知 |
+| `actor_device_id` | `text` | 可空；共享库存事件操作者，仅用于排除本人接收和审计 |
+| `notification_type` | `notification_type` | 临期、过期、补货、共享动态或系统通知 |
 | `message_key` | `text` | i18n 文案键，不直接保存单一语言完整句子 |
 | `message_payload` | `jsonb` | 食材名、剩余天数等模板参数 |
 | `dedupe_key` | `text` | 全局唯一，防止同一事件重复生成 |
@@ -410,6 +420,36 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 保存每个冰箱的轻量变化埋点：`inventory_version`、`cart_version`、`fridge_version`、`notifications_version` 与唯一的 256 位 `broadcast_topic` 能力值。库存批次、补货规则、分类、购物项、共享成员/邀请/名称或通知表发生写入时，数据库触发器在同一事务中递增对应版本；共享模式还通过 `realtime.send` 发送对应领域和字符串版本号。客户端只比较版本；实际数据仍从原业务接口读取。
 
 该表启用 RLS，移动端角色无权限，仅 service role 可读写。它不保存业务内容，也不是缓存数据库。
+
+### 7.18 `device_profiles`
+
+无登录账号场景下的设备个人资料。昵称用于共享成员识别，鉴权仍完全依赖设备凭证；昵称本身不授予任何数据权限。
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `device_id` | `text` | 主键，外键 → `devices.device_id` |
+| `display_name` | `text` | 可空；非空时去除首尾空白后长度为 1–32，且不得包含控制字符 |
+| `avatar_key` | `text` | `sage`、`sky`、`apricot`、`plum`、`coral` 之一 |
+| `notifications_enabled` / `notification_badges_enabled` | `boolean` | 当前设备的提醒总开关和首页角标开关 |
+| `quiet_hours_enabled` | `boolean` | 是否在设定时段隐藏首页角标 |
+| `quiet_hours_start` / `quiet_hours_end` | `time` | 默认 22:00–08:00，起止时间不得相同 |
+| `expiring_notifications_enabled` | `boolean` | 控制临期与过期提醒 |
+| `restock_notifications_enabled` | `boolean` | 控制补货提醒 |
+| `shared_notifications_enabled` | `boolean` | 为共享库存动态预留的设备级开关 |
+| `system_notifications_enabled` | `boolean` | 控制系统与召回提醒 |
+| `system_delivery_enabled` | `boolean` | 当前设备是否已允许 App 经系统通知中心投递；默认关闭 |
+| `notification_time_zone` | `text` | 评估免打扰时段的 IANA 时区 |
+| `created_at` / `updated_at` | `timestamptz` | 审计时间 |
+
+新设备由触发器创建默认资料，历史设备由 migration 回填稳定头像令牌。用户第一次保存昵称时更新已有行；昵称不要求全局唯一。通知偏好只影响当前设备，关闭某一类别不会删除冰箱共享通知或改变其他成员设置。设备恢复更新成员关系的 `device_id` 时，同一事务触发器会把昵称、头像、通知开关、免打扰时段和时区一起覆盖到新设备临时资料并删除旧资料。昵称或头像发生变化会递增当前冰箱的 `fridge` 同步版本，但 Broadcast 和成员接口不会返回完整 `device_id`。
+
+### 7.19 `device_push_tokens`
+
+每台安装实例最多保存一个 Expo Push Token，字段包含 `platform`、`locale`、`is_active` 和审计时间。Token 全局唯一、随设备删除级联清理；设备恢复会停用旧设备 Token，新设备必须重新取得系统权限并注册。移动端角色无读取权限。
+
+### 7.20 `notification_deliveries`
+
+以 `(notification_uid, device_id)` 为主键记录一次系统投递结果：`sent`、`failed` 或 `suppressed`，以及 Expo ticket、错误码和尝试时间。该表用于幂等投递和服务端审计，不作为 App 通知列表的数据源。
 
 ## 8. 派生状态
 
@@ -484,7 +524,7 @@ Seed 使用 upsert，可重复运行。它不创建个人冰箱或默认分类�
 
 ## 12. 安全与权限
 
-全部 17 张业务/安全表都已经启用 RLS。
+全部 20 张业务/安全表都已经启用 RLS。
 
 当前权限策略：
 
@@ -520,6 +560,8 @@ Seed 使用 upsert，可重复运行。它不创建个人冰箱或默认分类�
 GET /api/health
 GET /api/sync/state
 POST /api/devices/bootstrap
+GET /api/profile
+PATCH /api/profile
 GET /api/fridges/context
 POST /api/fridges/share
 POST /api/fridges/invites
@@ -540,6 +582,9 @@ PUT /api/inventory/batches/:batchUid/restock-rule
 DELETE /api/inventory/batches/:batchUid
 GET /api/notifications
 POST /api/notifications/:id/read
+GET /api/notification-preferences
+PATCH /api/notification-preferences
+POST /api/notification-delivery/register
 GET /api/cart
 POST /api/cart
 GET /api/restock
@@ -554,6 +599,7 @@ GET /api/restock
 已实现：
 
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
+- 设备个人资料：`GET /api/profile` 只读取当前已鉴权设备；`PATCH /api/profile` 只允许修改当前设备 1–32 字符的昵称。头像使用稳定产品令牌，App 不上传照片。
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：只有用户明确点击后，`POST /api/food-presets/generate` 才调用 Gemini 生成标准名、双语别名、分类、储存区、参考天数和说明；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
@@ -561,8 +607,8 @@ GET /api/restock
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
-- 通知：打开列表时按当前库存同步临期、过期、补货提醒；已读写入 `notification_reads`，按设备独立。
-- 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请与匿名成员设备摘要。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
+- 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会立即写入带操作者昵称和批次详情的 `shared` 通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统投递只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员，投递失败不回滚库存 mutation。
+- 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请，以及不含真实 `device_id` 的昵称、头像令牌与成员顺序。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
 - 邀请失败状态：加入 RPC 会先读取邀请码真实状态，再分别返回 `invite_not_found`、`invite_expired`、`invite_used`、`invite_revoked`；Express 保留这些稳定错误码，Expo 负责显示对应中英文提示。只有格式错误或确实不存在的码显示无效/未找到。
 - 前台静默同步：`GET /api/sync/state` 返回当前冰箱模式、四个领域版本，以及共享模式下的 Realtime endpoint、publishable key 和高熵频道能力值。数据库 Broadcast 变化后只通知当前已挂载页面静默重拉相关接口；连接正常时每 30 秒对账，未配置或断线时共享模式回退每 6 秒探测，个人模式保持 30 秒。App 回前台会重建频道并立即对账，网络错误最长 60 秒退避。该方案不依赖 Vercel Function 实例内存，也不需要 Redis。
 
@@ -615,9 +661,12 @@ POST /api/food-presets/generate
 ```text
 GET  /api/notifications
 POST /api/notifications/:notificationUid/read
+GET  /api/notification-preferences
+PATCH /api/notification-preferences
+POST /api/notification-delivery/register
 ```
 
-打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按到期前三天安排本地原生提醒，并在日期变化、库存移除或设置关闭后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。
 ### 已完成：库存批次详情与修改
 
 ```text
@@ -712,3 +761,7 @@ npx supabase db push --include-seed
 13. 同步版本与 Broadcast 只做页面失效通知，业务记录仍从 HTTP API 读取；不得把 `fridge_sync_versions` 或 Broadcast payload 当作业务缓存。
 14. 成就按冰箱保存。
 15. Schema 变化使用新 migration，并同步更新本文档。
+16. 设备昵称不构成账号或授权；成员摘要不得返回完整 `device_id`，设备恢复必须同步迁移 `device_profiles`。
+17. 通知偏好按设备保存；免打扰只影响角标/提醒呈现，不得把共享通知删除或替其他成员标记已读。
+18. `actor_device_id` 只用于共享通知排除操作者本人；成员响应仍不得暴露真实设备 ID。
+19. Push Token 与投递审计只允许 service role 访问；远程 Push 必须使用 EAS development/preview/production build 和真实设备验证，不能把 Expo Go 当成远程 Push 验收环境。

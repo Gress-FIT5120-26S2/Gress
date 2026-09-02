@@ -7,6 +7,9 @@
     "backfill:preset-icons": "node scripts/backfill-preset-icons.js",
     "dev": "node src/index.js",
     "start": "node src/index.js",
+    "verify:notification-preferences": "node scripts/verify-notification-preferences.js",
+    "verify:profile": "node scripts/verify-profile.js",
+    "verify:shared-notifications": "node scripts/verify-shared-notifications.js",
     "verify:sharing": "node scripts/verify-sharing.js",
     "verify:sync": "node scripts/verify-sync.js"
   },
