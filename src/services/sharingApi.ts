@@ -12,6 +12,8 @@ export type FridgeAccessContext = {
     uid: string;
   };
   members: Array<{
+    avatarKey: 'sage' | 'sky' | 'apricot' | 'plum' | 'coral';
+    displayName: string | null;
     index: number;
     isCurrent: boolean;
     joinedAt: string;
@@ -20,8 +22,8 @@ export type FridgeAccessContext = {
 };
 
 // Arthur: NarIyirm
-// 中文：共享入口读取当前冰箱模式、有效邀请和匿名成员摘要；数据由 server/routes/sharing.js 按已认证 fridgeUid 组装。
-// EN: The sharing entry reads mode, active invite, and anonymous member summaries assembled by server/routes/sharing.js for the authenticated fridgeUid.
+// 中文：共享入口读取当前冰箱模式、有效邀请和安全成员摘要；昵称可见但真实 device_id 不会下发。
+// EN: The sharing entry reads fridge mode, the active invite, and safe member summaries with names but without real device IDs.
 export function getFridgeAccessContext() {
   return requestApi<FridgeAccessContext>('/api/fridges/context');
 }

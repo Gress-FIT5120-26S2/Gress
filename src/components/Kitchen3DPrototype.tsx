@@ -168,14 +168,19 @@ function PulseMarker({ hasStatus = false, position, reduceMotion, selected = fal
 
     const breathing = reduceMotion ? 1 : 0.92 + ((Math.sin(clock.elapsedTime * 2.1) + 1) / 2) * 0.14;
     const blinking = reduceMotion ? 1 : 0.38 + ((Math.sin(clock.elapsedTime * 5.4) + 1) / 2) * 0.62;
+    const alertCycle = clock.elapsedTime % 2.8;
+    const alertJump = !reduceMotion && hasStatus && alertCycle < 0.58
+      ? Math.sin((alertCycle / 0.58) * Math.PI) * 0.13
+      : 0;
     const targetScale = selected ? 0.04 : breathing;
     const nextScale = MathUtils.damp(marker.scale.x, targetScale, selected ? 18 : 8, Math.min(delta, 0.05));
     marker.scale.setScalar(nextScale);
+    marker.position.y = alertJump;
 
     if (whiteMaterialRef.current) whiteMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : 0.9;
     if (alertMaterialRef.current) alertMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : blinking;
-    if (lightRef.current) lightRef.current.intensity = selected ? 0 : hasStatus ? 0.5 * blinking : 0.34 * breathing;
-    if (Math.abs(nextScale - targetScale) > 0.01) invalidate();
+    if (lightRef.current) lightRef.current.intensity = selected ? 0 : hasStatus ? (0.58 + alertJump * 2.4) * blinking : 0.34 * breathing;
+    if ((!reduceMotion && hasStatus) || Math.abs(nextScale - targetScale) > 0.01) invalidate();
   });
 
   return (
@@ -190,8 +195,8 @@ function PulseMarker({ hasStatus = false, position, reduceMotion, selected = fal
               <capsuleGeometry args={[0.045, 0.12, 6, 14]} />
               <meshBasicMaterial ref={alertMaterialRef} color="#FFC24F" transparent opacity={1} depthTest={false} toneMapped={false} />
             </mesh>
-            <mesh position={[0, -0.075, 0]} renderOrder={20}>
-              <cylinderGeometry args={[0.032, 0.042, 0.045, 14]} />
+            <mesh position={[0, -0.085, 0]} renderOrder={20}>
+              <sphereGeometry args={[0.038, 14, 14]} />
               <meshBasicMaterial color="#A86822" depthTest={false} toneMapped={false} />
             </mesh>
           </>

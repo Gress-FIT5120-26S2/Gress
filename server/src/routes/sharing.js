@@ -63,7 +63,22 @@ async function readContext(deviceId, fridgeUid) {
   ]);
   const failed = [fridgeResult, membersResult, inviteResult, recoveryResult].find((result) => result.error);
   if (failed?.error) throw failed.error;
+  const memberIds = (membersResult.data ?? []).map((member) => member.device_id);
+  const profilesResult = memberIds.length > 0
+    ? await supabase
+      .from('device_profiles')
+      .select('device_id, display_name, avatar_key')
+      .in('device_id', memberIds)
+    : { data: [], error: null };
+  if (profilesResult.error) throw profilesResult.error;
+  const profileByDevice = new Map((profilesResult.data ?? []).map((profile) => [profile.device_id, profile]));
+
+  // Arthur: NarIyirm
+  // 中文：成员摘要只返回昵称、头像令牌和顺序，不把真实 device_id 暴露给同一冰箱的其他设备。
+  // EN: Member summaries expose only names, avatar tokens, and order without leaking real device IDs to other devices in the fridge.
   const members = (membersResult.data ?? []).map((member, index) => ({
+    avatarKey: profileByDevice.get(member.device_id)?.avatar_key ?? 'sage',
+    displayName: profileByDevice.get(member.device_id)?.display_name ?? null,
     index: index + 1,
     isCurrent: member.device_id === deviceId,
     joinedAt: member.joined_at,

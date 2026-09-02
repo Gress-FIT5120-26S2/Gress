@@ -41,7 +41,10 @@ export function KitchenMailbox({ active, reduceMotion, unreadCount }: { active: 
   const startedAtRef = useRef<number | null>(null);
   const finishedRef = useRef(false);
   const invalidate = useThree((state) => state.invalidate);
-  const visibleLetterCount = Math.min(LETTER_OFFSETS.length, Math.max(0, unreadCount));
+  // Arthur: NarIyirm
+  // 中文：1–4 条按真实数量呈现未满信箱，5 条起固定进入六封满溢视觉，未读再多也不继续增加几何体。
+  // EN: Counts 1–4 show a partially filled mailbox; five or more switch to a fixed six-letter overflow state without adding unbounded geometry.
+  const visibleLetterCount = unreadCount <= 0 ? 0 : unreadCount < 5 ? unreadCount : LETTER_OFFSETS.length;
 
   useEffect(() => {
     startedAtRef.current = null;
@@ -112,7 +115,7 @@ export function KitchenMailbox({ active, reduceMotion, unreadCount }: { active: 
         <Envelope key={index} position={[x, y, 0.34 + z]} rotationZ={rotationZ} />
       ))}
 
-      <group ref={featuredLetterRef} position={[0, 0.2, 0.28]} visible={unreadCount > 0}>
+      <group ref={featuredLetterRef} position={[0, 0.2, 0.28]} visible={active && unreadCount > 0}>
         <Envelope position={[0, 0, 0]} rotationZ={0} />
         <group ref={flapRef} position={[0, 0.13, 0.018]}>
           <mesh position={[0, -0.07, 0]}>

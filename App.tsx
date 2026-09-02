@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { getApiHealth } from './src/services/apiClient';
-import { fetchNotifications } from './src/services/notificationApi';
+import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
@@ -15,12 +15,12 @@ import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
-import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/ProfileSettings';
+import { ProfileScreen } from './src/components/ProfileScreen';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
-import { error } from 'three';
 import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
 import { RealtimeSyncProvider, subscribeToSync } from './src/services/realtimeSync';
+import { addSystemNotificationResponseListener, openLastSystemNotification, refreshSystemNotificationDelivery, scheduleExpiryReminders, setSystemNotificationBadge } from './src/services/systemNotifications';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -55,7 +55,7 @@ type FirstUseJourneyState = 'checking' | 'pending' | 'complete';
 const FIRST_USE_JOURNEY_KEY = 'kitchmemo:first-use-journey:v1';
 
 function KitchMemoApp() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   // Arthur: NarIyirm
@@ -67,10 +67,12 @@ function KitchMemoApp() {
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
   const [fridgeFocusFilter, setFridgeFocusFilter] = useState<FridgeFilter | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
-  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [notificationReturnTab, setNotificationReturnTab] = useState<'home' | 'profile'>('home');
+  const [notificationTargetId, setNotificationTargetId] = useState<string | null>(null);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -146,36 +148,57 @@ function KitchMemoApp() {
     // 中文：提醒与冰箱助手已解耦；未读数只供首页信箱和独立通知页使用。
     // EN: Reminders are decoupled from the fridge assistant; unread state now serves only the home mailbox and standalone inbox.
     fetchNotifications()
-      .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
+      .then((snapshot) => {
+        setUnreadNotificationCount(snapshot.unreadCount);
+        setNotificationBadgeCount(snapshot.badgeCount);
+        void setSystemNotificationBadge(snapshot.badgeCount).catch(() => undefined);
+        void fetchNotificationPreferences()
+          .then((preferences) => refreshSystemNotificationDelivery(preferences, language))
+          .catch(() => undefined);
+      })
       .catch(() => undefined);
-  }, [activeTab]);
+  }, [activeTab, language]);
 
   useEffect(() => subscribeToSync(['notifications', 'home'], () => {
     if (activeTab !== 'home' && activeTab !== 'notifications') return;
     void fetchNotifications()
-      .then((snapshot) => setUnreadNotificationCount(snapshot.unreadCount))
+      .then((snapshot) => {
+        setUnreadNotificationCount(snapshot.unreadCount);
+        setNotificationBadgeCount(snapshot.badgeCount);
+        void setSystemNotificationBadge(snapshot.badgeCount).catch(() => undefined);
+      })
       .catch(() => undefined);
   }), [activeTab]);
 
   useEffect(() => {
     let mounted = true;
-    // 中文：首页提示数量必须与冰箱“快过期”筛选一致，因此直接从库存快照按同一规则计数。
-    // EN: The home prompt must match the fridge expiring chip, so count from the inventory snapshot with the same rule.
+    // Arthur: NarIyirm
+    // 中文：首页计数和系统临期提醒共用同一库存快照，避免两个入口对“快过期”产生不同判断。
+    // EN: The home count and native expiry reminders share one inventory snapshot so both entry points use the same expiring rule.
     getInventorySnapshot()
       .then((snapshot) => {
-        if (mounted) setExpiringCount(countExpiringBatches(snapshot.batches));
+        if (!mounted) return;
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+        void fetchNotificationPreferences()
+          .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
+          .catch(() => undefined);
       })
       .catch(() => undefined);
     return () => {
       mounted = false;
     };
-  }, [activeTab]);
+  }, [activeTab, language]);
 
   useEffect(() => subscribeToSync(['inventory', 'home'], () => {
     void getInventorySnapshot()
-      .then((snapshot) => setExpiringCount(countExpiringBatches(snapshot.batches)))
+      .then((snapshot) => {
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+        void fetchNotificationPreferences()
+          .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
+          .catch(() => undefined);
+      })
       .catch(() => undefined);
-  }), []);
+  }), [language]);
 
   useEffect(() => {
     let mounted = true;
@@ -303,8 +326,21 @@ function KitchMemoApp() {
 
   const openNotifications = useCallback(() => {
     dismissHomeInteractionHint();
+    setNotificationReturnTab('home');
+    setNotificationTargetId(null);
     handleCinematicNavigate('notifications');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
+
+  useEffect(() => {
+    const openFromSystem = (notificationId?: string) => {
+      setNotificationReturnTab('home');
+      setNotificationTargetId(notificationId ?? null);
+      setActiveTab('notifications');
+    };
+    const subscription = addSystemNotificationResponseListener(openFromSystem);
+    void openLastSystemNotification(openFromSystem);
+    return () => subscription.remove();
+  }, []);
 
   const completeFirstUseJourney = useCallback(() => {
     setFirstUseJourneyState('complete');
@@ -320,7 +356,13 @@ function KitchMemoApp() {
         <Animated.View
           style={[
             styles.screenStage,
-            activeTab === 'home' ? styles.homeContent : activeTab === 'fridge' ? styles.fridgeContent : styles.standardContent,
+            activeTab === 'home'
+              ? styles.homeContent
+              : activeTab === 'fridge'
+                ? styles.fridgeContent
+                : activeTab === 'profile' || activeTab === 'notifications'
+                  ? styles.profileContent
+                  : styles.standardContent,
             { opacity: screenOpacity, transform: [{ scale: screenScale }] },
           ]}
         >
@@ -344,6 +386,22 @@ function KitchMemoApp() {
             <FridgeScreen blurTarget={blurTargetRef} initialFilter={fridgeFocusFilter} key={fridgeFocusFilter ?? 'unfiltered'} />
           ) : activeTab === 'shopping' ? (       
             <ShoppingScreen />                    
+          ) : activeTab === 'notifications' ? (
+            <NotificationInbox
+              initialNotificationId={notificationTargetId}
+              onBack={() => setActiveTab(notificationReturnTab)}
+              onCountsChange={(badgeCount, unreadCount) => {
+                setNotificationBadgeCount(badgeCount);
+                setUnreadNotificationCount(unreadCount);
+                void setSystemNotificationBadge(badgeCount).catch(() => undefined);
+              }}
+            />
+          ) : activeTab === 'profile' ? (
+            <ProfileScreen onOpenNotifications={() => {
+              setNotificationReturnTab('profile');
+              setNotificationTargetId(null);
+              setActiveTab('notifications');
+            }} />
           ) : activeTab !== 'home' ? (
             <>
               <View style={styles.glow} />
@@ -352,7 +410,6 @@ function KitchMemoApp() {
                 <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
                 <Text style={styles.title}>{screen.title}</Text>
                 <Text style={styles.description}>{screen.description}</Text>
-                {activeTab === 'notifications' ? <NotificationInbox onUnreadCountChange={setUnreadNotificationCount} /> : null}
                 <Text style={styles.connection}>{status}</Text>
               </View>
             </>
@@ -367,6 +424,7 @@ function KitchMemoApp() {
           {activeTab === 'home' ? (
             <HomeAmbientOverlay
               blurTarget={blurTargetRef}
+              badgeCount={notificationBadgeCount}
               expiringCount={expiringCount}
               onOpenExpiring={openExpiringFridge}
               onOpenNotifications={openNotifications}
@@ -374,9 +432,6 @@ function KitchMemoApp() {
               showInteractionHint={showHomeInteractionHint}
               unreadCount={unreadNotificationCount}
             />
-          ) : null}
-          {activeTab === 'profile' ? (
-            <ProfileSettingsButton blurTarget={blurTargetRef} onPress={() => setIsSettingsVisible(true)} />
           ) : null}
           <FloatingTabBar
             activeTab={activeTab}
@@ -403,7 +458,6 @@ function KitchMemoApp() {
         />
       )}
       <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
-      <LanguageSettingsModal onClose={() => setIsSettingsVisible(false)} visible={isSettingsVisible} />
     </View>
   );
 }
@@ -435,6 +489,7 @@ const styles = StyleSheet.create({
   screenStage: { flex: 1, overflow: 'hidden' },
   homeContent: { paddingHorizontal: 0, paddingTop: 0 },
   fridgeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  profileContent: { paddingHorizontal: 0, paddingTop: 0 },
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
   chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
   transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },

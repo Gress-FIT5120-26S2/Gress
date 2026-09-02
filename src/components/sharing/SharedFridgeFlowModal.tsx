@@ -45,6 +45,21 @@ type SharedFridgeFlowModalProps = {
 const BLUE = '#168ACB';
 const DARK = '#234657';
 const PALE = '#EAF7FD';
+const MEMBER_AVATAR_COLOURS: Record<FridgeAccessContext['members'][number]['avatarKey'], string> = {
+  sage: '#DDEFE7',
+  sky: '#DDF3FB',
+  apricot: '#FFF0DF',
+  plum: '#EEE7F5',
+  coral: '#FBE7E5',
+};
+
+function memberAvatarColour(avatarKey: FridgeAccessContext['members'][number]['avatarKey']) {
+  return MEMBER_AVATAR_COLOURS[avatarKey] ?? MEMBER_AVATAR_COLOURS.sage;
+}
+
+function memberInitial(displayName: string | null, index: number) {
+  return Array.from(displayName?.trim() || String(index))[0]?.toUpperCase() ?? String(index);
+}
 
 function rawInviteCode(value: string) {
   return value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8);
@@ -412,10 +427,15 @@ export function SharedFridgeFlowModal({
                 <View style={styles.listCard}>
                   {(currentContext?.members ?? []).map((member) => (
                     <View key={`${member.index}-${member.joinedAt}`} style={styles.memberRow}>
-                      <View style={styles.memberIcon}><Ionicons color={BLUE} name="phone-portrait-outline" size={21} /></View>
+                      <View style={[styles.memberIcon, { backgroundColor: memberAvatarColour(member.avatarKey) }]}>
+                        <Text style={styles.memberInitial}>{memberInitial(member.displayName, member.index)}</Text>
+                      </View>
                       <View style={styles.memberCopy}>
-                        <Text style={styles.memberName}>{member.isCurrent ? copy.currentDevice : copy.deviceLabel(member.index)}</Text>
-                        <Text style={styles.memberMeta}>{copy.joinedAt(new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-AU', { day: 'numeric', month: 'short' }).format(new Date(member.joinedAt)))}</Text>
+                        <Text style={styles.memberName}>{member.displayName ?? copy.deviceLabel(member.index)}</Text>
+                        <Text style={styles.memberMeta}>
+                          {member.isCurrent ? `${copy.currentDeviceSuffix} · ` : ''}
+                          {copy.joinedAt(new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-AU', { day: 'numeric', month: 'short' }).format(new Date(member.joinedAt)))}
+                        </Text>
                       </View>
                       {member.isCurrent ? <View style={styles.currentDot} /> : null}
                     </View>
@@ -594,6 +614,7 @@ const styles = StyleSheet.create({
   listCard: { overflow: 'hidden', borderRadius: 20, backgroundColor: '#FFFFFF' },
   memberRow: { minHeight: 68, flexDirection: 'row', alignItems: 'center', gap: 12, paddingHorizontal: 15, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#E1ECF1' },
   memberIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: PALE },
+  memberInitial: { color: '#24566E', fontSize: 15, fontWeight: '900' },
   memberCopy: { flex: 1 },
   memberName: { color: DARK, fontSize: 14, fontWeight: '800' },
   memberMeta: { marginTop: 3, color: '#8297A2', fontSize: 11 },
