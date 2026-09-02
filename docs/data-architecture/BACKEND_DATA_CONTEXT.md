@@ -421,7 +421,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | 冷冻 | `storage_zone = 'frozen'` |
 | 常温 | `storage_zone = 'pantry'` |
 | 已过期 | `lifecycle_state = 'active' AND expires_at < now()` |
-| 快过期 | 尚未过期且 `expires_at` 位于业务配置的提醒窗口内；当前前端原型使用 3 天 |
+| 快过期 | 尚未过期且 `expires_at` 位于 3 天提醒窗口内。冰箱「快过期」标签、首页临期件数和 `sync_fridge_notifications` 的 `expiring` 事件共用该窗口；前端从 `GET /api/inventory` 快照按批次计算，不把 `expiring` 写成库存字段，也不另开首页专用接口 |
 | 需补货 | 按食材和单位汇总有效批次后，小于或等于 `restock_rules.minimum_quantity` |
 
 不要在库存批次中增加 `expired` 或 `expiring` 固定状态，否则时间推进后数据会失真。
@@ -554,7 +554,7 @@ GET /api/restock
 已实现：
 
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
-- 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。
+- 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：只有用户明确点击后，`POST /api/food-presets/generate` 才调用 Gemini 生成标准名、双语别名、分类、储存区、参考天数和说明；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
 - 新增库存：表单会提交命中的 `presetUid`，新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`；历史无法可靠匹配的批次继续保留 null。
@@ -584,6 +584,8 @@ POST /api/devices/bootstrap
 GET /api/inventory
 POST /api/inventory/batches
 ```
+
+首页临期提示复用 `GET /api/inventory`，由 `src/services/inventoryApi.ts` 的 `countExpiringBatches` 与冰箱页同一规则计数。点击后打开冰箱页并带上 `expiring` 初始筛选；3D 冰箱热点和底部导航仍打开未筛选列表。不要为此新增独立首页接口或把临期件数写入数据库。
 
 ### 已完成：拍照识别与可编辑预填
 
@@ -661,7 +663,7 @@ POST /api/devices/recover
 
 Expo 冰箱页左上角是共享功能唯一主入口：个人模式提供创建或输入邀请码；共享模式进入管理页。创建页支持自定义名称，分享页生成二维码并支持复制、系统分享和二维码图片分享，加入页支持手输或 Expo Camera 扫码。设置页只保留设备恢复码，避免共享操作分散在两个入口。
 
-Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页摘要。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取，只有当前页面订阅对应领域，后台 Tab 不会产生多余业务请求。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
+Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页临期件数。首页件数订阅 `inventory` 与 `home`，与冰箱快过期筛选同源。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取，只有当前页面订阅对应领域，后台 Tab 不会产生多余业务请求。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
 
 ### 阶段五：成就
 

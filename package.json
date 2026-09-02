@@ -33,6 +33,7 @@
     "react-native-qrcode-svg": "^6.3.21",
     "react-native-svg": "15.15.4",
     "react-native-view-shot": "5.1.0",
+    "sharp": "^0.35.4",
     "three": "^0.185.1"
   },
   "devDependencies": {

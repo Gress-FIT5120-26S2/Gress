@@ -40,9 +40,9 @@ type AddItemMethodSheetProps = {
 
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);
-const MAX_HEIGHT_RATIO = 0.5;
-const COLLAPSED_HEIGHT_RATIO = 0.36;
-const MIN_COLLAPSED_HEIGHT = 280;
+const MAX_HEIGHT_RATIO = 0.56;
+const COLLAPSED_HEIGHT_RATIO = 0.44;
+const MIN_COLLAPSED_HEIGHT = 360;
 const MIN_EXPANSION_DISTANCE = 52;
 const SHEET_EDGE_GAP = 12;
 const SNAP_VELOCITY = 0.28;
@@ -391,29 +391,25 @@ const MethodCard = memo(function MethodCard({
       onPress={onPress}
       style={({ pressed }) => [styles.methodCard, { borderColor: `${tone}26` }, pressed ? styles.methodCardPressed : null]}
     >
-      {badge ? (
-        <View style={styles.recommendedBadge}>
-          <Ionicons name="sparkles" size={10} color="#C96E1A" />
-          <Text style={styles.recommendedText}>{badge}</Text>
-        </View>
-      ) : null}
+      <View style={styles.recommendedRow}>
+        {badge ? (
+          <View style={styles.recommendedBadge}>
+            <Ionicons name="sparkles" size={11} color="#C96E1A" />
+            <Text style={styles.recommendedText}>{badge}</Text>
+          </View>
+        ) : null}
+      </View>
       <View style={[styles.methodIcon, { backgroundColor: tint }]}>
         <Ionicons name={icon} size={26} color={tone} />
       </View>
       <View style={styles.methodCopy}>
-        <Text numberOfLines={1} style={styles.methodTitle}>{title}</Text>
-        <Text numberOfLines={2} style={styles.methodDescription}>{description}</Text>
+        <Text numberOfLines={2} style={styles.methodTitle}>{title}</Text>
+        <Text numberOfLines={3} style={styles.methodDescription}>{description}</Text>
       </View>
       <Animated.View style={[styles.methodDetails, { opacity: detailsOpacity, transform: [{ translateY: detailsTranslateY }] }]}>
         <View style={[styles.detailMarker, { backgroundColor: tone }]} />
         <Text style={styles.methodDetailsText}>{details}</Text>
       </Animated.View>
-      {/* Arthur: NarIyirm
-          中文：底部操作始终占用固定安全区域，避免收起状态下与说明文案发生重叠。
-          EN: The bottom action keeps a fixed safe area so it never overlaps descriptive copy while collapsed. */}
-      <View style={[styles.arrowButton, { backgroundColor: tone }]}>
-        <Ionicons name="arrow-forward" size={18} color="#FFFFFF" />
-      </View>
     </Pressable>
   );
 });
@@ -433,34 +429,34 @@ const styles = StyleSheet.create({
   sheet: {
     flex: 1,
     overflow: 'hidden',
-    paddingRight: 18,
-    paddingBottom: 20,
-    paddingLeft: 18,
+    paddingRight: 22,
+    paddingBottom: 24,
+    paddingLeft: 22,
     borderRadius: 30,
     borderCurve: 'continuous',
     backgroundColor: '#FBFCFA',
     boxShadow: '0 10px 32px rgba(38, 51, 46, 0.18)',
   },
-  dragArea: { height: 44, alignItems: 'center', justifyContent: 'center' },
+  dragArea: { height: 40, alignItems: 'center', justifyContent: 'center' },
   grabber: { width: 42, height: 5, borderRadius: 3, borderCurve: 'continuous', backgroundColor: '#DDE3E0' },
-  header: { minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 11, paddingBottom: 11 },
+  header: { minHeight: 70, flexDirection: 'row', alignItems: 'center', gap: 12, paddingBottom: 16 },
   addIcon: { width: 49, height: 49, alignItems: 'center', justifyContent: 'center', borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FF7A35', boxShadow: '0 6px 16px rgba(255, 122, 53, 0.20)' },
-  headerCopy: { flex: 1, minWidth: 0, gap: 2 },
+  headerCopy: { flex: 1, minWidth: 0, gap: 4 },
   title: { color: '#173D31', fontSize: 21, fontWeight: '900', letterSpacing: -0.45 },
   subtitle: { color: '#718079', fontSize: 13, fontWeight: '600' },
   closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
-  methodRow: { flex: 1, flexDirection: 'row', gap: 10, paddingTop: 3 },
-  methodCard: { position: 'relative', flex: 1, minWidth: 0, paddingTop: 14, paddingRight: 14, paddingBottom: 62, paddingLeft: 14, borderWidth: 1, borderRadius: 20, borderCurve: 'continuous', backgroundColor: '#FFFFFF', boxShadow: '0 6px 18px rgba(54, 74, 66, 0.07)' },
+  methodRow: { flex: 1, flexDirection: 'row', gap: 14, paddingTop: 6 },
+  methodCard: { flex: 1, minWidth: 0, paddingTop: 12, paddingRight: 16, paddingBottom: 16, paddingLeft: 16, borderWidth: 1, borderRadius: 22, borderCurve: 'continuous', backgroundColor: '#FFFFFF', boxShadow: '0 6px 18px rgba(54, 74, 66, 0.07)' },
   methodCardPressed: { opacity: 0.86, transform: [{ scale: 0.985 }] },
-  methodIcon: { width: 47, height: 47, alignItems: 'center', justifyContent: 'center', borderRadius: 14, borderCurve: 'continuous' },
-  methodCopy: { gap: 4, marginTop: 9 },
-  methodTitle: { color: '#193C31', fontSize: 16.5, fontWeight: '900', letterSpacing: -0.2 },
-  methodDescription: { color: '#718079', fontSize: 12.5, fontWeight: '600', lineHeight: 17 },
-  methodDetails: { flexDirection: 'row', gap: 7, marginTop: 12, paddingTop: 10, borderTopWidth: 1, borderTopColor: '#EEF1EF' },
+  recommendedRow: { minHeight: 24, marginBottom: 10, justifyContent: 'center' },
+  methodIcon: { width: 50, height: 50, alignItems: 'center', justifyContent: 'center', borderRadius: 15, borderCurve: 'continuous' },
+  methodCopy: { gap: 6, marginTop: 14 },
+  methodTitle: { minHeight: 42, color: '#193C31', fontSize: 16, fontWeight: '900', letterSpacing: -0.2, lineHeight: 21 },
+  methodDescription: { color: '#718079', fontSize: 13, fontWeight: '600', lineHeight: 18 },
+  methodDetails: { flexDirection: 'row', gap: 7, marginTop: 14, paddingTop: 12, borderTopWidth: 1, borderTopColor: '#EEF1EF' },
   detailMarker: { width: 3, minHeight: 30, borderRadius: 2, borderCurve: 'continuous', opacity: 0.75 },
-  methodDetailsText: { flex: 1, color: '#63736C', fontSize: 11.5, fontWeight: '600', lineHeight: 16.5 },
-  arrowButton: { position: 'absolute', bottom: 16, left: 14, width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, borderCurve: 'continuous' },
-  recommendedBadge: { position: 'absolute', top: 13, right: 11, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 7, paddingVertical: 4, borderRadius: 10, borderCurve: 'continuous', backgroundColor: '#FFF3E3' },
+  methodDetailsText: { flex: 1, color: '#63736C', fontSize: 12, fontWeight: '600', lineHeight: 17 },
+  recommendedBadge: { alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 8, paddingVertical: 5, borderRadius: 10, borderCurve: 'continuous', backgroundColor: '#FFF3E3' },
   recommendedText: { color: '#C96E1A', fontSize: 10.5, fontWeight: '900' },
   pressed: { opacity: 0.72, transform: [{ scale: 0.96 }] },
 });

@@ -63,6 +63,7 @@ const zh = {
   home: {
     period: { night: '今晚的厨房', dawn: '清晨的厨房', day: '今天的厨房', sunset: '傍晚的厨房' },
     expiring: (count: number) => `${count} 件食材值得先用`,
+    useFirst: '先用',
     freshnessGood: '今天的食材状态很好',
     freshnessHint: '打开冰箱并查看临期食材',
     mailboxHint: '查看食材、购物和共享厨房提醒',
@@ -646,6 +647,7 @@ const en: Translation = {
   home: {
     period: { night: 'Tonight in your kitchen', dawn: 'This morning in your kitchen', day: 'Today in your kitchen', sunset: 'This evening in your kitchen' },
     expiring: (count: number) => `${count} ingredients to use soon`,
+    useFirst: 'Use first',
     freshnessGood: 'Everything is looking fresh today',
     freshnessHint: 'Open the fridge to view ingredients nearing expiry',
     mailboxHint: 'View freshness, shopping, and shared-kitchen reminders',
