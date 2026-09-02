@@ -9,7 +9,8 @@ import { fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
-import { FridgeScreen } from './src/components/FridgeScreen';
+import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
+import { countExpiringBatches, getInventorySnapshot } from './src/services/inventoryApi';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
@@ -39,11 +40,6 @@ const transitionTones: Record<AppTab, string> = {
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 // Arthur: NarIyirm
-// 中文：临期数量先使用首页视觉样例值，后续只需把 Supabase 查询结果传入同一入口。
-// EN: The home preview uses a sample freshness count for now; the Supabase query can later feed this single entry point.
-const HOME_PREVIEW_EXPIRING_COUNT = 2;
-
-// Arthur: NarIyirm
 // 中文：购物车容量与冰箱库存共用一个 0–1 数据入口；目前是样例值，之后由 Supabase 库存统计替换。
 // EN: Cart fullness and fridge stock share one 0–1 data entry; Supabase inventory totals will replace this preview value.
 const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
@@ -71,6 +67,8 @@ function KitchMemoApp() {
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
+  const [fridgeFocusFilter, setFridgeFocusFilter] = useState<FridgeFilter | null>(null);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [isSettingsVisible, setIsSettingsVisible] = useState(false);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
@@ -161,6 +159,26 @@ function KitchMemoApp() {
 
   useEffect(() => {
     let mounted = true;
+    // 中文：首页提示数量必须与冰箱“快过期”筛选一致，因此直接从库存快照按同一规则计数。
+    // EN: The home prompt must match the fridge expiring chip, so count from the inventory snapshot with the same rule.
+    getInventorySnapshot()
+      .then((snapshot) => {
+        if (mounted) setExpiringCount(countExpiringBatches(snapshot.batches));
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab]);
+
+  useEffect(() => subscribeToSync(['inventory', 'home'], () => {
+    void getInventorySnapshot()
+      .then((snapshot) => setExpiringCount(countExpiringBatches(snapshot.batches)))
+      .catch(() => undefined);
+  }), []);
+
+  useEffect(() => {
+    let mounted = true;
     AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
       if (mounted) setReduceMotion(enabled);
     });
@@ -207,8 +225,11 @@ function KitchMemoApp() {
     }).start();
   }, [chromeOpacity, dismissHomeInteractionHint, reduceMotion]);
 
-  const handleCinematicNavigate = useCallback((targetTab: AppTab) => {
+  const handleCinematicNavigate = useCallback((targetTab: AppTab, fridgeFilter: FridgeFilter | null = null) => {
     if (transitionInProgressRef.current || targetTab === activeTab) return;
+    // 中文：只有首页临期文案会带上 expiring；3D 冰箱热点仍打开未筛选的冰箱页。
+    // EN: Only the home expiring headline passes expiring; the 3D fridge hotspot still opens an unfiltered fridge.
+    if (targetTab === 'fridge') setFridgeFocusFilter(fridgeFilter);
     transitionInProgressRef.current = true;
     setIsCinematicActive(true);
     setIsTransitionOverlayVisible(true);
@@ -277,7 +298,7 @@ function KitchMemoApp() {
 
   const openExpiringFridge = useCallback(() => {
     dismissHomeInteractionHint();
-    handleCinematicNavigate('fridge');
+    handleCinematicNavigate('fridge', 'expiring');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
   const openNotifications = useCallback(() => {
@@ -306,7 +327,7 @@ function KitchMemoApp() {
           {activeTab === 'home' && canMountKitchen ? (
             <Suspense fallback={<KitchenLoading />}>
               <Kitchen3DPrototype
-                expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+                expiringCount={expiringCount}
                 inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
                 lighting={kitchenLighting}
                 onExplore={dismissHomeInteractionHint}
@@ -320,7 +341,7 @@ function KitchMemoApp() {
           ) : activeTab === 'home' && !isOpening ? (
             <KitchenLoading />
           ) : activeTab === 'fridge' ? (
-            <FridgeScreen blurTarget={blurTargetRef} />
+            <FridgeScreen blurTarget={blurTargetRef} initialFilter={fridgeFocusFilter} key={fridgeFocusFilter ?? 'unfiltered'} />
           ) : activeTab === 'shopping' ? (       
             <ShoppingScreen />                    
           ) : activeTab !== 'home' ? (
@@ -346,7 +367,7 @@ function KitchMemoApp() {
           {activeTab === 'home' ? (
             <HomeAmbientOverlay
               blurTarget={blurTargetRef}
-              expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+              expiringCount={expiringCount}
               onOpenExpiring={openExpiringFridge}
               onOpenNotifications={openNotifications}
               phase={kitchenLighting.phase}
@@ -357,7 +378,14 @@ function KitchMemoApp() {
           {activeTab === 'profile' ? (
             <ProfileSettingsButton blurTarget={blurTargetRef} onPress={() => setIsSettingsVisible(true)} />
           ) : null}
-          <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />
+          <FloatingTabBar
+            activeTab={activeTab}
+            onChange={(tab) => {
+              if (tab === 'fridge') setFridgeFocusFilter(null);
+              setActiveTab(tab);
+            }}
+            blurTarget={blurTargetRef}
+          />
         </Animated.View>
       )}
       {isTransitionOverlayVisible ? (

@@ -107,6 +107,19 @@ export function getInventorySnapshot(): Promise<InventorySnapshot> {
   return requestApi<InventorySnapshot>('/api/inventory');
 }
 
+const EXPIRING_WINDOW_DAYS = 3;
+
+export function countExpiringBatches(batches: InventoryBatch[]) {
+  // 中文：与冰箱页“快过期”筛选同一规则：未过期且剩余天数不超过 3 天；首页文案必须用这个计数。
+  // EN: Match the fridge "expiring" chip: not expired, and at most 3 days left; the home headline must use this count.
+  return batches.filter((batch) => {
+    if (!batch.expiresAt) return false;
+    const expiryMilliseconds = new Date(batch.expiresAt).getTime();
+    if (Number.isNaN(expiryMilliseconds) || expiryMilliseconds < Date.now()) return false;
+    return Math.ceil((expiryMilliseconds - Date.now()) / 86_400_000) <= EXPIRING_WINDOW_DAYS;
+  }).length;
+}
+
 // Arthur: NarIyirm
 // 中文：详情弹窗按 batchUid 延迟读取版本和补货规则；对应后端 inventory.js 的单批次详情路由。
 // EN: The detail sheet lazily loads version and restock data by batchUid; the matching handler is the single-batch route in inventory.js.

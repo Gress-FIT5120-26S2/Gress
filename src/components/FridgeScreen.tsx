@@ -39,7 +39,7 @@ import { FridgeSpaceMenu } from './sharing/FridgeSpaceMenu';
 import { SharedFridgeFlowModal, type SharedFridgeFlowScreen } from './sharing/SharedFridgeFlowModal';
 
 type StorageZone = FridgeStorageZone;
-type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
+export type FridgeFilter = StorageZone | 'expired' | 'expiring' | 'restock';
 type FoodCategory = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
 type InventoryLoadMode = 'background' | 'initial' | 'manual';
 
@@ -141,15 +141,16 @@ function isExpiredAt(expiresAt: string | null) {
 // EN: The screen keeps data, filter state, and page layout together; only repeated visual components live in the fridge subfolder.
 type FridgeScreenProps = {
   blurTarget?: RefObject<View | null>;
+  initialFilter?: FridgeFilter | null;
 };
 
 // Arthur: NarIyirm
 // 中文：冰箱功能的页面编排入口；上游由 App.tsx 的 fridge Tab 挂载，下游通过 inventoryApi、sharingApi 和同步订阅读写权威数据。
 // EN: This orchestrates the fridge feature; App.tsx mounts it for the fridge tab and it reaches authoritative data through inventoryApi, sharingApi, and sync subscriptions.
-export function FridgeScreen({ blurTarget }: FridgeScreenProps) {
+export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenProps) {
   const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
-  const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(null);
+  const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(initialFilter);
   const [activeCategory, setActiveCategory] = useState<FoodCategory | null>(null);
   const [isAddSheetVisible, setIsAddSheetVisible] = useState(false);
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);

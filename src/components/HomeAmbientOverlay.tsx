@@ -34,7 +34,8 @@ export function HomeAmbientOverlay({
 }: HomeAmbientOverlayProps) {
   const { t } = useI18n();
   const isNight = phase === 'night';
-  const headline = expiringCount > 0 ? t.home.expiring(expiringCount) : t.home.freshnessGood;
+  const hasExpiring = expiringCount > 0;
+  const headline = hasExpiring ? t.home.expiring(expiringCount) : t.home.useFirst;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -71,7 +72,13 @@ export function HomeAmbientOverlay({
         <Text style={[styles.periodLabel, isNight ? styles.nightPrimary : styles.dayPrimary]}>
           {t.home.period[phase]}
         </Text>
-        <Text style={[styles.freshnessHeadline, isNight ? styles.nightPrimary : styles.dayPrimary]}>
+        <Text
+          style={[
+            styles.freshnessHeadline,
+            !hasExpiring && styles.useFirstHeadline,
+            isNight ? styles.nightPrimary : styles.dayPrimary,
+          ]}
+        >
           {headline}
         </Text>
       </Pressable>
@@ -113,6 +120,7 @@ const styles = StyleSheet.create({
   copyPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   periodLabel: { fontSize: 14, fontWeight: '600', lineHeight: 19 },
   freshnessHeadline: { marginTop: 7, fontSize: 23, fontWeight: '700', lineHeight: 30, letterSpacing: -0.35 },
+  useFirstHeadline: { fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
   nightPrimary: { color: '#F2D5AC' },
   dayPrimary: { color: '#633F2D' },
   nightSecondary: { color: 'rgba(218,231,242,0.72)' },
