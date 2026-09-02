@@ -1,8 +1,9 @@
 // src/components/shopping/ShoppingCheckoutReview.tsx
 // US5.4 checkout review + US5.5 add purchases to inventory (B1 draft flow).
-// Shows all cart items, highlights unresolved duplicate warnings, then lets the
-// user turn them into inventory one at a time via the shared InventoryEntryFlow.
-// US5.5.3: when leaving with checked-but-not-yet-stocked items, prompt first.
+// Receives ONLY the confirmed (checked) cart items. Lists them, highlights
+// duplicate warnings, and turns them into inventory one at a time via the
+// shared InventoryEntryFlow.
+// US5.5.3: leaving while any confirmed item is still not stocked prompts first.
 import React, { useMemo, useState } from 'react';
 import {
   Modal,
@@ -22,7 +23,7 @@ type DraftStatus = 'pending' | 'done';
 
 type ShoppingCheckoutReviewProps = {
   visible: boolean;
-  items: CartItem[];
+  items: CartItem[]; // already filtered to confirmed (checked) items
   inventoryNames: Set<string>;
   onClose: () => void;
   onAllStocked: (stockedItemUids: string[]) => void | Promise<void>;
@@ -52,9 +53,9 @@ export function ShoppingCheckoutReview({
     [items, status],
   );
 
-  // US5.5.3: checked (confirmed to buy) but not yet added to inventory
-  const checkedNotStocked = useMemo(
-    () => items.filter((i) => i.is_checked && status[i.item_uid] !== 'done'),
+  // US5.5.3: items here are already confirmed; these are the ones not yet stocked
+  const notStocked = useMemo(
+    () => items.filter((i) => status[i.item_uid] !== 'done'),
     [items, status],
   );
 
@@ -81,7 +82,6 @@ export function ShoppingCheckoutReview({
     }
   };
 
-  // clear stocked items from the cart, reset, and close
   const doClose = async () => {
     await onAllStocked(stockedUids);
     setStatus({});
@@ -89,9 +89,9 @@ export function ShoppingCheckoutReview({
     onClose();
   };
 
-  // US5.5.3: intercept close -- if there are checked items not stocked, ask first
+  // US5.5.3: intercept close -- if any confirmed item is not stocked, ask first
   const requestClose = () => {
-    if (checkedNotStocked.length > 0) {
+    if (notStocked.length > 0) {
       setLeaveConfirm(true);
       return;
     }
@@ -165,14 +165,14 @@ export function ShoppingCheckoutReview({
         />
       ) : null}
 
-      {/* US5.5.3: leave prompt when checked items are not yet stocked */}
+      {/* US5.5.3: leave prompt when confirmed items are not yet stocked */}
       {leaveConfirm ? (
         <View style={styles.confirmLayer}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => setLeaveConfirm(false)} />
           <View style={styles.confirmCard}>
             <Text style={styles.confirmTitle}>{copy.leaveTitle}</Text>
             <Text style={styles.confirmBody}>
-              {copy.leaveBody(checkedNotStocked.length)}
+              {copy.leaveBody(notStocked.length)}
             </Text>
             <View style={styles.confirmActions}>
               <Pressable style={styles.keepBtn} onPress={() => setLeaveConfirm(false)}>

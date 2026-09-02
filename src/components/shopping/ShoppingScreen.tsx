@@ -2,10 +2,10 @@
 // Shopping Mode (Epic E5). Two tabs:
 //   - 'restock': suggested buys (需补货), derived from restock rules + stock
 //   - 'cart':    the editable shopping cart (shopping_cart_items)
-// Cart items support quantity edit (−/＋ and tap-to-type) and delete (US5.2).
-// Adding goes through ShoppingAddSheet (US5.2.1) with a duplicate warning
-// against current inventory (US5.3). A checkout review (US5.4) converts the
-// cart into inventory drafts (US5.5).
+// Cart items support quantity edit (−/＋ and tap-to-type), delete, and a
+// checkbox to CONFIRM the purchase (US5.2). Only confirmed (checked) items go
+// to checkout review (US5.4) and become inventory (US5.5) -- this matches the
+// "confirmed cart" wording in the acceptance criteria.
 // NOTE: this file lives in components/shopping/, so imports reach up two levels.
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
@@ -37,10 +37,6 @@ import { ShoppingInventoryPeek } from './ShoppingInventoryPeek';
 
 type Tab = 'restock' | 'cart';
 
-// Shared hook: load current inventory names once, for duplicate detection (US5.3).
-// Arthur: NarIyirm
-// 中文：购物手动录入复用库存快照中的名称做“可能已有”提示；只读 inventoryApi，不改变库存。
-// EN: Manual cart entry reuses inventory snapshot names for possible-duplicate hints and never mutates inventory here.
 // Shared hook: load current inventory for duplicate detection (US5.3).
 // Returns a name Set (fast "is duplicate" check) and a name→batches map
 // (all matching batches, for showing per-batch details in US5.3.2).
@@ -75,9 +71,6 @@ function useInventoryNames() {
   return { names, byName, reload };
 }
 
-// Arthur: NarIyirm
-// 中文：购物功能的页面入口；在派生补货建议与 fridgeUid 共享购物车两个视图之间切换。
-// EN: This is the shopping feature entry, switching between derived restock suggestions and the fridgeUid-shared cart.
 export function ShoppingScreen() {
   const { t } = useI18n();
   const screen = t.screens.shopping;
@@ -108,9 +101,6 @@ export function ShoppingScreen() {
 }
 
 // ---- 建议购物 / 需补货 (derived, read-only + "add to cart") ----
-// Arthur: NarIyirm
-// 中文：补货视图读取 get_restock_suggestions 的派生结果，加入购物车后通知父级切换或刷新。
-// EN: The restock view reads derived get_restock_suggestions results and notifies its parent after adding one to the cart.
 function RestockView({ onAdded }: { onAdded: () => void }) {
   const { t } = useI18n();
   const [items, setItems] = useState<RestockSuggestion[]>([]);
@@ -164,10 +154,7 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
   );
 }
 
-// ---- 购物车 (editable list: add, quantity edit, delete, checkout) ----
-// Arthur: NarIyirm
-// 中文：共享购物车视图集中处理列表读取、数量、勾选和删除；每个 mutation 都通过 cartApi 回到 Express。
-// EN: The shared cart view handles loading, quantity, checking, and deletion, with every mutation returning to Express through cartApi.
+// ---- 购物车 (editable list: add, quantity edit, confirm, delete, checkout) ----
 function CartView() {
   const { t } = useI18n();
   const { names: inventoryNames, byName: inventoryByName } = useInventoryNames();
@@ -177,6 +164,9 @@ function CartView() {
   const [addVisible, setAddVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [peekVisible, setPeekVisible] = useState(false);
+
+  // confirmed cart = the checked items (US5.4/US5.5 operate on these only)
+  const checkedItems = useMemo(() => items.filter((i) => i.is_checked), [items]);
 
   const load = useCallback(async (manual = false) => {
     if (manual) setRefreshing(true);
@@ -195,30 +185,31 @@ function CartView() {
   }), [load]);
 
   const handleAdd = async (item: { name: string; quantity: number; unit: string }) => {
-  // merge into an existing same-name item instead of adding a duplicate row
-  const existing = items.find(
-    (i) => i.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
-  );
-  if (existing) {
-    const next = (existing.quantity ?? 1) + item.quantity;
-    setItems((prev) =>
-      prev.map((i) => (i.item_uid === existing.item_uid ? { ...i, quantity: next } : i)),
+    // merge into an existing same-name item instead of adding a duplicate row
+    const existing = items.find(
+      (i) => i.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
     );
-    try {
-      await updateCartQuantity(existing.item_uid, next);
-    } catch {
-      void load().catch(() => undefined);
+    if (existing) {
+      const next = (existing.quantity ?? 1) + item.quantity;
+      setItems((prev) =>
+        prev.map((i) => (i.item_uid === existing.item_uid ? { ...i, quantity: next } : i)),
+      );
+      try {
+        await updateCartQuantity(existing.item_uid, next);
+      } catch {
+        void load().catch(() => undefined);
+      }
+      return;
     }
-    return;
-  }
-  const created = await addCartItem({
-    name: item.name,
-    quantity: item.quantity,
-    unit: item.unit,
-    source: 'manual',
-  });
-  setItems((prev) => [created, ...prev]);
-};
+    const created = await addCartItem({
+      name: item.name,
+      quantity: item.quantity,
+      unit: item.unit,
+      source: 'manual',
+    });
+    setItems((prev) => [created, ...prev]);
+  };
+
   const changeQty = async (item: CartItem, delta: number) => {
     const next = Math.max((item.quantity ?? 1) + delta, 1);
     setItems((prev) =>
@@ -287,9 +278,12 @@ function CartView() {
         <Pressable style={styles.addBtn} onPress={() => setAddVisible(true)}>
           <Text style={styles.addBtnText}>+ {t.shopping.add}</Text>
         </Pressable>
-        {items.length > 0 ? (
+        {/* checkout only appears once the user has confirmed (checked) items */}
+        {checkedItems.length > 0 ? (
           <Pressable style={styles.checkoutBtn} onPress={() => setCheckoutVisible(true)}>
-            <Text style={styles.checkoutText}>{t.shopping.checkout.open}</Text>
+            <Text style={styles.checkoutText}>
+              {t.shopping.checkout.open} ({checkedItems.length})
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -337,16 +331,17 @@ function CartView() {
         onClose={() => setAddVisible(false)}
         onAdd={handleAdd}
       />
+      {/* checkout only receives the confirmed (checked) items */}
       <ShoppingCheckoutReview
         visible={checkoutVisible}
-        items={items}
+        items={checkedItems}
         inventoryNames={inventoryNames}
         onClose={() => setCheckoutVisible(false)}
         onAllStocked={handleStocked}
       />
-      <ShoppingInventoryPeek 
-        visible={peekVisible} 
-        onClose={() => setPeekVisible(false)} 
+      <ShoppingInventoryPeek
+        visible={peekVisible}
+        onClose={() => setPeekVisible(false)}
       />
     </View>
   );
@@ -433,8 +428,8 @@ const styles = StyleSheet.create({
   smallBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
   empty: { textAlign: 'center', color: '#718078', marginTop: 40 },
   peekBtn: {
-  flex: 1, height: 44, justifyContent: 'center', alignItems: 'center',
-  backgroundColor: '#168ACB', borderRadius: 10,
+    flex: 1, height: 44, justifyContent: 'center', alignItems: 'center',
+    backgroundColor: '#168ACB', borderRadius: 10,
   },
   peekText: { color: '#fff', fontWeight: '700', fontSize: 13 },
 });

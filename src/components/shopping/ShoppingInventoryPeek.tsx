@@ -1,7 +1,10 @@
 // src/components/shopping/ShoppingInventoryPeek.tsx
-// US5.1: a read-only look at what's already at home, shown inside Shopping Mode
-// so the user can plan before buying. Reuses the inventory snapshot (name,
-// quantity, storage, expiry). Read-only -- never mutates inventory.
+// US5.1 "Pre-Shop Review": a read-only look at what's already at home, shown
+// inside Shopping Mode so the user can review stock before deciding to buy.
+// Shows name, quantity, storage, relevant date, and a "Use First" priority tag
+// for items expiring soon. Read-only -- never mutates inventory.
+// "Use First" uses the same threshold as the fridge's "expiring" filter:
+// not expired AND <= 3 days left.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
   Modal,
@@ -15,6 +18,8 @@ import {
 import { useI18n } from '../../i18n';
 import { getInventorySnapshot, type InventoryBatch } from '../../services/inventoryApi';
 
+const USE_FIRST_DAYS = 3; // matches the fridge "expiring" threshold
+
 type ShoppingInventoryPeekProps = {
   visible: boolean;
   onClose: () => void;
@@ -26,8 +31,16 @@ const STORAGE_ICON: Record<InventoryBatch['storageZone'], string> = {
   pantry: '📦',
 };
 
+// days left until expiry (null if no expiry set); mirrors FridgeScreen.getDaysLeft
+function getDaysLeft(iso: string | null): number | null {
+  if (!iso) return null;
+  const ms = new Date(iso).getTime() - Date.now();
+  if (Number.isNaN(ms)) return null;
+  return Math.ceil(ms / 86_400_000);
+}
+
 export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPeekProps) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const copy = t.shopping.peek;
   const [batches, setBatches] = useState<InventoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,13 +61,18 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
     if (visible) void load();
   }, [visible, load]);
 
-  const locale = language === 'zh' ? 'zh-CN' : 'en-AU';
   const expiryLabel = (iso: string | null) => {
     if (!iso) return copy.noExpiry;
-    const ms = new Date(iso).getTime() - Date.now();
-    if (ms < 0) return copy.expired;
-    const days = Math.ceil(ms / 86_400_000);
+    const days = getDaysLeft(iso);
+    if (days === null) return copy.noExpiry;
+    if (days < 0) return copy.expired;
     return copy.daysLeft(days);
+  };
+
+  // priority status (US5.1.2 "Use First"): not expired and expiring within N days
+  const isUseFirst = (iso: string | null) => {
+    const days = getDaysLeft(iso);
+    return days !== null && days >= 0 && days <= USE_FIRST_DAYS;
   };
 
   return (
@@ -76,20 +94,30 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
             data={batches}
             keyExtractor={(b) => b.id}
             contentContainerStyle={styles.list}
-            renderItem={({ item }) => (
-              <View style={styles.row}>
-                <Text style={styles.storageIcon}>{STORAGE_ICON[item.storageZone]}</Text>
-                <View style={styles.grow}>
-                  <Text style={styles.name}>
-                    {item.name}
-                    {item.needsRestock ? <Text style={styles.lowTag}>  · {copy.low}</Text> : null}
-                  </Text>
-                  <Text style={styles.sub}>
-                    {item.remainingQuantity} {item.unit} · {expiryLabel(item.expiresAt)}
-                  </Text>
+            renderItem={({ item }) => {
+              const useFirst = isUseFirst(item.expiresAt);
+              return (
+                <View style={styles.row}>
+                  <Text style={styles.storageIcon}>{STORAGE_ICON[item.storageZone]}</Text>
+                  <View style={styles.grow}>
+                    <View style={styles.nameRow}>
+                      <Text style={styles.name}>{item.name}</Text>
+                      {useFirst ? (
+                        <View style={styles.useFirstTag}>
+                          <Text style={styles.useFirstText}>{copy.useFirst}</Text>
+                        </View>
+                      ) : null}
+                      {item.needsRestock ? (
+                        <Text style={styles.lowTag}>· {copy.low}</Text>
+                      ) : null}
+                    </View>
+                    <Text style={styles.sub}>
+                      {item.remainingQuantity} {item.unit} · {t.fridge.filters[item.storageZone]} · {expiryLabel(item.expiresAt)}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            )}
+              );
+            }}
             ListEmptyComponent={<Text style={styles.empty}>{copy.empty}</Text>}
           />
         )}
@@ -122,7 +150,15 @@ const styles = StyleSheet.create({
   },
   storageIcon: { fontSize: 22 },
   grow: { flex: 1 },
+  nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
   name: { fontSize: 16, color: '#244A3E', fontWeight: '600' },
+  useFirstTag: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: '#FFF3E7',
+  },
+  useFirstText: { color: '#BE701B', fontSize: 11, fontWeight: '800' },
   lowTag: { color: '#C96E1A', fontSize: 13, fontWeight: '700' },
   sub: { fontSize: 13, color: '#718078', marginTop: 3 },
   empty: { textAlign: 'center', color: '#718078', marginTop: 40 },

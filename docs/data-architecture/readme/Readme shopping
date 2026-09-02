@@ -3,7 +3,7 @@
 > Branch: `jingduo-develop` ｜ Author: Jingduo Zhang (jzha0609)
 > Scope: KitchMemo shopping cart feature (Epic E5 — Shopping Assistant & Smart Cart)
 
-Brings household inventory into the shopping journey: review what's at home, build a cart, warn about possible duplicate purchases, review at checkout, and turn completed purchases into inventory records.
+Brings household inventory into the shopping journey: review what's at home before buying, build a cart, warn about possible duplicate purchases, confirm and review at checkout, and turn completed purchases into inventory records.
 
 ---
 
@@ -11,14 +11,25 @@ Brings household inventory into the shopping journey: review what's at home, bui
 
 | User Story | Feature | Status |
 |---|---|---|
-| US5.1 | Review household stock before shopping (read-only peek) | ✅ |
-| US5.2 | Build a cart: add (manual / photo), edit quantity, delete | ✅ |
-| US5.3 | Duplicate-purchase warning (expandable, per-batch quantity/storage/expiry) | ✅ |
-| US5.4 | Checkout review: list all items, highlight duplicate warnings | ✅ |
-| US5.5 | Turn purchases into inventory drafts, edit-and-confirm, leave prompt | ✅ |
+| US5.1 | Pre-Shop Review: read-only stock view with name / quantity / storage / expiry / **Use First** priority tag | ✅ |
+| US5.2 | Build a cart: add (manual / photo), edit quantity, confirm (checkbox), delete | ✅ |
+| US5.3 | Duplicate-purchase warning — expandable, lists every matching batch (quantity / storage / expiry) | ✅ |
+| US5.4 | Checkout review of the confirmed (checked) cart, highlights duplicate warnings | ✅ |
+| US5.5 | Confirmed items → editable inventory drafts, edit-and-confirm, leave prompt | ✅ |
 | — | Photo recognition into the cart (reuses the team model, Plan A) | ✅ |
 
-**Not done / notes**: the recognition model itself is built by the team (recognises 8 fruit/veg only); units are not localised (the stored string is shown as-is); full inventory browsing (US5.1.2) stays on the Fridge tab — Shopping Mode only provides a read-only peek.
+**Notes**: the recognition model itself is built by the team (recognises 8 fruit/veg + freshness); units are not localised (the stored string is shown as-is); "Use First" reuses the fridge's *expiring* threshold (not expired and ≤ 3 days left).
+
+---
+
+## Key flow (US5.2 → US5.5)
+
+```
+add to cart  →  check the box (confirm to buy)  →  Checkout review (confirmed only)
+   →  add each to inventory (edit category/storage/expiry)  →  leave prompt if any unstocked
+```
+
+The checkbox is what makes an item a "confirmed" purchase: only checked items reach checkout, and the checkout button shows the confirmed count. This matches the "confirmed cart" wording in US5.4/US5.5.
 
 ---
 
@@ -27,11 +38,11 @@ Brings household inventory into the shopping journey: review what's at home, bui
 ### Frontend UI (`src/components/shopping/`)
 | File | Responsibility |
 |---|---|
-| `ShoppingScreen.tsx` | Main screen; toggle between "Suggested" and "Cart" views |
+| `ShoppingScreen.tsx` | Main screen; toggle between "Suggested" and "Cart"; cart add/edit/confirm/delete |
 | `ShoppingAddSheet.tsx` | Add-to-cart entry; reuses `AddItemMethodSheet` (manual / photo) |
-| `ShoppingManualEntry.tsx` | Lightweight manual entry form + duplicate warning |
-| `ShoppingCheckoutReview.tsx` | Checkout review + batch inventory add + leave prompt |
-| `ShoppingInventoryPeek.tsx` | Read-only view of current inventory |
+| `ShoppingManualEntry.tsx` | Lightweight manual entry form + expandable duplicate warning (US5.3) |
+| `ShoppingCheckoutReview.tsx` | Checkout review of confirmed items + batch inventory add + leave prompt (US5.5.3) |
+| `ShoppingInventoryPeek.tsx` | Pre-Shop Review: read-only stock with Use First tag (US5.1) |
 
 ### Frontend services (`src/services/`)
 | File | Responsibility |
@@ -41,7 +52,7 @@ Brings household inventory into the shopping journey: review what's at home, bui
 ### Backend (`server/src/`)
 | File | Responsibility |
 |---|---|
-| `routes/cart.js` | Cart CRUD (`/api/cart`) |
+| `routes/cart.js` | Cart CRUD (`/api/cart`) incl. PATCH quantity |
 | `routes/restock.js` | Restock suggestions (`/api/restock`) |
 | `middleware/requireFridge.js` | Resolves device + fridge ownership from `Device-ID` |
 
@@ -73,11 +84,13 @@ Database     (Supabase / PostgreSQL)
 
 ## Key design decisions
 
-1. **Owned by `fridge_uid`**: cart and restock are isolated per fridge; the `fridge_uid` is resolved server-side from `Device-ID`, so the client can't forge it.
+1. **Owned by `fridge_uid`**: cart and restock are isolated per fridge; `fridge_uid` is resolved server-side from `Device-ID`, so the client can't forge it.
 2. **Restock is a derived query**: nothing is stored — a DB function recomputes it live (stays accurate as stock changes).
-3. **Two kinds of "add"**: add-to-cart is lightweight (name/qty/unit → `shopping_cart_items`); add-to-inventory is full (category/storage/expiry → `inventory_batches`).
-4. **Reuse over rebuild**: photo recognition, the inventory entry form, and inventory reads all reuse existing team capabilities; the cart just wires them into the shopping context.
-5. **Optimistic updates**: quantity edits etc. update the UI first, sync in the background, and roll back on failure.
+3. **Checkbox = confirmed purchase**: only checked items go to checkout / inventory, giving the "confirmed cart" a concrete meaning.
+4. **Two kinds of "add"**: add-to-cart is lightweight (name/qty/unit → `shopping_cart_items`); add-to-inventory is full (category/storage/expiry → `inventory_batches`).
+5. **Reuse over rebuild**: photo recognition, the inventory entry form, and inventory reads all reuse existing team capabilities; the cart just wires them into the shopping context.
+6. **Use First = expiring**: the priority tag reuses the fridge's expiring threshold, so both screens agree on what "use first" means.
+7. **Optimistic updates**: quantity/confirm edits update the UI first, sync in the background, and roll back on failure.
 
 ---
 
@@ -110,5 +123,6 @@ The cart structures live in the migration `…_restock_and_cart.sql` (table + fu
 
 - Photo recognition supports 8 fruit/veg + freshness only (team model); the cart takes just the recognised food name.
 - Batch inventory add loops `createInventoryBatch` on the client — not a single transaction; a batch endpoint could optimise this.
-- Units are not localised (inventory / cart / notifications share the same data; this is a team-wide decision).
+- Units are not localised (inventory / cart / notifications share the same data; a team-wide decision).
+- The duplicate warning's expandable detail (US5.3.2) shows quantity/storage/expiry per batch; a per-batch "Use First" tag there is a possible future refinement.
 - `shopping_cart_items` is a new table outside the data-structure design baseline; ownership and the dedupe index should be confirmed at review.
