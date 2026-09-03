@@ -666,7 +666,7 @@ PATCH /api/notification-preferences
 POST /api/notification-delivery/register
 ```
 
-打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按到期前三天安排本地原生提醒，并在日期变化、库存移除或设置关闭后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按到期前三天安排本地原生提醒，并在日期变化、库存移除或设置关闭后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。SDK 53+ 的 Android Expo Go 已移除远程 Push：`src/services/systemNotifications.ts` 不得从 `expo-notifications` 入口导入（入口加载时会红屏），只从子模块调度本地提醒，并跳过 `getExpoPushTokenAsync` 与 `setNotificationChannelAsync`（Channel 原生 provider 为空会 NPE）。本地提醒走系统默认频道。远程 Push 仍须用 EAS development/preview/production build。
 ### 已完成：库存批次详情与修改
 
 ```text
@@ -764,4 +764,4 @@ npx supabase db push --include-seed
 16. 设备昵称不构成账号或授权；成员摘要不得返回完整 `device_id`，设备恢复必须同步迁移 `device_profiles`。
 17. 通知偏好按设备保存；免打扰只影响角标/提醒呈现，不得把共享通知删除或替其他成员标记已读。
 18. `actor_device_id` 只用于共享通知排除操作者本人；成员响应仍不得暴露真实设备 ID。
-19. Push Token 与投递审计只允许 service role 访问；远程 Push 必须使用 EAS development/preview/production build 和真实设备验证，不能把 Expo Go 当成远程 Push 验收环境。
+19. Push Token 与投递审计只允许 service role 访问；远程 Push 必须使用 EAS development/preview/production build 和真实设备验证，不能把 Expo Go 当成远程 Push 验收环境。Android Expo Go 仍应能打开 App 并使用本地临期/召回提醒，不得因 `expo-notifications` 入口的 Push 自注册或 `setNotificationChannelAsync` 的空 provider 而红屏。
