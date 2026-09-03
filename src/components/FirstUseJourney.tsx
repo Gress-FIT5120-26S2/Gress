@@ -9,7 +9,7 @@ type FirstUseJourneyProps = {
   visible: boolean;
 };
 
-type JourneyPage = 'problem' | 'identity' | 'features' | 'purpose';
+type JourneyPage = 'language' | 'problem' | 'identity' | 'features' | 'purpose';
 type SceneTheme = {
   accentText: TextStyle;
   foreground: TextStyle;
@@ -23,11 +23,11 @@ type SceneTheme = {
   screen: ViewStyle;
 };
 
-const PAGE_ORDER: JourneyPage[] = ['problem', 'identity', 'features', 'purpose'];
+const PAGE_ORDER: JourneyPage[] = ['language', 'problem', 'identity', 'features', 'purpose'];
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
-  const { t } = useI18n();
+  const { language, setLanguage, t } = useI18n();
   const [pageIndex, setPageIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const reveal = useRef(new Animated.Value(1)).current;
@@ -79,7 +79,7 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
         <View style={styles.topBar}>
           <Text style={[styles.brand, sceneStyles[page].foreground]}>KITCHMEMO</Text>
           <Text accessibilityLiveRegion="polite" style={[styles.progressLabel, sceneStyles[page].muted]}>
-            {t.onboarding.progress(pageIndex + 1, PAGE_ORDER.length)}
+            {page === 'language' ? `${pageIndex + 1} / ${PAGE_ORDER.length}` : t.onboarding.progress(pageIndex + 1, PAGE_ORDER.length)}
           </Text>
         </View>
 
@@ -94,12 +94,13 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
 
         <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
           <Animated.View style={[styles.page, { opacity: reveal, transform: [{ translateY: pageTranslateY }] }]}>
-            <JourneyScene page={page} />
-            <View style={styles.copyBlock}>
+            {page === 'language' ? <LanguageScene /> : <JourneyScene page={page} />}
+            <View style={[styles.copyBlock, page === 'language' && styles.languageCopyBlock]}>
               <Text style={[styles.eyebrow, sceneStyles[page].accentText]}>{copy.eyebrow}</Text>
-              <Text style={[styles.title, sceneStyles[page].foreground]}>{copy.title}</Text>
-              <Text style={[styles.body, sceneStyles[page].muted]}>{copy.body}</Text>
+              <Text style={[styles.title, page === 'language' && styles.languageTitle, sceneStyles[page].foreground]}>{copy.title}</Text>
+              <Text style={[styles.body, page === 'language' && styles.languageBody, sceneStyles[page].muted]}>{copy.body}</Text>
             </View>
+            {page === 'language' ? <LanguageOptions language={language} onSelect={setLanguage} /> : null}
           </Animated.View>
         </ScrollView>
 
@@ -111,12 +112,55 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
             </Pressable>
           ) : <View style={styles.backButton} />}
           <Pressable accessibilityRole="button" onPress={goForward} style={({ pressed }) => [styles.nextButton, sceneStyles[page].nextButton, pressed && styles.pressed]}>
-            <Text style={[styles.nextLabel, sceneStyles[page].nextLabel]}>{isLastPage ? t.onboarding.enter : t.onboarding.next}</Text>
+            <Text style={[styles.nextLabel, sceneStyles[page].nextLabel]}>{page === 'language' ? 'Continue  继续' : isLastPage ? t.onboarding.enter : t.onboarding.next}</Text>
             <Ionicons color={sceneStyles[page].nextIconColor} name={isLastPage ? 'home-outline' : 'arrow-forward'} size={20} />
           </Pressable>
         </View>
       </View>
     </Modal>
+  );
+}
+
+function LanguageScene() {
+  return (
+    <View style={styles.languageArtwork}>
+      <View style={styles.globeMark}>
+        <MaterialCommunityIcons color="#FFF4DA" name="web" size={82} />
+      </View>
+      <View style={[styles.speechBubble, styles.chineseBubble]}><Text style={styles.speechText}>你好</Text></View>
+      <View style={[styles.speechBubble, styles.englishBubble]}><Text style={styles.speechText}>Hello</Text></View>
+    </View>
+  );
+}
+
+function LanguageOptions({ language, onSelect }: { language: 'zh' | 'en'; onSelect: (language: 'zh' | 'en') => void }) {
+  return (
+    <View accessibilityRole="radiogroup" style={styles.languageOptions}>
+      {([
+        { code: 'zh' as const, primary: '简体中文', secondary: 'Chinese (Simplified)' },
+        { code: 'en' as const, primary: 'English', secondary: '英语' },
+      ]).map((option) => {
+        const selected = option.code === language;
+        return (
+          <Pressable
+            accessibilityLabel={`${option.primary}, ${option.secondary}`}
+            accessibilityRole="radio"
+            accessibilityState={{ checked: selected }}
+            key={option.code}
+            onPress={() => onSelect(option.code)}
+            style={({ pressed }) => [styles.languageOption, selected && styles.languageOptionSelected, pressed && styles.pressed]}
+          >
+            <View style={styles.languageOptionCopy}>
+              <Text style={styles.languagePrimary}>{option.primary}</Text>
+              <Text style={styles.languageSecondary}>{option.secondary}</Text>
+            </View>
+            <View style={[styles.radioOuter, selected && styles.radioOuterSelected]}>
+              {selected ? <View style={styles.radioInner} /> : null}
+            </View>
+          </Pressable>
+        );
+      })}
+    </View>
   );
 }
 
@@ -186,6 +230,13 @@ function FeatureStop({ icon, label }: { icon: ComponentProps<typeof MaterialComm
 }
 
 const sceneStyles: Record<JourneyPage, SceneTheme> = {
+  language: {
+    screen: { backgroundColor: '#F2B94B' },
+    foreground: { color: '#183D32' }, muted: { color: '#345E51' }, accentText: { color: '#8E3A22' },
+    routeLine: { backgroundColor: 'rgba(24,61,50,0.24)' }, routeStop: { backgroundColor: '#183D32' },
+    nextButton: { backgroundColor: '#183D32' }, nextLabel: { color: '#FFF8E8' },
+    iconColor: '#183D32', nextIconColor: '#FFF8E8',
+  },
   problem: {
     screen: { backgroundColor: '#F2B94B' },
     foreground: { color: '#183D32' }, muted: { color: '#345E51' }, accentText: { color: '#8E3A22' },
@@ -243,7 +294,25 @@ const styles = StyleSheet.create({
   personMark: { position: 'absolute', left: 28, bottom: 52, width: 90, height: 112, alignItems: 'center', justifyContent: 'center', borderRadius: 45, backgroundColor: '#FFF3D8' },
   problemPath: { position: 'absolute', right: 96, bottom: 84, left: 108, height: 5, backgroundColor: '#183D32', transform: [{ rotate: '-8deg' }] },
   binMark: { position: 'absolute', right: 28, bottom: 44, alignItems: 'center' },
-  sceneCaption: { position: 'absolute', top: 26, left: 28, maxWidth: 240, color: '#FFF5DF', fontSize: 23, lineHeight: 29, fontWeight: '900' },
+  sceneCaption: { position: 'absolute', top: 26, right: 28, left: 28, color: '#FFF5DF', fontSize: 23, lineHeight: 29, fontWeight: '900' },
+  languageArtwork: { minHeight: 210, overflow: 'hidden', alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#E96A2C' },
+  globeMark: { width: 126, height: 126, alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: '#FFF4DA', borderRadius: 63 },
+  speechBubble: { position: 'absolute', minWidth: 76, paddingHorizontal: 15, paddingVertical: 10, borderRadius: 18, backgroundColor: '#FFF4DA' },
+  chineseBubble: { top: 30, right: 28 },
+  englishBubble: { bottom: 28, left: 28 },
+  speechText: { color: '#183D32', fontSize: 16, fontWeight: '900' },
+  languageCopyBlock: { paddingTop: 20 },
+  languageTitle: { fontSize: 31, lineHeight: 36 },
+  languageBody: { marginTop: 9, fontSize: 14, lineHeight: 20 },
+  languageOptions: { gap: 10, marginTop: 16, marginBottom: 4 },
+  languageOption: { minHeight: 68, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, borderWidth: 2, borderColor: 'rgba(24,61,50,0.16)', borderRadius: 16, backgroundColor: 'rgba(255,248,232,0.78)' },
+  languageOptionSelected: { borderColor: '#183D32', backgroundColor: '#FFF8E8' },
+  languageOptionCopy: { gap: 2 },
+  languagePrimary: { color: '#183D32', fontSize: 18, fontWeight: '900' },
+  languageSecondary: { color: '#527064', fontSize: 12, fontWeight: '700' },
+  radioOuter: { width: 24, height: 24, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: '#83988F', borderRadius: 12 },
+  radioOuterSelected: { borderColor: '#183D32' },
+  radioInner: { width: 12, height: 12, borderRadius: 6, backgroundColor: '#183D32' },
   identityScene: { alignItems: 'center', justifyContent: 'center', backgroundColor: '#BFDCD4' },
   phone: { width: '78%', maxWidth: 330, minHeight: 242, padding: 17, borderWidth: 5, borderColor: '#173B31', borderRadius: 28, backgroundColor: '#F8FBFA' },
   phoneSpeaker: { alignSelf: 'center', width: 52, height: 5, marginBottom: 18, borderRadius: 3, backgroundColor: '#173B31' },

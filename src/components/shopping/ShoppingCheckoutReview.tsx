@@ -71,6 +71,7 @@ export function ShoppingCheckoutReview({
         categoryCode: submission.batch.categoryCode,
         storageZone: submission.batch.storageZone,
         expiresAt: submission.batch.expiresAt,
+        expiryWarningDays: submission.expiryWarningDays,
         purchasePrice: submission.batch.purchasePrice,
         presetUid: submission.batch.matchedPresetUid ?? item.preset_uid,
         restockRule: submission.restockRule,

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -15,11 +15,11 @@ import {
   View,
 } from 'react-native';
 import { useI18n } from '../i18n';
-import { getDeviceProfile, updateDeviceProfile, type DeviceProfile, type ProfileAvatarKey } from '../services/profileApi';
-import { subscribeToSync } from '../services/realtimeSync';
-import { getFridgeAccessContext, type FridgeAccessContext } from '../services/sharingApi';
+import { updateDeviceProfile, type DeviceProfile, type ProfileAvatarKey } from '../services/profileApi';
 import { DeviceRecoverySettings } from './DeviceRecoverySettings';
 import { NotificationSettingsModal } from './NotificationSettingsModal';
+import { ProfileBottomSheet } from './ProfileBottomSheet';
+import { useProfileData } from './ProfileDataProvider';
 import { LanguageSettingsModal } from './ProfileSettings';
 
 const AVATAR_COLOURS: Record<ProfileAvatarKey, { background: string; foreground: string }> = {
@@ -32,55 +32,26 @@ const AVATAR_COLOURS: Record<ProfileAvatarKey, { background: string; foreground:
 
 type ProfileScreenProps = {
   onOpenNotifications: () => void;
+  onReplayOnboarding: () => void;
 };
 
 // Arthur: NarIyirm
 // 中文：个人页把设备昵称、共享空间摘要和已实现设置集中展示；口味入口仅保留占位，不创建未生效的数据。
 // EN: The profile screen combines device identity, shared-space context, and working settings while keeping taste preferences as a non-persisting placeholder.
-export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
+export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: ProfileScreenProps) {
   const { language, t } = useI18n();
   const copy = t.profile;
-  const [profile, setProfile] = useState<DeviceProfile | null>(null);
-  const [context, setContext] = useState<FridgeAccessContext | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [failed, setFailed] = useState(false);
+  const { failed, fridgeContext: context, loading, profile, refresh, setProfile } = useProfileData();
   const [editVisible, setEditVisible] = useState(false);
   const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
   const [languageVisible, setLanguageVisible] = useState(false);
   const [recoveryVisible, setRecoveryVisible] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
+  const [replayVisible, setReplayVisible] = useState(false);
 
-  // Arthur: NarIyirm
-  // 中文：资料和冰箱上下文彼此独立，首次进入与同步刷新都并行读取，避免个人页产生串行等待。
-  // EN: Profile and fridge context are independent, so initial and sync refreshes load them in parallel without a client waterfall.
-  const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    setFailed(false);
-    try {
-      const [nextProfile, nextContext] = await Promise.all([
-        getDeviceProfile(),
-        getFridgeAccessContext(),
-      ]);
-      setProfile(nextProfile);
-      setContext(nextContext);
-    } catch {
-      setFailed(true);
-    } finally {
-      if (!silent) setLoading(false);
-    }
-  }, []);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  useEffect(() => subscribeToSync(['fridge'], () => {
-    void load(true);
-  }), [load]);
-
-  const displayName = profile?.displayName ?? copy.defaultName;
+  const displayName = profile?.displayName ?? null;
   const avatar = AVATAR_COLOURS[profile?.avatarKey ?? 'sage'];
-  const avatarInitial = useMemo(() => Array.from(displayName.trim())[0]?.toUpperCase() ?? 'K', [displayName]);
+  const avatarInitial = useMemo(() => displayName ? Array.from(displayName.trim())[0]?.toUpperCase() ?? 'K' : '+', [displayName]);
   const fridgeDetail = context
     ? context.fridge.mode === 'shared'
       ? copy.sharedFridge(context.fridge.name, context.fridge.memberCount)
@@ -95,7 +66,7 @@ export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
         <View style={styles.failedIcon}><Ionicons color="#168ACB" name="cloud-offline-outline" size={29} /></View>
         <Text style={styles.failedTitle}>{copy.loadError}</Text>
         <Text style={styles.failedDescription}>{copy.loadErrorDetail}</Text>
-        <Pressable accessibilityRole="button" onPress={() => { void load(); }} style={styles.retryButton}>
+        <Pressable accessibilityRole="button" onPress={() => { void refresh(); }} style={styles.retryButton}>
           <Text style={styles.retryText}>{copy.retry}</Text>
         </Pressable>
       </View>
@@ -103,13 +74,12 @@ export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
   }
 
   const openTastePlaceholder = () => Alert.alert(copy.tastePlaceholderTitle, copy.tastePlaceholderBody);
-
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
         <Text adjustsFontSizeToFit minimumFontScale={0.74} numberOfLines={1} style={styles.greeting}>
-          {copy.greeting(displayName)}
+          {displayName ? copy.greeting(displayName) : copy.greetingWithoutName}
         </Text>
 
         <View style={styles.identityPanel}>
@@ -125,7 +95,7 @@ export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
               <Text style={[styles.avatarText, { color: avatar.foreground }]}>{avatarInitial}</Text>
             </View>
             <View style={styles.identityCopy}>
-              <Text numberOfLines={1} style={styles.identityName}>{displayName}</Text>
+              <Text numberOfLines={1} style={styles.identityName}>{displayName ?? copy.nameNotSet}</Text>
               <Text numberOfLines={2} style={styles.identityMeta}>{fridgeDetail}</Text>
             </View>
           </View>
@@ -153,6 +123,12 @@ export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
             icon="language-outline"
             onPress={() => setLanguageVisible(true)}
             title={copy.languageTitle}
+          />
+          <ProfileRow
+            detail={copy.replayOnboardingDetail}
+            icon="refresh-circle-outline"
+            onPress={() => setReplayVisible(true)}
+            title={copy.replayOnboardingTitle}
           />
           <ProfileRow
             detail={copy.tastePlaceholderDetail}
@@ -198,11 +174,16 @@ export function ProfileScreen({ onOpenNotifications }: ProfileScreenProps) {
       <RecoveryModal
         onClose={() => {
           setRecoveryVisible(false);
-          void load(true);
+          void refresh(true);
         }}
         visible={recoveryVisible}
       />
       <PrivacyModal onClose={() => setPrivacyVisible(false)} visible={privacyVisible} />
+      <ReplayOnboardingModal
+        onClose={() => setReplayVisible(false)}
+        onReplay={onReplayOnboarding}
+        visible={replayVisible}
+      />
     </View>
   );
 }
@@ -228,32 +209,6 @@ function ProfileRow({ detail, icon, isLast = false, onPress, title }: {
       </View>
       <Ionicons color="#5F8176" name="chevron-forward" size={19} />
     </Pressable>
-  );
-}
-
-function SheetModal({ children, onClose, title, visible }: {
-  children: ReactNode;
-  onClose: () => void;
-  title: string;
-  visible: boolean;
-}) {
-  const { t } = useI18n();
-  return (
-    <Modal animationType="fade" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={visible}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel={t.settings.close} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <View style={styles.sheetHeader}>
-            <Text style={styles.sheetTitle}>{title}</Text>
-            <Pressable accessibilityLabel={t.settings.close} accessibilityRole="button" onPress={onClose} style={styles.closeButton}>
-              <Ionicons color="#365048" name="close" size={22} />
-            </Pressable>
-          </View>
-          {children}
-        </View>
-      </View>
-    </Modal>
   );
 }
 
@@ -346,12 +301,15 @@ function EditProfileModal({ currentName, onClose, onSaved, visible }: {
 
 function RecoveryModal({ onClose, visible }: { onClose: () => void; visible: boolean }) {
   const { t } = useI18n();
+  const [contentVersion, setContentVersion] = useState(0);
   return (
-    <SheetModal onClose={onClose} title={t.profile.recoveryTitle} visible={visible}>
-      <ScrollView contentContainerStyle={styles.modalScrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-        <DeviceRecoverySettings active={visible} />
-      </ScrollView>
-    </SheetModal>
+    <ProfileBottomSheet contentKey={String(contentVersion)} onClose={onClose} title={t.profile.recoveryTitle} visible={visible}>
+      {({ onContentScroll }) => (
+        <ScrollView contentContainerStyle={styles.modalScrollContent} keyboardShouldPersistTaps="handled" onScroll={onContentScroll} scrollEventThrottle={16} showsVerticalScrollIndicator={false}>
+          <DeviceRecoverySettings active={visible} onContentChange={() => setContentVersion((version) => version + 1)} />
+        </ScrollView>
+      )}
+    </ProfileBottomSheet>
   );
 }
 
@@ -359,16 +317,41 @@ function PrivacyModal({ onClose, visible }: { onClose: () => void; visible: bool
   const { t } = useI18n();
   const copy = t.profile.privacy;
   return (
-    <SheetModal onClose={onClose} title={copy.title} visible={visible}>
-      <View style={styles.privacyContent}>
-        <PrivacyPoint icon="phone-portrait-outline" text={copy.deviceIdentity} />
-        <PrivacyPoint icon="people-outline" text={copy.sharedVisibility} />
-        <PrivacyPoint icon="lock-closed-outline" text={copy.security} />
-        <Pressable accessibilityRole="button" onPress={onClose} style={styles.privacyCloseButton}>
-          <Text style={styles.privacyCloseText}>{copy.close}</Text>
-        </Pressable>
-      </View>
-    </SheetModal>
+    <ProfileBottomSheet onClose={onClose} title={copy.title} visible={visible}>
+      {({ requestClose }) => (
+        <View style={styles.privacyContent}>
+          <PrivacyPoint icon="phone-portrait-outline" text={copy.deviceIdentity} />
+          <PrivacyPoint icon="people-outline" text={copy.sharedVisibility} />
+          <PrivacyPoint icon="lock-closed-outline" text={copy.security} />
+          <Pressable accessibilityRole="button" onPress={() => requestClose()} style={styles.privacyCloseButton}>
+            <Text style={styles.privacyCloseText}>{copy.close}</Text>
+          </Pressable>
+        </View>
+      )}
+    </ProfileBottomSheet>
+  );
+}
+
+function ReplayOnboardingModal({ onClose, onReplay, visible }: { onClose: () => void; onReplay: () => void; visible: boolean }) {
+  const { t } = useI18n();
+  const copy = t.profile;
+  return (
+    <ProfileBottomSheet onClose={onClose} title={copy.replayOnboardingTitle} visible={visible}>
+      {({ requestClose }) => (
+        <View style={styles.replayContent}>
+          <View style={styles.replayIcon}><Ionicons color="#D66C1C" name="map-outline" size={28} /></View>
+          <Text style={styles.replayDescription}>{copy.replayOnboardingConfirmBody}</Text>
+          <View style={styles.replayActions}>
+            <Pressable accessibilityRole="button" onPress={() => requestClose()} style={({ pressed }) => [styles.replayCancelButton, pressed && styles.pressed]}>
+              <Text style={styles.replayCancelText}>{copy.replayOnboardingCancel}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={() => requestClose(onReplay)} style={({ pressed }) => [styles.replayConfirmButton, pressed && styles.pressed]}>
+              <Text style={styles.replayConfirmText}>{copy.replayOnboardingConfirm}</Text>
+            </Pressable>
+          </View>
+        </View>
+      )}
+    </ProfileBottomSheet>
   );
 }
 
@@ -443,16 +426,24 @@ const styles = StyleSheet.create({
   saveButton: { minHeight: 52, alignItems: 'center', justifyContent: 'center', marginTop: 10, borderRadius: 15, backgroundColor: '#F58220' },
   saveButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
   disabled: { opacity: 0.46 },
-  modalScrollContent: { paddingBottom: 20 },
-  privacyContent: { gap: 4, paddingBottom: 4 },
+  modalScrollContent: { paddingHorizontal: 20, paddingBottom: 28 },
+  privacyContent: { gap: 4, paddingHorizontal: 20, paddingTop: 18, paddingBottom: 20 },
   privacyPoint: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 12 },
   privacyIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#E7F7FC' },
   privacyText: { flex: 1, color: '#4E675E', fontSize: 13, lineHeight: 19 },
   privacyCloseButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 14, borderRadius: 15, backgroundColor: '#168ACB' },
   privacyCloseText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  replayContent: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 28, paddingBottom: 24 },
+  replayIcon: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 32, backgroundColor: '#FFF0E3' },
+  replayDescription: { maxWidth: 420, marginTop: 18, color: '#536C63', fontSize: 14, lineHeight: 21, textAlign: 'center' },
+  replayActions: { width: '100%', flexDirection: 'row', gap: 10, marginTop: 24 },
+  replayCancelButton: { minHeight: 50, flex: 1, alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#C9D8D3', borderRadius: 15, backgroundColor: '#FFFFFF' },
+  replayCancelText: { color: '#4F675E', fontSize: 14, fontWeight: '800' },
+  replayConfirmButton: { minHeight: 50, flex: 1.35, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: '#F58220' },
+  replayConfirmText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
   skeletonContent: { paddingHorizontal: 18, paddingTop: 72 },
   skeletonLine: { height: 15, borderRadius: 8, backgroundColor: '#E3EEEA' },
   skeletonHeading: { width: 220, height: 34, marginTop: 12 },
   skeletonHero: { height: 190, marginTop: 22, borderRadius: 16, backgroundColor: '#EAF4F2' },
-  skeletonList: { height: 222, marginTop: 12, borderRadius: 16, backgroundColor: '#EDF4F1' },
+  skeletonList: { height: 296, marginTop: 12, borderRadius: 16, backgroundColor: '#EDF4F1' },
 });

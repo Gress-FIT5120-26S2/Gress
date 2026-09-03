@@ -290,6 +290,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `currency` | `char(3)` | 默认 `AUD`，三位大写代码 |
 | `stocked_at` | `timestamptz` | 入库时间 |
 | `expires_at` | `timestamptz` | 可空，不得早于入库时间 |
+| `expiry_warning_days` | `smallint` | 无到期时间时为空；否则为 1–7 天，用于批次级本地临期提醒 |
 | `opened_at` | `timestamptz` | 可空，不得早于入库时间 |
 | `lifecycle_state` | `inventory_lifecycle` | 默认 `active` |
 | `version` | `integer` | 默认 1，用于共享编辑乐观锁 |
@@ -601,11 +602,11 @@ GET /api/restock
 已实现：
 
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
-- 设备个人资料：`GET /api/profile` 只读取当前已鉴权设备；`PATCH /api/profile` 只允许修改当前设备 1–32 字符的昵称。头像使用稳定产品令牌，App 不上传照片。
+- 设备个人资料：`GET /api/profile` 只读取当前已鉴权设备；`PATCH /api/profile` 只允许修改当前设备 1–32 字符的昵称。头像使用稳定产品令牌，App 不上传照片。Expo 的常驻 `ProfileDataProvider` 会在开场期间并行预取资料和 `GET /api/fridges/context`，跨 Tab 保留在内存中，并在冰箱同步事件后静默刷新；个人页不使用持久化资料缓存，也不在每次进入时重复请求。服务端昵称为空时，界面显示设置提示而非本地默认昵称。
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：只有用户明确点击后，`POST /api/food-presets/generate` 才调用 Gemini 生成标准名、双语别名、分类、储存区、参考天数和说明；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
-- 新增库存：表单会提交命中的 `presetUid`，新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`；历史无法可靠匹配的批次继续保留 null。
+- 新增库存：表单会提交命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`；新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`，并在同一事务保存批次级临期提前天数。历史无法可靠匹配的批次继续保留 null preset；已有有效期批次回填为 3 天。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
@@ -668,7 +669,7 @@ PATCH /api/notification-preferences
 POST /api/notification-delivery/register
 ```
 
-打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按到期前三天安排本地原生提醒，并在日期变化、库存移除或设置关闭后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。SDK 53+ 的 Android Expo Go 已移除远程 Push：`src/services/systemNotifications.ts` 不得从 `expo-notifications` 入口导入（入口加载时会红屏），只从子模块调度本地提醒，并跳过 `getExpoPushTokenAsync` 与 `setNotificationChannelAsync`（Channel 原生 provider 为空会 NPE）。本地提醒走系统默认频道。远程 Push 仍须用 EAS development/preview/production build。
+打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按各自保存的 `expiry_warning_days` 安排本地原生提醒，并在日期、提前天数、库存或设置变化后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。SDK 53+ 的 Android Expo Go 已移除远程 Push：`src/services/systemNotifications.ts` 不得从 `expo-notifications` 入口导入（入口加载时会红屏），只从子模块调度本地提醒，并跳过 `getExpoPushTokenAsync` 与 `setNotificationChannelAsync`（Channel 原生 provider 为空会 NPE）。本地提醒走系统默认频道。远程 Push 仍须用 EAS development/preview/production build。
 ### 已完成：库存批次详情与修改
 
 ```text
@@ -684,6 +685,8 @@ DELETE /api/inventory/batches/:batchUid
 批次详情还会按 `preset_uid` 返回与库存列表一致的远程 icon URL 和 Emoji fallback；列表卡片、详情顶部及删除确认框共用 `PresetFoodIcon` 渲染与失败回退逻辑。
 
 `20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
+
+`20260904020000_inventory_expiry_warning_days.sql` 新增批次级 `expiry_warning_days`，并为创建与完整编辑 RPC 增加原子保存该字段的安全重载；Express 的列表与详情响应统一返回 `expiryWarningDays`。
 
 ### 已完成并在开发库验证：共享冰箱与设备恢复
 
@@ -714,7 +717,7 @@ POST /api/devices/recover
 
 Expo 冰箱页左上角是共享功能唯一主入口：个人模式提供创建或输入邀请码；共享模式进入管理页。创建页支持自定义名称，分享页生成二维码并支持复制、系统分享和二维码图片分享，加入页支持手输或 Expo Camera 扫码。设置页只保留设备恢复码，避免共享操作分散在两个入口。
 
-Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页临期件数。首页件数订阅 `inventory` 与 `home`，与冰箱快过期筛选同源。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取，只有当前页面订阅对应领域，后台 Tab 不会产生多余业务请求。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
+Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页临期件数。首页件数订阅 `inventory` 与 `home`，与冰箱快过期筛选同源。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取；页面业务列表只在挂载时订阅对应领域，个人资料 Provider 是例外，它常驻订阅轻量 `fridge` 摘要以保证个人页进入即显示最新资料。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
 
 ### 阶段五：成就
 

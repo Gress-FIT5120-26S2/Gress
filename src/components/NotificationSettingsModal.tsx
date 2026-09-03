@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +20,7 @@ import {
   type NotificationPreferences,
 } from '../services/notificationApi';
 import { enableSystemNotificationDelivery } from '../services/systemNotifications';
+import { ProfileBottomSheet } from './ProfileBottomSheet';
 
 type EditablePreferences = Omit<NotificationPreferences, 'updatedAt'>;
 
@@ -42,8 +42,8 @@ function timeFromDate(date: Date) {
 }
 
 // Arthur: NarIyirm
-// 中文：通知设置使用独立全屏层，开关即时保存到当前设备；免打扰只压低首页角标，不把通知历史标成已读。
-// EN: Notification settings use a dedicated full-screen layer with immediate device-scoped saves; quiet hours suppress the home badge without marking history as read.
+// 中文：通知设置在统一底部抽屉中即时保存到当前设备；免打扰只压低首页角标，不把通知历史标成已读。
+// EN: Notification settings save immediately for the current device inside the shared bottom sheet; quiet hours suppress the home badge without marking history as read.
 export function NotificationSettingsModal({ onClose, onOpenInbox, visible }: NotificationSettingsModalProps) {
   const { language, t } = useI18n();
   const copy = t.profile.notificationSettings;
@@ -93,11 +93,6 @@ export function NotificationSettingsModal({ onClose, onOpenInbox, visible }: Not
     }
   }, [deviceTimeZone, preferences]);
 
-  const openInbox = () => {
-    onClose();
-    onOpenInbox();
-  };
-
   const toggleSystemDelivery = async (value: boolean) => {
     if (!value) {
       await save({ systemDeliveryEnabled: false });
@@ -117,40 +112,25 @@ export function NotificationSettingsModal({ onClose, onOpenInbox, visible }: Not
   const enabled = preferences?.notificationsEnabled ?? false;
 
   return (
-    <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-      <View style={styles.screen}>
-        <View style={styles.navigationBar}>
-          <Pressable
-            accessibilityLabel={copy.back}
-            accessibilityRole="button"
-            hitSlop={8}
-            onPress={onClose}
-            style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-          >
-            <Ionicons color="#168ACB" name="chevron-back" size={25} />
-            <Text style={styles.backText}>{copy.back}</Text>
-          </Pressable>
-          <Text numberOfLines={1} style={styles.navigationTitle}>{copy.title}</Text>
-          <View style={styles.navigationStatus}>
-            {savingCount > 0 ? <ActivityIndicator color="#168ACB" size="small" /> : null}
-          </View>
-        </View>
-
-        {loading ? (
-          <View style={styles.stateBox}>
-            <ActivityIndicator color="#168ACB" />
-            <Text style={styles.stateText}>{copy.loading}</Text>
-          </View>
-        ) : loadFailed || !preferences ? (
-          <View style={styles.stateBox}>
-            <Ionicons color="#5D7A70" name="cloud-offline-outline" size={31} />
-            <Text style={styles.stateTitle}>{copy.loadError}</Text>
-            <Pressable accessibilityRole="button" onPress={() => { void load(); }} style={styles.retryButton}>
-              <Text style={styles.retryText}>{copy.retry}</Text>
-            </Pressable>
-          </View>
-        ) : (
-          <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+    <ProfileBottomSheet contentKey={`${loading}-${loadFailed}-${Boolean(preferences)}`} onClose={onClose} title={copy.title} visible={visible}>
+      {({ onContentScroll, requestClose }) => (
+        <View style={styles.screen}>
+          {savingCount > 0 ? <ActivityIndicator color="#168ACB" size="small" style={styles.savingIndicator} /> : null}
+          {loading ? (
+            <View style={styles.stateBox}>
+              <ActivityIndicator color="#168ACB" />
+              <Text style={styles.stateText}>{copy.loading}</Text>
+            </View>
+          ) : loadFailed || !preferences ? (
+            <View style={styles.stateBox}>
+              <Ionicons color="#5D7A70" name="cloud-offline-outline" size={31} />
+              <Text style={styles.stateTitle}>{copy.loadError}</Text>
+              <Pressable accessibilityRole="button" onPress={() => { void load(); }} style={styles.retryButton}>
+                <Text style={styles.retryText}>{copy.retry}</Text>
+              </Pressable>
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.content} onScroll={onContentScroll} scrollEventThrottle={16} showsVerticalScrollIndicator={false}>
             {saveFailed ? (
               <View accessibilityLiveRegion="polite" style={styles.errorBanner}>
                 <Ionicons color="#B04950" name="alert-circle-outline" size={18} />
@@ -246,16 +226,17 @@ export function NotificationSettingsModal({ onClose, onOpenInbox, visible }: Not
             <SettingsGroup>
               <DisclosureRow
                 detail={copy.historyDetail}
-                onPress={openInbox}
+                onPress={() => requestClose(onOpenInbox)}
                 title={copy.historyTitle}
               />
             </SettingsGroup>
 
             <Text style={styles.footer}>{copy.footer}</Text>
-          </ScrollView>
-        )}
-      </View>
-    </Modal>
+            </ScrollView>
+          )}
+        </View>
+      )}
+    </ProfileBottomSheet>
   );
 }
 
@@ -349,12 +330,7 @@ function DisclosureRow({ detail, onPress, title }: { detail: string; onPress: ()
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F2F7F5' },
-  navigationBar: { minHeight: Platform.OS === 'ios' ? 104 : 76, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 12, paddingBottom: 12, backgroundColor: 'rgba(247,251,250,0.97)' },
-  backButton: { width: 112, minHeight: 44, flexDirection: 'row', alignItems: 'center' },
-  backText: { marginLeft: -3, color: '#168ACB', fontSize: 15, fontWeight: '600' },
-  navigationTitle: { flex: 1, paddingBottom: 11, color: '#183E32', fontSize: 17, fontWeight: '800', textAlign: 'center' },
-  navigationStatus: { width: 112, minHeight: 44, alignItems: 'flex-end', justifyContent: 'center', paddingRight: 12 },
-  pressed: { opacity: 0.56 },
+  savingIndicator: { position: 'absolute', zIndex: 2, top: 14, right: 20 },
   content: { paddingHorizontal: 16, paddingTop: 22, paddingBottom: 46 },
   group: { overflow: 'hidden', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   sectionLabel: { marginTop: 26, marginBottom: 8, paddingHorizontal: 14, color: '#4C6A60', fontSize: 13, fontWeight: '700' },

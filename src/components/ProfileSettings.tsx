@@ -1,6 +1,6 @@
-import { Ionicons } from '@expo/vector-icons';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { type AppLanguage, useI18n } from '../i18n';
+import { ProfileBottomSheet } from './ProfileBottomSheet';
 
 function LanguageOption({ language, label, detail }: { language: AppLanguage; label: string; detail: string }) {
   const { language: selectedLanguage, setLanguage, t } = useI18n();
@@ -26,52 +26,31 @@ function LanguageOption({ language, label, detail }: { language: AppLanguage; la
 }
 
 export function LanguageSettingsModal({ onClose, visible }: { onClose: () => void; visible: boolean }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
 
   return (
-    <Modal animationType="fade" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={visible}>
-      <View style={styles.modalRoot}>
-        <Pressable accessibilityLabel={t.settings.close} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={styles.sheet}>
-          <View style={styles.handle} />
-          <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-            <View style={styles.header}>
-              <View style={styles.headerCopy}>
-                <Text style={styles.title}>{t.settings.title}</Text>
-                <Text style={styles.subtitle}>{t.settings.subtitle}</Text>
-              </View>
-              <Pressable accessibilityLabel={t.settings.close} accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.closeButton, pressed && styles.buttonPressed]}>
-                <Ionicons name="close" size={22} color="#365048" />
-              </Pressable>
-            </View>
-
-            <Text style={styles.sectionLabel}>{t.settings.language}</Text>
-            <Text style={styles.sectionDescription}>{t.settings.languageDescription}</Text>
-            {/* Arthur: NarIyirm
+    <ProfileBottomSheet contentKey={language} onClose={onClose} title={t.settings.title} visible={visible}>
+      {({ onContentScroll }) => (
+        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" onScroll={onContentScroll} scrollEventThrottle={16} showsVerticalScrollIndicator={false}>
+          <Text style={styles.subtitle}>{t.settings.subtitle}</Text>
+          <Text style={styles.sectionLabel}>{t.settings.language}</Text>
+          <Text style={styles.sectionDescription}>{t.settings.languageDescription}</Text>
+          {/* Arthur: NarIyirm
                 中文：两个选项直接更新全局语言状态，同一渲染帧内所有已接入文案都会同步切换。
                 EN: Both options update global language state so every connected string switches within the same render frame. */}
-            <View accessibilityRole="radiogroup" style={styles.languageGroup}>
-              <LanguageOption language="zh" label={t.settings.chinese} detail={t.settings.chineseDetail} />
-              <LanguageOption language="en" label={t.settings.english} detail={t.settings.englishDetail} />
-            </View>
-          </ScrollView>
-        </View>
-      </View>
-    </Modal>
+          <View accessibilityRole="radiogroup" style={styles.languageGroup}>
+            <LanguageOption language="zh" label={t.settings.chinese} detail={t.settings.chineseDetail} />
+            <LanguageOption language="en" label={t.settings.english} detail={t.settings.englishDetail} />
+          </View>
+        </ScrollView>
+      )}
+    </ProfileBottomSheet>
   );
 }
 
 const styles = StyleSheet.create({
-  buttonPressed: { opacity: 0.78, transform: [{ scale: 0.97 }] },
-  modalRoot: { flex: 1, justifyContent: 'flex-end', backgroundColor: 'rgba(20,38,32,0.32)' },
-  sheet: { maxHeight: '92%', paddingHorizontal: 22, paddingTop: 10, paddingBottom: 20, borderTopLeftRadius: 30, borderTopRightRadius: 30, backgroundColor: '#F8F7F1', shadowColor: '#183D32', shadowOpacity: 0.2, shadowRadius: 26, shadowOffset: { width: 0, height: -8 }, elevation: 18 },
-  scrollContent: { paddingBottom: 24 },
-  handle: { width: 38, height: 5, alignSelf: 'center', borderRadius: 3, backgroundColor: '#CDD5D0' },
-  header: { marginTop: 20, flexDirection: 'row', alignItems: 'flex-start' },
-  headerCopy: { flex: 1, paddingRight: 16 },
-  title: { color: '#183D32', fontSize: 28, fontWeight: '700', letterSpacing: -0.7 },
-  subtitle: { marginTop: 6, color: '#6C7B73', fontSize: 14, lineHeight: 20 },
-  closeButton: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: '#E8ECE8' },
+  scrollContent: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 34 },
+  subtitle: { color: '#6C7B73', fontSize: 14, lineHeight: 20 },
   sectionLabel: { marginTop: 30, color: '#294E42', fontSize: 15, fontWeight: '800' },
   sectionDescription: { marginTop: 6, color: '#718078', fontSize: 13, lineHeight: 19 },
   languageGroup: { marginTop: 15, gap: 10 },

@@ -4,7 +4,6 @@ import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, Sty
 import {
   createInventoryBatch,
   getFoodPresetSuggestion,
-  getInventoryBatchDetail,
   getInventorySnapshot,
   setInventoryRestockRule,
   updateInventoryBatch,
@@ -27,7 +26,6 @@ import {
   type InventoryEntrySource,
   type InventoryEntryInitialValues,
   type InventoryEntrySubmission,
-  type InventoryUnit,
 } from './inventory-entry/InventoryEntryFlow';
 import { PhotoRecognitionCamera } from './inventory-entry/PhotoRecognitionCamera';
 import {
@@ -112,14 +110,6 @@ function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(value);
 }
 
-function formatEntryDate(date: Date) {
-  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
-}
-
-function formatEntryTime(date: Date) {
-  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
-}
-
 function getDaysLeft(expiresAt: string | null) {
   if (!expiresAt) return null;
   const remainingMilliseconds = new Date(expiresAt).getTime() - Date.now();
@@ -159,7 +149,6 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const [recognitionInitialValues, setRecognitionInitialValues] = useState<InventoryEntryInitialValues | undefined>();
   const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
-  const [editingBatch, setEditingBatch] = useState<InventoryBatchDetail | null>(null);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [isRefreshingInventory, setIsRefreshingInventory] = useState(false);
@@ -300,13 +289,11 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     // 中文：这个回调只会在选择窗完全卸载后触发，因此不会与手动录入的原生 Modal 重叠。
     // EN: This callback fires only after the chooser unmounts, preventing overlap with the manual entry native Modal.
     if (method === 'manual') {
-      setEditingBatch(null);
       setRecognitionInitialValues(undefined);
       setEntrySource('manual');
       setIsManualEntryVisible(true);
     }
     if (method === 'camera') {
-      setEditingBatch(null);
       setRecognitionDraft(null);
       setRecognitionInitialValues(undefined);
       setIsRecognitionCameraVisible(true);
@@ -369,7 +356,6 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
 
   const closeManualEntry = useCallback(() => {
     setIsManualEntryVisible(false);
-    setEditingBatch(null);
     setRecognitionInitialValues(undefined);
     setEntrySource('manual');
   }, []);
@@ -383,6 +369,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     await createInventoryBatch({
       categoryCode: submission.batch.categoryCode,
       expiresAt: submission.batch.expiresAt,
+      expiryWarningDays: submission.expiryWarningDays,
       initialQuantity: submission.batch.initialQuantity,
       name: submission.batch.name,
       presetUid: submission.batch.matchedPresetUid,
@@ -401,62 +388,28 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   }, [loadInventory]);
 
   // Arthur: NarIyirm
-  // 中文：从详情页进入编辑前重新获取批次和最新 version，避免共享场景用过期快照打开表单。
-  // EN: Before editing from detail, this reloads the batch and latest version so shared-fridge edits never start from a stale snapshot.
-  const openBatchEditor = useCallback(async (batchUid: string) => {
-    // Arthur: NarIyirm
-    // 中文：详情窗关闭后重新获取最新版本再编辑，避免共享冰箱中用旧 version 覆盖其他设备刚完成的修改。
-    // EN: Reload the latest version after closing the detail sheet so editing cannot overwrite a change just made by another shared-fridge device.
-    try {
-      const result = await getInventoryBatchDetail(batchUid);
-      setEditingBatch(result.batch);
-      setIsManualEntryVisible(true);
-    } catch {
-      setSelectedBatchUid(batchUid);
-    }
-  }, []);
-
-  // Arthur: NarIyirm
-  // 中文：编辑表单先提交带 expectedVersion 的批次资料，再保存名称级补货规则，最后重拉库存快照。
-  // EN: The edit form first submits versioned batch details, then saves the name-level restock rule, and finally reloads the snapshot.
-  const saveEditedInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
-    if (!editingBatch) return;
-    await updateInventoryBatch(editingBatch.id, {
+  // 中文：同一详情抽屉中的编辑表单提交当前批次 version，合并更新后的详情与补货规则，再刷新背后的库存列表。
+  // EN: The editor inside the detail sheet submits its current batch version, merges the updated detail and restock rule, then refreshes the inventory behind it.
+  const saveEditedInventoryEntry = useCallback(async (editingBatch: InventoryBatchDetail, submission: InventoryEntrySubmission) => {
+    const updated = await updateInventoryBatch(editingBatch.id, {
       categoryCode: submission.batch.categoryCode,
       expectedVersion: editingBatch.version,
       expiresAt: submission.batch.expiresAt,
+      expiryWarningDays: submission.expiryWarningDays,
       name: submission.batch.name,
       purchasePrice: submission.batch.purchasePrice,
       remainingQuantity: submission.batch.remainingQuantity,
       storageZone: submission.batch.storageZone,
       unit: submission.batch.unit,
     });
-    await setInventoryRestockRule(editingBatch.id, submission.restockRule ? {
+    const restock = await setInventoryRestockRule(editingBatch.id, submission.restockRule ? {
       enabled: true,
       minimumQuantity: submission.restockRule.minimumQuantity,
       targetQuantity: submission.restockRule.targetQuantity,
     } : null);
     await loadInventory();
-  }, [editingBatch, loadInventory]);
-
-  const editInitialValues = useMemo<InventoryEntryInitialValues | undefined>(() => {
-    if (!editingBatch) return undefined;
-    const expiry = editingBatch.expiresAt ? new Date(editingBatch.expiresAt) : null;
-    return {
-      categoryCode: editingBatch.categoryCode,
-      expiryDate: expiry ? formatEntryDate(expiry) : undefined,
-      expiryEnabled: Boolean(expiry),
-      expiryTime: expiry ? formatEntryTime(expiry) : undefined,
-      name: editingBatch.name,
-      price: editingBatch.purchasePrice === null ? '' : String(editingBatch.purchasePrice),
-      quantity: formatQuantity(editingBatch.remainingQuantity),
-      restockEnabled: Boolean(editingBatch.restockRule?.enabled),
-      restockMinimumQuantity: editingBatch.restockRule?.minimumQuantity,
-      restockTargetQuantity: editingBatch.restockRule?.targetQuantity,
-      storageZone: editingBatch.storageZone,
-      unit: editingBatch.unit as InventoryUnit,
-    };
-  }, [editingBatch]);
+    return { ...updated.batch, restockRule: restock.restockRule };
+  }, [loadInventory]);
 
   const renderInventoryItem = useCallback(({ item }: ListRenderItemInfo<InventoryItem>) => {
     const categoryStyle = CATEGORY_STYLE[item.category];
@@ -619,11 +572,11 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       />
       <InventoryEntryFlow
         blurTarget={blurTarget}
-        initialValues={editingBatch ? editInitialValues : recognitionInitialValues}
-        mode={editingBatch ? 'edit' : 'create'}
+        initialValues={recognitionInitialValues}
+        mode="create"
         onClose={closeManualEntry}
-        onSubmit={editingBatch ? saveEditedInventoryEntry : saveInventoryEntry}
-        source={editingBatch ? 'manual' : entrySource}
+        onSubmit={saveInventoryEntry}
+        source={entrySource}
         visible={isManualEntryVisible}
       />
       <PhotoRecognitionCamera
@@ -644,7 +597,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
         blurTarget={blurTarget}
         onChanged={loadInventory}
         onClose={() => setSelectedBatchUid(null)}
-        onEdit={(batchUid) => { setSelectedBatchUid(null); void openBatchEditor(batchUid); }}
+        onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
       />
       <FridgeSpaceMenu
