@@ -9,8 +9,8 @@ export type DeviceProfile = {
 };
 
 // Arthur: NarIyirm
-// 中文：个人页只通过 Express 读取当前设备资料；昵称为空时由界面按当前语言显示通用称呼。
-// EN: The profile screen reads the current device only through Express; a null name receives a localized generic label in the UI.
+// 中文：个人页只通过 Express 读取当前设备资料；昵称为空时界面明确提示用户设置，不伪造本地昵称。
+// EN: The profile screen reads the current device only through Express; a null name is shown as an explicit setup prompt instead of a fabricated local name.
 export function getDeviceProfile() {
   return requestApi<DeviceProfile>('/api/profile');
 }

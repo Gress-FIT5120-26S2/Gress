@@ -27,6 +27,12 @@ import {
   type InventoryBatchDetail,
   type InventoryCategoryCode,
 } from '../../services/inventoryApi';
+import {
+  InventoryEntryFlow,
+  type InventoryEntryInitialValues,
+  type InventoryEntrySubmission,
+  type InventoryUnit,
+} from '../inventory-entry/InventoryEntryFlow';
 import { PresetFoodIcon } from './PresetFoodIcon';
 
 type InventoryItemDetailSheetProps = {
@@ -34,7 +40,7 @@ type InventoryItemDetailSheetProps = {
   blurTarget?: RefObject<View | null>;
   onChanged: () => void | Promise<void>;
   onClose: () => void;
-  onEdit: (batchUid: string) => void;
+  onSaveEdit: (batch: InventoryBatchDetail, submission: InventoryEntrySubmission) => Promise<InventoryBatchDetail>;
   visible: boolean;
 };
 
@@ -65,6 +71,14 @@ function formatQuantity(value: number) {
   return Number.isInteger(value) ? String(value) : String(roundQuantity(value));
 }
 
+function formatEntryDate(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function formatEntryTime(date: Date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
 // Arthur: NarIyirm
 // 中文：库存卡片的详情与快捷 mutation 入口；上游由 FridgeScreen 传 batchUid，下游调用 inventoryApi 的详情、数量、补货和归档接口。
 // EN: This is the inventory card's detail and quick-mutation surface; FridgeScreen supplies batchUid and inventoryApi handles detail, quantity, restock, and archive calls.
@@ -72,7 +86,7 @@ export function InventoryItemDetailSheet({
   batchUid,
   onChanged,
   onClose,
-  onEdit,
+  onSaveEdit,
   visible,
 }: InventoryItemDetailSheetProps) {
   const { height, width } = useWindowDimensions();
@@ -109,6 +123,8 @@ export function InventoryItemDetailSheet({
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const contentOpacity = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
     let mounted = true;
@@ -155,6 +171,7 @@ export function InventoryItemDetailSheet({
     setRemoveError(null);
     setShowRemoveConfirm(false);
     setIsClosing(false);
+    setIsEditing(false);
     hasAutoExpandedAtContentEnd.current = false;
     afterCloseRef.current = null;
     translateY.stopAnimation();
@@ -176,6 +193,18 @@ export function InventoryItemDetailSheet({
     void loadBatch();
     return () => cancelAnimationFrame(frame);
   }, [batchUid, dismissedOffset, loadBatch, previewOffset, reducedMotion, translateY, visible]);
+
+  useEffect(() => {
+    if (!visible) return;
+    contentOpacity.stopAnimation();
+    contentOpacity.setValue(reducedMotion ? 1 : 0.72);
+    Animated.timing(contentOpacity, {
+      duration: reducedMotion ? 80 : 130,
+      easing: Easing.out(Easing.cubic),
+      toValue: 1,
+      useNativeDriver: true,
+    }).start();
+  }, [contentOpacity, isEditing, reducedMotion, visible]);
 
   const finishClose = useCallback(() => {
     const afterClose = afterCloseRef.current;
@@ -427,10 +456,37 @@ export function InventoryItemDetailSheet({
   const openEditor = useCallback(() => {
     if (!batch) return;
     // Arthur: NarIyirm
-    // 中文：详情窗完全关闭后按 ID 重新读取最新批次再打开编辑器，确保共享成员刚保存的版本和数量不会被旧快照覆盖。
-    // EN: After the sheet fully closes, reload the batch by ID before opening the editor so a shared member's newer version and quantity are never overwritten by a stale snapshot.
-    void requestClose(() => onEdit(batch.id));
-  }, [batch, onEdit, requestClose]);
+    // 中文：编辑器直接复用当前已加载的批次和 version，并在同一个抽屉内切换内容；保存时的乐观锁仍会阻止共享成员数据被覆盖。
+    // EN: The editor reuses the loaded batch and version inside this sheet; optimistic locking on save still prevents overwriting another member's changes.
+    setIsEditing(true);
+    animateToDetent(0);
+  }, [animateToDetent, batch]);
+
+  const editInitialValues = useMemo<InventoryEntryInitialValues | undefined>(() => {
+    if (!batch) return undefined;
+    const expiry = batch.expiresAt ? new Date(batch.expiresAt) : null;
+    return {
+      categoryCode: batch.categoryCode,
+      expiryDate: expiry ? formatEntryDate(expiry) : undefined,
+      expiryEnabled: Boolean(expiry),
+      expiryTime: expiry ? formatEntryTime(expiry) : undefined,
+      expiryWarningDays: batch.expiryWarningDays ?? 3,
+      name: batch.name,
+      price: batch.purchasePrice === null ? '' : String(batch.purchasePrice),
+      quantity: formatQuantity(draftQuantity),
+      restockEnabled,
+      restockMinimumQuantity: minimumQuantity,
+      restockTargetQuantity: targetQuantity,
+      storageZone: batch.storageZone,
+      unit: batch.unit as InventoryUnit,
+    };
+  }, [batch, draftQuantity, minimumQuantity, restockEnabled, targetQuantity]);
+
+  const saveEdit = useCallback(async (submission: InventoryEntrySubmission) => {
+    if (!batch) return;
+    const updatedBatch = await onSaveEdit(batch, submission);
+    applyLoadedBatch(updatedBatch);
+  }, [applyLoadedBatch, batch, onSaveEdit]);
 
   const unitLabel = batch ? (t.fridge.manualEntry.units[batch.unit as keyof typeof t.fridge.manualEntry.units] ?? batch.unit) : '';
   const categoryLabel = batch
@@ -477,19 +533,33 @@ export function InventoryItemDetailSheet({
               },
             ]}
         >
-          <View accessibilityHint={t.fridge.addItem.dragHint} style={styles.dragArea}>
+          <View accessibilityHint={t.fridge.addItem.dragHint} style={[styles.dragArea, isEditing && styles.editingDragArea]}>
             {/* Arthur: NarIyirm
                 中文：只有顶部横条注册抽屉手势，内容区始终保留给滚动，避免阅读详情时误触改变弹窗高度。
                 EN: Only the top grabber registers sheet gestures, leaving the content area to scroll without accidental detent changes. */}
             <View {...panResponder.panHandlers} style={styles.grabberTouchTarget}>
               <View style={styles.grabber} />
             </View>
-            <Pressable accessibilityRole="button" disabled={isClosing} onPress={() => void requestClose()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-              <Text style={styles.closeText}>{copy.close}</Text>
-            </Pressable>
+            {!isEditing ? (
+              <Pressable accessibilityRole="button" disabled={isClosing} onPress={() => void requestClose()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
+                <Text style={styles.closeText}>{copy.close}</Text>
+              </Pressable>
+            ) : null}
           </View>
 
-          {isLoading ? (
+          {isEditing && batch ? (
+            <Animated.View style={[styles.editorContent, { opacity: contentOpacity }]}>
+              <InventoryEntryFlow
+                initialValues={editInitialValues}
+                mode="edit"
+                onClose={() => setIsEditing(false)}
+                onSubmit={saveEdit}
+                presentation="embedded"
+                source="manual"
+                visible
+              />
+            </Animated.View>
+          ) : isLoading ? (
             <View style={styles.centerState}>
               <ActivityIndicator color="#1599D2" />
               <Text style={styles.stateText}>{copy.loading}</Text>
@@ -605,7 +675,7 @@ export function InventoryItemDetailSheet({
                 </View>
               </ScrollView>
           )}
-          {batch && !isLoading && !loadError ? (
+          {batch && !isLoading && !loadError && !isEditing ? (
           <View style={styles.footer}>
             <Pressable accessibilityRole="button" disabled={isClosing} onPress={openEditor} style={({ pressed }) => [styles.editButton, pressed && styles.pressed]}>
               <Ionicons name="pencil" size={20} color="#FFFFFF" />
@@ -690,6 +760,7 @@ const styles = StyleSheet.create({
   backdropTint: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(112, 118, 116, 0.22)' },
   sheet: { position: 'absolute', right: 0, left: 0, overflow: 'hidden', borderWidth: 1, borderColor: '#D5DEDA', borderRadius: 34, borderCurve: 'continuous', backgroundColor: '#F7F9F8', shadowColor: '#10271F', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.14, shadowRadius: 24, elevation: 18 },
   dragArea: { height: 66, justifyContent: 'center', paddingHorizontal: 22, paddingTop: 8 },
+  editingDragArea: { height: 34, paddingTop: 0 },
   grabberTouchTarget: { position: 'absolute', zIndex: 5, top: 0, right: 0, left: 0, height: 42, alignItems: 'center', justifyContent: 'center' },
   grabber: { width: 52, height: 5, borderRadius: 3, backgroundColor: '#929998' },
   closeButton: { width: 82, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.72)' },
@@ -699,6 +770,7 @@ const styles = StyleSheet.create({
   retryButton: { minHeight: 44, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 22, backgroundColor: '#E9F7FB' },
   retryText: { color: '#148EAF', fontSize: 14, fontWeight: '800' },
   scrollView: { flex: 1 },
+  editorContent: { flex: 1 },
   scrollContent: { gap: 14, paddingHorizontal: 18, paddingBottom: 122 },
   stockCard: { padding: 20, borderWidth: 1, borderColor: 'rgba(139, 205, 220, 0.42)', borderRadius: 25, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.82)' },
   itemHeader: { flexDirection: 'row', alignItems: 'center', gap: 14 },

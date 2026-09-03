@@ -14,6 +14,7 @@ export type InventoryBatch = {
   categoryCode: InventoryCategoryCode;
   currency: string;
   expiresAt: string | null;
+  expiryWarningDays: number | null;
   id: string;
   iconEmoji?: string | null;
   iconUrl?: string | null;
@@ -63,6 +64,7 @@ export type InventorySnapshot = {
 export type CreateInventoryBatchInput = {
   categoryCode: InventoryCategoryCode;
   expiresAt: string | null;
+  expiryWarningDays: number | null;
   initialQuantity: number;
   name: string;
   presetUid: string | null;
@@ -80,6 +82,7 @@ export type UpdateInventoryBatchInput = {
   categoryCode: InventoryCategoryCode;
   expectedVersion: number;
   expiresAt: string | null;
+  expiryWarningDays: number | null;
   name: string;
   purchasePrice: number | null;
   remainingQuantity: number;

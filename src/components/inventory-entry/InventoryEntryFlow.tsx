@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
-import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   AccessibilityInfo,
   KeyboardAvoidingView,
@@ -29,6 +29,7 @@ export type InventoryEntryInitialValues = Partial<{
   expiryEnabled: boolean;
   expiryDate: string;
   expiryTime: string;
+  expiryWarningDays: number;
   name: string;
   price: string;
   quantity: string;
@@ -69,6 +70,7 @@ type InventoryEntryFlowProps = {
   mode?: 'create' | 'edit';
   onClose: () => void;
   onSubmit: (submission: InventoryEntrySubmission) => void | Promise<void>;
+  presentation?: 'embedded' | 'modal';
   source?: InventoryEntrySource;
   visible: boolean;
 };
@@ -109,6 +111,7 @@ export function InventoryEntryFlow({
   mode = 'create',
   onClose,
   onSubmit,
+  presentation = 'modal',
   source = 'manual',
   visible,
 }: InventoryEntryFlowProps) {
@@ -143,7 +146,7 @@ export function InventoryEntryFlow({
   const [isSaving, setIsSaving] = useState(false);
   const latestNameRef = useRef('');
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!visible) return;
     const now = new Date();
     const defaultExpiry = addDays(now, 7);
@@ -167,7 +170,7 @@ export function InventoryEntryFlow({
     setExpiryEnabled(initialValues?.expiryEnabled ?? true);
     setExpiryDate(initialValues?.expiryDate ?? formatDate(defaultExpiry));
     setExpiryTime(initialValues?.expiryTime ?? formatTime(now));
-    setWarningDays(3);
+    setWarningDays(initialValues?.expiryWarningDays ?? 3);
     setRestockEnabled(initialValues?.restockEnabled ?? false);
     setMinimumQuantity(initialValues?.restockMinimumQuantity ?? 1);
     setTargetQuantity(initialValues?.restockTargetQuantity ?? 2);
@@ -343,8 +346,8 @@ export function InventoryEntryFlow({
         unit,
       },
       // Arthur: NarIyirm
-      // 中文：提醒提前天数先留在提交对象中；后端接入时需用新 migration 增加字段，不能改已部署的初始 migration。
-      // EN: Warning days stay in the submission contract; backend integration needs a new migration rather than editing the deployed initial migration.
+      // 中文：把用户选择的临期提前天数随批次资料提交；关闭有效期时发送 null 以同步停用该批次的本地提醒。
+      // EN: Submit the selected expiry lead time with batch details; send null when expiry is disabled to stop that batch's local reminder.
       expiryWarningDays: expiryEnabled ? warningDays : null,
       restockRule: restockEnabled ? {
         enabled: true,
@@ -367,30 +370,13 @@ export function InventoryEntryFlow({
     }
   }, [categoryCode, copy.validation, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, onClose, onSubmit, price, quantity, restockEnabled, source, storageZone, suggestion, targetQuantity, unit, validateBasics, warningDays]);
 
-  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 47;
+  const topInset = presentation === 'embedded' ? 0 : Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 47;
   const unitLabel = copy.units[unit];
 
   return (
-    <Modal
-      animationType={reduceMotion ? 'fade' : 'slide'}
-      onRequestClose={onClose}
-      presentationStyle="overFullScreen"
-      statusBarTranslucent
-      transparent
-      visible={visible}
-    >
-      {/* Arthur: NarIyirm
-          中文：iOS 显示原生毛玻璃；Android 仅在 Android 12 以上启用真实模糊，旧设备保持相同的半透明材质以避免性能波动。
-          EN: iOS uses native glass; Android enables real blur only on Android 12+, while older devices keep the same translucent material to avoid performance swings. */}
-      <BlurView
-        blurMethod="dimezisBlurViewSdk31Plus"
-        blurTarget={blurTarget}
-        intensity={Platform.OS === 'ios' ? 56 : 34}
-        tint="systemUltraThinMaterialLight"
-        style={styles.frostedBackdrop}
-      >
+    <InventoryEntryPresentation blurTarget={blurTarget} onClose={onClose} presentation={presentation} reduceMotion={reduceMotion} visible={visible}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalRoot}>
-          <View style={[styles.header, { paddingTop: topInset + 8 }]}>
+          <View style={[styles.header, presentation === 'embedded' && styles.embeddedHeader, { paddingTop: topInset + 8 }]}>
             <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.headerButton, pressed ? styles.pressed : null]}>
               <Text style={styles.headerButtonText}>{copy.cancel}</Text>
             </Pressable>
@@ -530,6 +516,29 @@ export function InventoryEntryFlow({
             {saveError ? <Text style={styles.footerError}>{saveError}</Text> : null}
           </View>
         </KeyboardAvoidingView>
+    </InventoryEntryPresentation>
+  );
+}
+
+function InventoryEntryPresentation({ blurTarget, children, onClose, presentation, reduceMotion, visible }: {
+  blurTarget?: RefObject<View | null>;
+  children: ReactNode;
+  onClose: () => void;
+  presentation: 'embedded' | 'modal';
+  reduceMotion: boolean;
+  visible: boolean;
+}) {
+  if (presentation === 'embedded') {
+    return visible ? <View style={styles.embeddedBackdrop}>{children}</View> : null;
+  }
+
+  return (
+    <Modal animationType={reduceMotion ? 'fade' : 'slide'} onRequestClose={onClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible={visible}>
+      {/* Arthur: NarIyirm
+          中文：独立新增流程使用全屏毛玻璃；详情内编辑则复用已有抽屉，不创建第二个原生 Modal。
+          EN: Standalone creation uses a full-screen glass surface, while detail editing reuses its existing sheet instead of presenting a second native Modal. */}
+      <BlurView blurMethod="dimezisBlurViewSdk31Plus" blurTarget={blurTarget} intensity={Platform.OS === 'ios' ? 56 : 34} tint="systemUltraThinMaterialLight" style={styles.frostedBackdrop}>
+        {children}
       </BlurView>
     </Modal>
   );
@@ -579,8 +588,10 @@ function ChoiceChip({
 
 const styles = StyleSheet.create({
   frostedBackdrop: { flex: 1, backgroundColor: 'rgba(236, 243, 240, 0.54)' },
+  embeddedBackdrop: { flex: 1, backgroundColor: '#F7F9F8' },
   modalRoot: { flex: 1 },
   header: { minHeight: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 12, backgroundColor: 'rgba(250, 252, 250, 0.46)' },
+  embeddedHeader: { minHeight: 64, paddingBottom: 8, backgroundColor: '#F7F9F8' },
   headerButton: { minWidth: 74, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15, borderRadius: 22, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   headerButtonText: { color: '#263C34', fontSize: 15, fontWeight: '700' },
   headerTitleWrap: { position: 'absolute', right: 94, bottom: 16, left: 94, alignItems: 'center' },

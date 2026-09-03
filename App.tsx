@@ -16,6 +16,7 @@ import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { ProfileScreen } from './src/components/ProfileScreen';
+import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
 import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
@@ -81,6 +82,8 @@ function KitchMemoApp() {
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
+  const notificationNavigationReadyRef = useRef(false);
+  const pendingSystemNotificationRef = useRef<{ notificationId?: string } | null>(null);
   const chromeOpacity = useRef(new Animated.Value(1)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
   const screenScale = useRef(new Animated.Value(1)).current;
@@ -331,16 +334,38 @@ function KitchMemoApp() {
     handleCinematicNavigate('notifications');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
-  useEffect(() => {
-    const openFromSystem = (notificationId?: string) => {
-      setNotificationReturnTab('home');
-      setNotificationTargetId(notificationId ?? null);
-      setActiveTab('notifications');
-    };
-    const subscription = addSystemNotificationResponseListener(openFromSystem);
-    void openLastSystemNotification(openFromSystem);
-    return () => subscription.remove();
+  const openSystemNotification = useCallback((notificationId?: string) => {
+    setNotificationReturnTab('home');
+    setNotificationTargetId(notificationId ?? null);
+    setActiveTab('notifications');
   }, []);
+
+  const queueOrOpenSystemNotification = useCallback((notificationId?: string) => {
+    if (!notificationNavigationReadyRef.current) {
+      pendingSystemNotificationRef.current = { notificationId };
+      return;
+    }
+    openSystemNotification(notificationId);
+  }, [openSystemNotification]);
+
+  useEffect(() => {
+    const subscription = addSystemNotificationResponseListener(queueOrOpenSystemNotification);
+    void openLastSystemNotification(queueOrOpenSystemNotification);
+    return () => subscription.remove();
+  }, [queueOrOpenSystemNotification]);
+
+  useEffect(() => {
+    const navigationReady = !isOpening && firstUseJourneyState === 'complete';
+    notificationNavigationReadyRef.current = navigationReady;
+    if (!navigationReady || !pendingSystemNotificationRef.current) return;
+
+    // Arthur: NarIyirm
+    // 中文：冷启动通知会先排队，等待开场动画和首次引导全部结束后才打开通知详情，避免弹窗覆盖加载过程。
+    // EN: Cold-start notification navigation waits until the opener and first-use journey finish so its detail cannot cover app loading.
+    const pending = pendingSystemNotificationRef.current;
+    pendingSystemNotificationRef.current = null;
+    openSystemNotification(pending.notificationId);
+  }, [firstUseJourneyState, isOpening, openSystemNotification]);
 
   const completeFirstUseJourney = useCallback(() => {
     setFirstUseJourneyState('complete');
@@ -397,11 +422,19 @@ function KitchMemoApp() {
               }}
             />
           ) : activeTab === 'profile' ? (
-            <ProfileScreen onOpenNotifications={() => {
-              setNotificationReturnTab('profile');
-              setNotificationTargetId(null);
-              setActiveTab('notifications');
-            }} />
+            <ProfileScreen
+              onOpenNotifications={() => {
+                setNotificationReturnTab('profile');
+                setNotificationTargetId(null);
+                setActiveTab('notifications');
+              }}
+              onReplayOnboarding={() => {
+                // Arthur: NarIyirm
+                // 中文：个人页重播只切换当前会话的引导状态，不清除首次完成标记或任何业务数据。
+                // EN: Profile replay changes only the current session's journey state without clearing completion or business data.
+                setFirstUseJourneyState('pending');
+              }}
+            />
           ) : activeTab !== 'home' ? (
             <>
               <View style={styles.glow} />
@@ -435,6 +468,10 @@ function KitchMemoApp() {
           ) : null}
           <FloatingTabBar
             activeTab={activeTab}
+            // Arthur: NarIyirm
+            // 中文：主页底部安全区与按时间插值的 3D 天空共用颜色，其他页面仍使用稳定的浅色导航底座。
+            // EN: Home shares the time-interpolated 3D sky colour with the bottom safe area while other screens keep a stable light navigation base.
+            bottomMaskColor={activeTab === 'home' ? kitchenLighting.background : '#F7FBFA'}
             onChange={(tab) => {
               if (tab === 'fridge') setFridgeFocusFilter(null);
               setActiveTab(tab);
@@ -466,7 +503,9 @@ export default function App() {
   return (
     <RealtimeSyncProvider>
       <I18nProvider>
-        <KitchMemoApp />
+        <ProfileDataProvider>
+          <KitchMemoApp />
+        </ProfileDataProvider>
       </I18nProvider>
     </RealtimeSyncProvider>
   );

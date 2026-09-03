@@ -31,6 +31,14 @@ function asNumber(value) {
 }
 
 // Arthur: NarIyirm
+// 中文：没有有效期时关闭批次提醒；旧版 App 未提交提前天数时沿用历史默认值 3，避免 API 发布造成兼容性中断。
+// EN: Disable batch reminders without an expiry; preserve the historical default of 3 for older app builds that omit the lead time.
+function getExpiryWarningDays(body) {
+  if (body.expiresAt == null) return null;
+  return body.expiryWarningDays === undefined ? 3 : asNumber(body.expiryWarningDays);
+}
+
+// Arthur: NarIyirm
 // 中文：库存写入成功后创建共享事件并等待系统通知投递；通知失败不会把已提交的库存操作伪装成失败。
 // EN: After a successful inventory write, create the shared event and await system delivery; notification failure never misrepresents the committed inventory action as failed.
 async function notifySharedInventory(deviceId, batchUid, action) {
@@ -108,7 +116,7 @@ async function getInventorySnapshot(deviceId) {
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
     supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
     supabase.from('food_categories').select('category_uid, name, system_code, colour, icon').eq('fridge_uid', fridgeUid).order('created_at'),
-    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
+    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
     supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
   ]);
 
@@ -152,6 +160,7 @@ async function getInventorySnapshot(deviceId) {
         categoryCode: categoryByUid.get(batch.category_uid)?.system_code ?? 'other',
         currency: batch.currency,
         expiresAt: batch.expires_at,
+        expiryWarningDays: batch.expiry_warning_days,
         id: batch.batch_uid,
         iconEmoji: preset?.icon_emoji ?? null,
         iconUrl: getPresetIconUrl(preset?.icon_path),
@@ -178,7 +187,7 @@ async function getInventoryBatchDetail(deviceId, batchUid) {
   const fridgeUid = await resolveFridge(deviceId);
   const batchResult = await supabase
     .from('inventory_batches')
-    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, opened_at, lifecycle_state, version')
+    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version')
     .eq('fridge_uid', fridgeUid)
     .eq('batch_uid', batchUid)
     .eq('lifecycle_state', 'active')
@@ -220,6 +229,7 @@ async function getInventoryBatchDetail(deviceId, batchUid) {
     categoryName: categoryResult.data?.name ?? 'Other',
     currency: batch.currency,
     expiresAt: batch.expires_at,
+    expiryWarningDays: batch.expiry_warning_days,
     id: batch.batch_uid,
     iconEmoji: presetResult.data?.icon_emoji ?? null,
     iconUrl: getPresetIconUrl(presetResult.data?.icon_path),
@@ -343,6 +353,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   const remainingQuantity = asNumber(body.remainingQuantity);
   const purchasePrice = body.purchasePrice === null || body.purchasePrice === undefined ? null : asNumber(body.purchasePrice);
   const expectedVersion = asNumber(body.expectedVersion);
+  const expiryWarningDays = getExpiryWarningDays(body);
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
   if (!name || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
@@ -356,6 +367,9 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
     return sendInvalidRequest(response, 'Expiry time is invalid.');
   }
+  if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
+    return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
+  }
 
   try {
     const { error } = await supabase.rpc('update_inventory_batch_details', {
@@ -364,6 +378,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
       p_device_id: deviceId,
       p_expected_version: expectedVersion,
       p_expires_at: body.expiresAt ?? null,
+      p_expiry_warning_days: expiryWarningDays,
       p_name: name,
       p_purchase_price: purchasePrice,
       p_remaining_quantity: remainingQuantity,
@@ -551,6 +566,7 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   const restockMinimum = hasRestock ? asNumber(restock.minimumQuantity) : null;
   const restockTarget = hasRestock ? asNumber(restock.targetQuantity) : null;
   const presetUid = body.presetUid === null || body.presetUid === undefined ? null : body.presetUid;
+  const expiryWarningDays = getExpiryWarningDays(body);
 
   if (!name || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
     return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
@@ -561,6 +577,9 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
     return sendInvalidRequest(response, 'Expiry time is invalid.');
+  }
+  if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
+    return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
   }
   if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockTarget <= restockMinimum)) {
     return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
@@ -575,6 +594,7 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
       p_currency: 'AUD',
       p_device_id: deviceId,
       p_expires_at: body.expiresAt ?? null,
+      p_expiry_warning_days: expiryWarningDays,
       p_initial_quantity: quantity,
       p_name: name,
       p_purchase_price: purchasePrice,

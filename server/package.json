@@ -8,6 +8,7 @@
     "dev": "node src/index.js",
     "start": "node src/index.js",
     "verify:notification-preferences": "node scripts/verify-notification-preferences.js",
+    "verify:expiry-warning-days": "node scripts/verify-expiry-warning-days.js",
     "verify:api-security": "node scripts/verify-api-security.js",
     "verify:api-security:live": "node scripts/verify-api-security.js --live",
     "verify:profile": "node scripts/verify-profile.js",

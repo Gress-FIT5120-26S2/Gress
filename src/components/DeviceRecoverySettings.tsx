@@ -12,7 +12,7 @@ type PendingAction = 'create' | 'restore' | null;
 // Arthur: NarIyirm
 // 中文：设置页的设备恢复入口；上游由 Profile 设置挂载，下游调用 sharingApi 生成一次性码或转移旧设备身份。
 // EN: This is the settings recovery surface; Profile settings mount it and sharingApi either creates a one-time code or transfers the old device identity.
-export function DeviceRecoverySettings({ active }: { active: boolean }) {
+export function DeviceRecoverySettings({ active, onContentChange }: { active: boolean; onContentChange?: () => void }) {
   const { t } = useI18n();
   const copy = t.settings.sharing;
   const [configured, setConfigured] = useState(false);
@@ -44,8 +44,9 @@ export function DeviceRecoverySettings({ active }: { active: boolean }) {
       const result = await createDeviceRecoveryCode();
       setRecoveryCode(result.recoveryCode);
       setConfigured(true);
+      onContentChange?.();
     });
-  }, [run]);
+  }, [onContentChange, run]);
 
   const restore = useCallback(() => {
     const code = restoreCode.trim();
@@ -59,10 +60,11 @@ export function DeviceRecoverySettings({ active }: { active: boolean }) {
           setRecoveryCode(result.recoveryCode);
           setRestoreCode('');
           setConfigured(true);
+          onContentChange?.();
         }),
       },
     ]);
-  }, [copy, restoreCode, run]);
+  }, [copy, onContentChange, restoreCode, run]);
 
   return (
     <View style={styles.root}>

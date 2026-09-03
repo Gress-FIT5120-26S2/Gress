@@ -23,7 +23,6 @@ const CHANNEL_ID = 'kitchmemo-reminders';
 const INACTIVITY_NOTIFICATION_KEY = '@kitchmemo/inactivity-notification-id';
 const EXPIRY_NOTIFICATION_KEY = '@kitchmemo/expiry-notification-map';
 const INACTIVITY_DAYS = 7;
-const EXPIRY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_EXPIRY_REMINDERS = 32;
 
 // 中文：不要从 expo-notifications 入口导入。入口会执行 DevicePushTokenAutoRegistration，在 Android Expo Go 里直接红屏。
@@ -146,12 +145,12 @@ export async function scheduleInactivityReminder(preferences: NotificationPrefer
 }
 
 // Arthur: NarIyirm
-// 中文：每个有效批次只保留一条按“到期前三天”触发的本地系统提醒；日期变化、移除库存或关闭提醒时会精确取消旧任务。
-// EN: Keep one local system reminder per active batch at three days before expiry, precisely cancelling it when the date changes, stock is removed, or reminders are disabled.
+// 中文：每个有效批次按其保存的提前天数保留一条本地提醒；日期或提前天数变化时会取消并重建旧任务。
+// EN: Keep one local reminder per active batch using its saved lead time, rebuilding it whenever the expiry date or lead time changes.
 export async function scheduleExpiryReminders(batches: InventoryBatch[], preferences: NotificationPreferences, language: AppLanguage) {
   if (Platform.OS === 'web') return;
   const stored = await AsyncStorage.getItem(EXPIRY_NOTIFICATION_KEY);
-  let previous: Record<string, { expiresAt: string; identifier: string }> = {};
+  let previous: Record<string, { expiresAt: string; expiryWarningDays: number; identifier: string }> = {};
   try {
     const parsed = stored ? JSON.parse(stored) : {};
     previous = parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed : {};
@@ -173,7 +172,7 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
 
   for (const [batchId, entry] of Object.entries(previous)) {
     const batch = upcomingById.get(batchId);
-    if (batch?.expiresAt === entry.expiresAt) continue;
+    if (batch?.expiresAt === entry.expiresAt && batch.expiryWarningDays === entry.expiryWarningDays) continue;
     await cancelScheduledNotificationAsync(entry.identifier).catch(() => undefined);
     delete previous[batchId];
   }
@@ -184,9 +183,11 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
 
   const useChannel = await ensureAndroidChannel();
   for (const batch of upcoming) {
-    if (!batch.expiresAt || previous[batch.id]?.expiresAt === batch.expiresAt) continue;
+    if (!batch.expiresAt || batch.expiryWarningDays === null) continue;
+    const previousEntry = previous[batch.id];
+    if (previousEntry?.expiresAt === batch.expiresAt && previousEntry.expiryWarningDays === batch.expiryWarningDays) continue;
     const expiryAt = new Date(batch.expiresAt);
-    const ideal = new Date(expiryAt.getTime() - EXPIRY_WINDOW_MS);
+    const ideal = new Date(expiryAt.getTime() - batch.expiryWarningDays * 24 * 60 * 60 * 1000);
     const triggerDate = afterQuietHours(new Date(Math.max(ideal.getTime(), Date.now() + 5_000)), preferences);
     if (triggerDate >= expiryAt) continue;
     const copy = expiryCopy(language, batch.name);
@@ -203,7 +204,7 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
         ...(useChannel ? { channelId: CHANNEL_ID } : {}),
       },
     });
-    previous[batch.id] = { expiresAt: batch.expiresAt, identifier };
+    previous[batch.id] = { expiresAt: batch.expiresAt, expiryWarningDays: batch.expiryWarningDays, identifier };
   }
   await AsyncStorage.setItem(EXPIRY_NOTIFICATION_KEY, JSON.stringify(previous));
 }

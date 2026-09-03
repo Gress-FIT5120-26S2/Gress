@@ -33,6 +33,12 @@ const zh = {
     enter: '进入我的厨房',
     features: { inventory: '记住库存', useFirst: '先用快到期的', restock: '只补真正需要的' },
     pages: {
+      language: {
+        eyebrow: '欢迎来到 KitchMemo',
+        title: '选择你的语言\nChoose your language',
+        body: '此选择会用于整个应用，之后也可以在“我的”页面中更改。\nThis choice applies throughout the app and can be changed later in Profile.',
+        sceneLabel: '',
+      },
       problem: {
         eyebrow: '为什么做 KitchMemo',
         title: '食材不是突然浪费的，它只是被忘记了。',
@@ -548,7 +554,8 @@ const zh = {
   profile: {
     eyebrow: '我的厨房',
     greeting: (name: string) => `你好，${name}`,
-    defaultName: '厨房成员',
+    greetingWithoutName: '你好',
+    nameNotSet: '设置昵称',
     editProfile: '编辑资料',
     sharedFridge: (name: string, count: number) => `${name} · ${count} 位成员`,
     personalFridge: (name: string) => `${name} · 个人冰箱`,
@@ -593,6 +600,11 @@ const zh = {
       footer: '这些选择只影响当前设备，不会改变其他共享成员的通知。共享动态开关已准备好，会在共享库存事件上线后生效。',
     },
     languageTitle: '语言',
+    replayOnboardingTitle: '重新查看新手引导',
+    replayOnboardingDetail: '从语言选择页开始，再次浏览完整介绍',
+    replayOnboardingConfirmBody: '这只会重新播放引导，不会清除冰箱、设置或通知记录。',
+    replayOnboardingCancel: '取消',
+    replayOnboardingConfirm: '开始引导',
     tastePlaceholderTitle: '我的口味与忌口',
     tastePlaceholderDetail: '功能预留，暂不影响购物或食材建议',
     tastePlaceholderBody: '这个入口已经为未来的个人智能建议保留，目前不会保存偏好，也不会改变共享补货结果。',
@@ -709,6 +721,12 @@ const en: Translation = {
     enter: 'Enter my kitchen',
     features: { inventory: 'Remember inventory', useFirst: 'Use dated food first', restock: 'Restock only what is needed' },
     pages: {
+      language: {
+        eyebrow: 'WELCOME TO KITCHMEMO',
+        title: 'Choose your language\n选择你的语言',
+        body: 'This choice applies throughout the app and can be changed later in Profile.\n此选择会用于整个应用，之后也可以在“我的”页面中更改。',
+        sceneLabel: '',
+      },
       problem: {
         eyebrow: 'WHY KITCHMEMO EXISTS',
         title: 'Food is not suddenly wasted. It is simply forgotten.',
@@ -1224,7 +1242,8 @@ const en: Translation = {
   profile: {
     eyebrow: 'MY KITCHEN',
     greeting: (name: string) => `Hello, ${name}`,
-    defaultName: 'Kitchen member',
+    greetingWithoutName: 'Hello',
+    nameNotSet: 'Set a display name',
     editProfile: 'Edit profile',
     sharedFridge: (name: string, count: number) => `${name} · ${count} member${count === 1 ? '' : 's'}`,
     personalFridge: (name: string) => `${name} · Personal fridge`,
@@ -1269,6 +1288,11 @@ const en: Translation = {
       footer: 'These choices affect only this device, not other shared members. Shared activity is ready here and will take effect when shared inventory events launch.',
     },
     languageTitle: 'Language',
+    replayOnboardingTitle: 'Replay onboarding',
+    replayOnboardingDetail: 'Start at language selection and view the full introduction again',
+    replayOnboardingConfirmBody: 'This only replays onboarding. It will not clear your fridge, settings, or notification history.',
+    replayOnboardingCancel: 'Cancel',
+    replayOnboardingConfirm: 'Start onboarding',
     tastePlaceholderTitle: 'Tastes & avoidances',
     tastePlaceholderDetail: 'Reserved for later and does not affect shopping suggestions',
     tastePlaceholderBody: 'This entry is reserved for future personal suggestions. It does not save preferences or change shared restock results yet.',
