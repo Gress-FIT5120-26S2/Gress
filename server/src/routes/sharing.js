@@ -4,8 +4,6 @@ import { supabase } from '../supabase.js';
 
 const router = express.Router();
 const INVITE_ALPHABET = '23456789ABCDEFGHJKLMNPQRSTUVWXYZ';
-const RECOVERY_WINDOW_MS = 15 * 60 * 1000;
-const recoveryAttempts = new Map();
 
 function digest(value) {
   return createHash('sha256').update(value, 'utf8').digest('hex');
@@ -227,19 +225,6 @@ export async function recoverDeviceRoute(request, response) {
     return response.status(400).json({ error: 'invalid_recovery_code' });
   }
 
-  // Arthur: NarIyirm
-  // 中文：恢复码是唯一绕过旧设备凭证的入口；按来源与新设备限制尝试次数，成功后立即清除计数并轮换恢复码。
-  // EN: Recovery is the only route bypassing the old device credential; attempts are limited per source and new device, then cleared and rotated on success.
-  const attemptKey = `${request.ip}:${deviceId}`;
-  const now = Date.now();
-  const attempt = recoveryAttempts.get(attemptKey);
-  const currentAttempt = !attempt || attempt.resetAt <= now
-    ? { count: 0, resetAt: now + RECOVERY_WINDOW_MS }
-    : attempt;
-  if (currentAttempt.count >= 5) return response.status(429).json({ error: 'recovery_rate_limited' });
-  currentAttempt.count += 1;
-  recoveryAttempts.set(attemptKey, currentAttempt);
-
   const nextRecoveryCode = randomReadableCode(5, 5);
   const { data: fridgeUid, error } = await supabase.rpc('recover_device', {
     p_new_credential_digest: digest(deviceCredential),
@@ -251,7 +236,6 @@ export async function recoverDeviceRoute(request, response) {
 
   try {
     const context = await readContext(deviceId, fridgeUid);
-    recoveryAttempts.delete(attemptKey);
     return response.json({ ...context, recoveryCode: nextRecoveryCode });
   } catch (contextError) {
     return sharingError(response, contextError);

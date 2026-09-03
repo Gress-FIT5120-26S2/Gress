@@ -122,9 +122,10 @@ vercel env run -e production -- npm run backfill:preset-icons
 
 脚本只处理启用且 `icon_path` 仍为空的 preset，每条成功后立即保存，可以在中断后安全重跑。首次执行应先观察少量日志和 Cloudflare 用量，再决定是否完成整批。
 
-## 8. 上线前必须补充的保护
+## 8. 生产保护
 
-- 当前 AI 生成限流是进程内限流；Vercel 多实例之间不共享。公开上线前应增加 Vercel Firewall、网关或数据库级全局限流。
+- API 全局限流及恢复、邀请码加入、图片识别、AI 生成的敏感路由限流由 Supabase 原子桶跨 Vercel 实例共享；拒绝响应必须保留 `429`、`Retry-After` 与 `RateLimit-*` headers。
+- 浏览器请求只允许 `CORS_ALLOWED_ORIGINS` 中精确列出的来源；原生 App 不发送 `Origin`。新增 Web 客户端域名时必须先更新白名单再重新部署。
 - 为 Gemini、Cloudflare 和 Vercel 设置用量/预算告警。
 - 保留手动填写库存建议及 Emoji fallback，使免费额度耗尽或 AI 服务失败时仍可保存食材。
 - 监控 AI 请求成功率、延迟、429、上游 5xx 和 icon Storage 上传失败，但不要记录密钥或完整设备凭证。

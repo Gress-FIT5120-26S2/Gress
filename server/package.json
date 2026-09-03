@@ -8,6 +8,8 @@
     "dev": "node src/index.js",
     "start": "node src/index.js",
     "verify:notification-preferences": "node scripts/verify-notification-preferences.js",
+    "verify:api-security": "node scripts/verify-api-security.js",
+    "verify:api-security:live": "node scripts/verify-api-security.js --live",
     "verify:profile": "node scripts/verify-profile.js",
     "verify:shared-notifications": "node scripts/verify-shared-notifications.js",
     "verify:sharing": "node scripts/verify-sharing.js",

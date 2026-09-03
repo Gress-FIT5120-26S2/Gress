@@ -45,3 +45,4 @@ server/.env.production
 # generated native folders
 /ios
 /android
+.vercel
