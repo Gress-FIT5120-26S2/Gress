@@ -381,7 +381,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#2e7d32',
     borderRadius: 10,
   },
-  addBtnText: { color: '#fff', fontWeight: '700' },
+  addBtnText: {width:'100%', textAlign:'center', color: '#fff', fontWeight: '700' },
   checkoutBtn: {
     flex: 1,
     height: 44,
@@ -390,7 +390,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FF812B',
     borderRadius: 10,
   },
-  checkoutText: { color: '#fff', fontWeight: '700' },
+  checkoutText: {width:'100%', textAlign:'center', color: '#fff', fontWeight: '700' },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -431,5 +431,5 @@ const styles = StyleSheet.create({
     flex: 1, height: 44, justifyContent: 'center', alignItems: 'center',
     backgroundColor: '#168ACB', borderRadius: 10,
   },
-  peekText: { color: '#fff', fontWeight: '700', fontSize: 13 },
+  peekText: {width:'100%', textAlign:'center', color: '#fff', fontWeight: '700', fontSize: 13 },
 });
