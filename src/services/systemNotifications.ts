@@ -1,6 +1,19 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isRunningInExpoGo } from 'expo';
 import Constants from 'expo-constants';
-import * as Notifications from 'expo-notifications';
+import { cancelScheduledNotificationAsync } from 'expo-notifications/build/cancelScheduledNotificationAsync';
+import { AndroidImportance } from 'expo-notifications/build/NotificationChannelManager.types';
+import { getPermissionsAsync, requestPermissionsAsync } from 'expo-notifications/build/NotificationPermissions';
+import { SchedulableTriggerInputTypes } from 'expo-notifications/build/Notifications.types';
+import {
+  addNotificationResponseReceivedListener,
+  clearLastNotificationResponseAsync,
+  getLastNotificationResponseAsync,
+} from 'expo-notifications/build/NotificationsEmitter';
+import { setNotificationHandler } from 'expo-notifications/build/NotificationsHandler';
+import { scheduleNotificationAsync } from 'expo-notifications/build/scheduleNotificationAsync';
+import { setBadgeCountAsync } from 'expo-notifications/build/setBadgeCountAsync';
+import { setNotificationChannelAsync } from 'expo-notifications/build/setNotificationChannelAsync';
 import { Platform } from 'react-native';
 import type { AppLanguage } from '../i18n';
 import type { InventoryBatch } from './inventoryApi';
@@ -13,7 +26,11 @@ const INACTIVITY_DAYS = 7;
 const EXPIRY_WINDOW_MS = 3 * 24 * 60 * 60 * 1000;
 const MAX_EXPIRY_REMINDERS = 32;
 
-Notifications.setNotificationHandler({
+// 中文：不要从 expo-notifications 入口导入。入口会执行 DevicePushTokenAutoRegistration，在 Android Expo Go 里直接红屏。
+// EN: Do not import the expo-notifications barrel. It runs DevicePushTokenAutoRegistration and throws in Android Expo Go.
+const isAndroidExpoGo = Platform.OS === 'android' && isRunningInExpoGo();
+
+setNotificationHandler({
   handleNotification: async () => ({
     shouldPlaySound: true,
     shouldSetBadge: true,
@@ -23,14 +40,21 @@ Notifications.setNotificationHandler({
 });
 
 async function ensureAndroidChannel() {
-  if (Platform.OS !== 'android') return;
-  await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-    name: 'KitchMemo reminders',
-    importance: Notifications.AndroidImportance.HIGH,
-    vibrationPattern: [0, 180, 100, 180],
-    lightColor: '#F58220',
-    sound: 'default',
-  });
+  // 中文：Android Expo Go 的 NotificationChannel 原生 provider 为空，调用会 NPE；开发构建里再创建自定义频道。
+  // EN: Android Expo Go's notification-channel provider is null and NPEs; create the custom channel only in a dev/production build.
+  if (Platform.OS !== 'android' || isAndroidExpoGo) return false;
+  try {
+    await setNotificationChannelAsync(CHANNEL_ID, {
+      name: 'KitchMemo reminders',
+      importance: AndroidImportance.HIGH,
+      vibrationPattern: [0, 180, 100, 180],
+      lightColor: '#F58220',
+      sound: 'default',
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 function projectId() {
@@ -40,10 +64,12 @@ function projectId() {
 }
 
 async function registerPushToken(language: AppLanguage) {
+  if (isAndroidExpoGo) return false;
   const easProjectId = projectId();
   if (!easProjectId || (Platform.OS !== 'ios' && Platform.OS !== 'android')) return false;
   try {
-    const token = await Notifications.getExpoPushTokenAsync({ projectId: easProjectId });
+    const { getExpoPushTokenAsync } = await import('expo-notifications/build/getExpoPushTokenAsync');
+    const token = await getExpoPushTokenAsync({ projectId: easProjectId });
     await registerNotificationDelivery(token.data, Platform.OS, language);
     return true;
   } catch {
@@ -84,7 +110,7 @@ function afterQuietHours(date: Date, preferences: NotificationPreferences) {
 async function cancelInactivityReminder() {
   const identifier = await AsyncStorage.getItem(INACTIVITY_NOTIFICATION_KEY);
   if (!identifier) return;
-  await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => undefined);
+  await cancelScheduledNotificationAsync(identifier).catch(() => undefined);
   await AsyncStorage.removeItem(INACTIVITY_NOTIFICATION_KEY);
 }
 
@@ -98,11 +124,11 @@ export async function scheduleInactivityReminder(preferences: NotificationPrefer
       || !preferences.systemEnabled
       || !preferences.systemDeliveryEnabled) return;
 
-  const permission = await Notifications.getPermissionsAsync();
+  const permission = await getPermissionsAsync();
   if (permission.status !== 'granted') return;
-  await ensureAndroidChannel();
+  const useChannel = await ensureAndroidChannel();
   const copy = notificationCopy(language);
-  const identifier = await Notifications.scheduleNotificationAsync({
+  const identifier = await scheduleNotificationAsync({
     content: {
       title: copy.title,
       body: copy.body,
@@ -110,10 +136,10 @@ export async function scheduleInactivityReminder(preferences: NotificationPrefer
       sound: 'default',
     },
     trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
+      type: SchedulableTriggerInputTypes.TIME_INTERVAL,
       seconds: INACTIVITY_DAYS * 24 * 60 * 60,
       repeats: false,
-      channelId: CHANNEL_ID,
+      ...(useChannel ? { channelId: CHANNEL_ID } : {}),
     },
   });
   await AsyncStorage.setItem(INACTIVITY_NOTIFICATION_KEY, identifier);
@@ -132,7 +158,7 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
   } catch {
     previous = {};
   }
-  const permission = await Notifications.getPermissionsAsync();
+  const permission = await getPermissionsAsync();
   const enabled = permission.status === 'granted'
     && preferences.notificationsEnabled
     && preferences.expiringEnabled
@@ -148,7 +174,7 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
   for (const [batchId, entry] of Object.entries(previous)) {
     const batch = upcomingById.get(batchId);
     if (batch?.expiresAt === entry.expiresAt) continue;
-    await Notifications.cancelScheduledNotificationAsync(entry.identifier).catch(() => undefined);
+    await cancelScheduledNotificationAsync(entry.identifier).catch(() => undefined);
     delete previous[batchId];
   }
   if (!enabled) {
@@ -156,7 +182,7 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
     return;
   }
 
-  await ensureAndroidChannel();
+  const useChannel = await ensureAndroidChannel();
   for (const batch of upcoming) {
     if (!batch.expiresAt || previous[batch.id]?.expiresAt === batch.expiresAt) continue;
     const expiryAt = new Date(batch.expiresAt);
@@ -164,14 +190,18 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
     const triggerDate = afterQuietHours(new Date(Math.max(ideal.getTime(), Date.now() + 5_000)), preferences);
     if (triggerDate >= expiryAt) continue;
     const copy = expiryCopy(language, batch.name);
-    const identifier = await Notifications.scheduleNotificationAsync({
+    const identifier = await scheduleNotificationAsync({
       content: {
         title: copy.title,
         body: copy.body,
         data: { batchUid: batch.id, screen: 'notifications', source: 'expiring' },
         sound: 'default',
       },
-      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: triggerDate, channelId: CHANNEL_ID },
+      trigger: {
+        type: SchedulableTriggerInputTypes.DATE,
+        date: triggerDate,
+        ...(useChannel ? { channelId: CHANNEL_ID } : {}),
+      },
     });
     previous[batch.id] = { expiresAt: batch.expiresAt, identifier };
   }
@@ -181,9 +211,9 @@ export async function scheduleExpiryReminders(batches: InventoryBatch[], prefere
 export async function enableSystemNotificationDelivery(language: AppLanguage) {
   if (Platform.OS === 'web') return { granted: false, tokenRegistered: false };
   await ensureAndroidChannel();
-  let permission = await Notifications.getPermissionsAsync();
+  let permission = await getPermissionsAsync();
   if (permission.status !== 'granted') {
-    permission = await Notifications.requestPermissionsAsync({
+    permission = await requestPermissionsAsync({
       ios: { allowAlert: true, allowBadge: true, allowSound: true },
     });
   }
@@ -196,7 +226,7 @@ export async function refreshSystemNotificationDelivery(preferences: Notificatio
     await cancelInactivityReminder();
     return;
   }
-  const permission = await Notifications.getPermissionsAsync();
+  const permission = await getPermissionsAsync();
   if (permission.status !== 'granted') return;
   await ensureAndroidChannel();
   await registerPushToken(language);
@@ -204,19 +234,19 @@ export async function refreshSystemNotificationDelivery(preferences: Notificatio
 }
 
 export const setSystemNotificationBadge = (count: number) =>
-  Platform.OS === 'web' ? Promise.resolve(false) : Notifications.setBadgeCountAsync(Math.max(0, count));
+  Platform.OS === 'web' ? Promise.resolve(false) : setBadgeCountAsync(Math.max(0, count));
 
 export const addSystemNotificationResponseListener = (onOpenNotifications: (notificationId?: string) => void) =>
-  Notifications.addNotificationResponseReceivedListener((response) => {
+  addNotificationResponseReceivedListener((response) => {
     const data = response.notification.request.content.data;
     if (data?.screen === 'notifications') onOpenNotifications(typeof data.notificationId === 'string' ? data.notificationId : undefined);
   });
 
 export async function openLastSystemNotification(onOpenNotifications: (notificationId?: string) => void) {
-  const response = await Notifications.getLastNotificationResponseAsync();
+  const response = await getLastNotificationResponseAsync();
   const data = response?.notification.request.content.data;
   if (data?.screen === 'notifications') {
     onOpenNotifications(typeof data.notificationId === 'string' ? data.notificationId : undefined);
-    await Notifications.clearLastNotificationResponseAsync();
+    await clearLastNotificationResponseAsync();
   }
 }
