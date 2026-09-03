@@ -1,4 +1,3 @@
-import cors from 'cors';
 import express from 'express';
 import { inventoryRouter } from './routes/inventory.js';
 import { recognitionRouter } from './routes/recognition.js';
@@ -9,13 +8,16 @@ import notificationsRouter from './routes/notifications.js';
 import profileRouter from './routes/profile.js';
 import sharingRouter, { recoverDeviceRoute } from './routes/sharing.js';
 import syncRouter from './routes/sync.js';
+import { createCorsPolicy } from './middleware/corsPolicy.js';
+import { databaseRateLimit, getClientIp, rateLimitPolicies } from './middleware/rateLimit.js';
 import { requireDevice } from './middleware/requireDevice.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
-app.use(cors());
+app.use(...createCorsPolicy());
 app.use(express.json());
+app.use('/api', databaseRateLimit(rateLimitPolicies.global, getClientIp));
 
 app.get('/api/health', async (_request, response) => {
   // Arthur: NarIyirm
@@ -34,8 +36,23 @@ app.get('/api/health', async (_request, response) => {
 // Arthur: NarIyirm
 // 中文：恢复入口在常规鉴权前用一次性恢复码自证，兼容 Android 重装后 ID 相同但 SecureStore 凭证已丢失；其它 API 仍必须验证设备凭证。
 // EN: Recovery self-authenticates with a one-time code before normal auth, covering Android reinstalls where the ID remains but SecureStore is lost; all other APIs verify device credentials.
-app.post('/api/devices/recover', recoverDeviceRoute);
+app.post(
+  '/api/devices/recover',
+  databaseRateLimit(
+    rateLimitPolicies.recovery,
+    (request) => `${getClientIp(request)}:${request.get('Device-ID')?.trim() || 'missing-device'}`,
+  ),
+  recoverDeviceRoute,
+);
 app.use('/api', requireDevice);
+app.use(
+  '/api/photo-recognition',
+  databaseRateLimit(rateLimitPolicies.photoRecognition, (request) => request.deviceId),
+);
+app.use(
+  '/api/fridges/join',
+  databaseRateLimit(rateLimitPolicies.fridgeJoin, (request) => request.deviceId),
+);
 app.use('/api', inventoryRouter);
 app.use('/api', cartRouter);
 app.use('/api', restockRouter);

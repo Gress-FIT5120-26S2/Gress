@@ -8,15 +8,13 @@ import {
   generateFoodPresetMetadata,
 } from '../services/foodPresetAi.js';
 import { deliverSharedNotification } from '../services/pushNotifications.js';
+import { consumeRateLimit, rateLimitPolicies } from '../middleware/rateLimit.js';
 
 const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
 const STORAGE_ZONES = new Set(['chilled', 'frozen', 'pantry']);
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESET_ICON_BUCKET = 'food-preset-icons';
-const AI_GENERATION_WINDOW_MS = 60 * 60 * 1000;
-const AI_GENERATION_LIMIT = 5;
-const generationAttemptsByDevice = new Map();
 
 function getDeviceId(request) {
   const deviceId = request.get('Device-ID')?.trim();
@@ -87,22 +85,6 @@ async function getEnabledFoodPresets() {
     .eq('is_enabled', true);
   if (error) throw error;
   return data ?? [];
-}
-
-// Arthur: NarIyirm
-// 中文：免费模型端点仍需防止单个设备反复触发昂贵生成；进程内窗口是第一层保护，生产网关还应配置全局限流。
-// EN: Free model endpoints still need protection from repeated generation by one device; this process-local window is the first layer and production gateways should add global rate limiting.
-function claimGenerationAttempt(deviceId) {
-  const now = Date.now();
-  const activeAttempts = (generationAttemptsByDevice.get(deviceId) ?? [])
-    .filter((attemptedAt) => now - attemptedAt < AI_GENERATION_WINDOW_MS);
-  if (activeAttempts.length >= AI_GENERATION_LIMIT) {
-    generationAttemptsByDevice.set(deviceId, activeAttempts);
-    return false;
-  }
-  activeAttempts.push(now);
-  generationAttemptsByDevice.set(deviceId, activeAttempts);
-  return true;
 }
 
 async function resolveFridge(deviceId) {
@@ -493,9 +475,12 @@ inventoryRouter.post('/food-presets/generate', async (request, response) => {
   try {
     const existingPreset = findPresetMatch(await getEnabledFoodPresets(), inputName);
     if (existingPreset) return response.json({ generated: false, suggestion: toPresetSuggestion(existingPreset) });
-    if (!claimGenerationAttempt(deviceId)) {
-      return response.status(429).json({ message: 'AI generation is limited to five new foods per hour.' });
-    }
+    if (!await consumeRateLimit({
+      identifier: deviceId,
+      policy: rateLimitPolicies.aiGeneration,
+      request,
+      response,
+    })) return undefined;
 
     const metadata = await generateFoodPresetMetadata(inputName);
     const candidates = [inputName, metadata.canonicalName, ...metadata.aliases];

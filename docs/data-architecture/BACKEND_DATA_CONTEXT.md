@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-03（Australia/Sydney）。
+- 最后核对日期：2026-09-04（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 17 份 migration；截至 2026-09-03，开发与生产项目均已应用并通过远程 lint 至 `20260902031000_notification_delivery.sql`，CLI 当前链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续两份迁移。
+- 本地 schema 历史共有 19 份 migration；`20260903010000_api_security_hardening.sql` 新增跨实例 API 限流原子桶/RPC，固定补货函数 `search_path`，收紧 RLS 自动启用函数及未来 public 函数的默认执行权限；`20260904010000_fix_api_rate_limit_timestamp.sql` 修正首版限流函数变量名与 PostgreSQL `CURRENT_TIME` 表达式的冲突。两份 migration 已按顺序在开发项目验证并应用生产项目，两端远程 lint 与限流/补货 RPC 验证均通过。CLI 已恢复链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 应用最新本地 migration 后共有 20 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
@@ -70,6 +70,8 @@ Express API
 - Expo 本地开发使用根目录 `.env.development`，生产构建使用 `.env.production`（或 EAS 的对应环境变量）；两者只设置 `EXPO_PUBLIC_API_URL`。
 - 本地 Express 默认读取 `server/.env.development`；当 `NODE_ENV=production` 时读取 `server/.env.production`。部署平台直接提供的环境变量优先于文件。
 - Express 可用 `FOOD_RECOGNITION_API_URL` 覆盖视觉模型地址；该配置只存在于服务端，App 不直接调用模型。
+- Express 默认拒绝所有带 `Origin` 的浏览器请求；需要网页客户端时必须在 `CORS_ALLOWED_ORIGINS` 中逐项配置完整来源。原生 App 不发送 `Origin`，不受该白名单影响。
+- 所有 `/api` 请求通过 `claim_api_rate_limit` 使用跨 Vercel 实例共享的数据库固定窗口限流；恢复、邀请码加入、图片识别和 AI 生成使用更严格的独立 scope。限流键在 Express 中以服务端密钥 HMAC 后再保存，响应包含 `RateLimit-*`，拒绝时返回 `429` 与 `Retry-After`。
 - AI 预设生成只从 Express 读取 `GEMINI_API_KEY`、`GEMINI_PRESET_MODEL`、`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_AI_API_TOKEN` 和 `CLOUDFLARE_ICON_MODEL`。当前默认文本模型为稳定版 `gemini-3.5-flash-lite`，继续通过受支持的 GenerateContent API 请求结构化输出；这些值不得使用 `EXPO_PUBLIC_` 前缀，App 只调用已鉴权的 Express 接口。
 - Expo Push Token 只由 App 在系统授权后交给 Express，并只保存在 `device_push_tokens`。启用 Expo Push Access Token 安全时，`EXPO_ACCESS_TOKEN` 只配置在 Express；不得返回给 App、成员接口或日志。
 - `server/.env` 仅作为旧开发机兼容回退。新配置请使用按环境命名的文件，所有真实 `.env` 文件都不得提交 Git。
