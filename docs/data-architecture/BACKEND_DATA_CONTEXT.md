@@ -84,7 +84,7 @@ Express API
 当前 Expo 实现：
 
 - iOS：首次生成 `ios_<UUID>`，保存到 SecureStore，后续复用。
-- Android：读取系统 Android ID，形成 `android_<ANDROID_ID>`。
+- Android：Device-ID 与随机 Device-Credential 一同保存在 SecureStore。已有 credential 的旧安装首次升级时把 `android_<ANDROID_ID>` 保存为安装 ID，以保留原冰箱关系；全新安装或卸载重装会生成新的 `android_<UUID>`，确保 ID 与 credential 同生共灭，不再形成旧 Android ID 搭配新 credential 的永久 401。
 - Web：当前不支持，会抛出 `Unsupported platform`。
 
 因此数据库中的所有 `device_id` 字段必须是 `text`，不能改成 PostgreSQL `uuid`。
@@ -92,6 +92,7 @@ Express API
 已知限制：
 
 - 更换设备后通常会得到新的 `device_id`。
+- Android 卸载重装会得到新的安装 ID；覆盖升级会保留原 ID 与凭证。测试 APK 应使用同一签名密钥覆盖安装，不能依赖卸载后恢复原匿名身份。
 - 当前没有跨设备恢复机制。
 - 单独知道某个 `device_id` 不足以访问数据。首次请求会以 256 位随机凭证完成兼容认领，后续请求验证 SHA-256 摘要；恢复成功会撤销旧设备凭证并轮换恢复码。
 

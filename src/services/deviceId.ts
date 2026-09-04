@@ -4,91 +4,79 @@ import * as SecureStore from 'expo-secure-store';
 import * as Crypto from 'expo-crypto';
 
 const IOS_DEVICE_ID_KEY = 'gress_ios_device_id_v1';
+const ANDROID_DEVICE_ID_KEY = 'gress_android_device_id_v2';
 const DEVICE_CREDENTIAL_KEY = 'gress_device_credential_v1';
 
-let pendingDeviceId: Promise<string> | null = null;
-let pendingDeviceCredential: Promise<string> | null = null;
+type DeviceIdentity = {
+  credential: string;
+  deviceId: string;
+};
+
+let pendingDeviceIdentity: Promise<DeviceIdentity> | null = null;
 
 function bytesToHex(bytes: Uint8Array) {
   return Array.from(bytes, (value) => value.toString(16).padStart(2, '0')).join('');
 }
 
-/**
- * 获取设备标识：
- *
- * iOS:
- * - 第一次生成 UUID 并保存到 Keychain
- * - 后续直接从 Keychain 读取
- *
- * Android:
- * - 读取系统 ANDROID_ID
- */
-async function createOrReadDeviceId(): Promise<string> {
+async function createOrReadDeviceIdentity(): Promise<DeviceIdentity> {
+  const savedCredential = await SecureStore.getItemAsync(DEVICE_CREDENTIAL_KEY);
+  const credential = savedCredential ?? bytesToHex(await Crypto.getRandomBytesAsync(32));
+
   if (Platform.OS === 'ios') {
     const savedId = await SecureStore.getItemAsync(IOS_DEVICE_ID_KEY);
-
-    if (savedId) {
-      return savedId;
-    }
-
-    const newId = `ios_${Crypto.randomUUID()}`;
-
-    await SecureStore.setItemAsync(IOS_DEVICE_ID_KEY, newId);
-
-    return newId;
+    const deviceId = savedId ?? `ios_${Crypto.randomUUID()}`;
+    await Promise.all([
+      savedId ? Promise.resolve() : SecureStore.setItemAsync(IOS_DEVICE_ID_KEY, deviceId),
+      savedCredential ? Promise.resolve() : SecureStore.setItemAsync(DEVICE_CREDENTIAL_KEY, credential),
+    ]);
+    return { credential, deviceId };
   }
 
   if (Platform.OS === 'android') {
-    const androidId = Application.getAndroidId();
+    const savedId = await SecureStore.getItemAsync(ANDROID_DEVICE_ID_KEY);
+    let deviceId = savedId;
 
-    if (!androidId) {
-      throw new Error('Unable to read Android ID');
+    if (!deviceId && savedCredential) {
+      const androidId = Application.getAndroidId();
+      if (!androidId) throw new Error('Unable to read Android ID');
+
+      // Arthur: NarIyirm
+      // 中文：已有凭证说明这是覆盖升级；首次迁移继续使用旧 ANDROID_ID，避免现有冰箱被误识别成新安装。
+      // EN: An existing credential identifies an in-place upgrade, so the first migration preserves the legacy ANDROID_ID and its fridge membership.
+      deviceId = `android_${androidId}`;
     }
 
-    return `android_${androidId}`;
+    // Arthur: NarIyirm
+    // 中文：全新或卸载重装时 ID 与凭证一同生成并保存在 SecureStore；两者同生共灭，避免旧 ANDROID_ID 搭配新凭证造成永久 401。
+    // EN: Fresh and reinstalled apps create the ID and credential together in SecureStore so their lifecycles match and cannot form a stale-ID/new-credential 401 pair.
+    deviceId ??= `android_${Crypto.randomUUID()}`;
+    await Promise.all([
+      savedId ? Promise.resolve() : SecureStore.setItemAsync(ANDROID_DEVICE_ID_KEY, deviceId),
+      savedCredential ? Promise.resolve() : SecureStore.setItemAsync(DEVICE_CREDENTIAL_KEY, credential),
+    ]);
+    return { credential, deviceId };
   }
 
   throw new Error(`Unsupported platform: ${Platform.OS}`);
 }
 
-/**
- * 防止多个组件同时调用时生成多个 iOS UUID
- */
-export function getDeviceId(): Promise<string> {
-  if (!pendingDeviceId) {
-    pendingDeviceId = createOrReadDeviceId().catch(error => {
-      pendingDeviceId = null;
+function getDeviceIdentity(): Promise<DeviceIdentity> {
+  if (!pendingDeviceIdentity) {
+    // Arthur: NarIyirm
+    // 中文：ID 与凭证共享一次初始化，避免并发挂载时分别生成不配套的身份字段。
+    // EN: Device ID and credential share one initialization so concurrent mounts cannot generate an unmatched identity pair.
+    pendingDeviceIdentity = createOrReadDeviceIdentity().catch((error) => {
+      pendingDeviceIdentity = null;
       throw error;
     });
   }
-
-  return pendingDeviceId;
+  return pendingDeviceIdentity;
 }
 
-// Arthur: NarIyirm
-// 中文：普通 API 从这里读取或首次生成 256 位随机凭证；原文只保存在 SecureStore，后端只保存摘要。
-// EN: Domain APIs read or first create a 256-bit random credential here; plaintext stays in SecureStore while the backend stores only its digest.
-async function createOrReadDeviceCredential(): Promise<string> {
-  const savedCredential = await SecureStore.getItemAsync(DEVICE_CREDENTIAL_KEY);
-  if (savedCredential) return savedCredential;
-
-  // Arthur: NarIyirm
-  // 中文：设备凭证使用 Expo 57 原生安全随机数生成并保存在 SecureStore；Device-ID 不再单独构成授权。
-  // EN: The device credential uses Expo 57 native secure randomness and is kept in SecureStore; Device-ID alone no longer authorises access.
-  const credential = bytesToHex(await Crypto.getRandomBytesAsync(32));
-  await SecureStore.setItemAsync(DEVICE_CREDENTIAL_KEY, credential);
-  return credential;
+export async function getDeviceId(): Promise<string> {
+  return (await getDeviceIdentity()).deviceId;
 }
 
-// Arthur: NarIyirm
-// 中文：并发请求共享同一个 pending Promise，避免多个组件首次挂载时生成并覆盖不同的设备凭证。
-// EN: Concurrent requests share one pending Promise so first-mounted components cannot generate and overwrite different device credentials.
-export function getDeviceCredential(): Promise<string> {
-  if (!pendingDeviceCredential) {
-    pendingDeviceCredential = createOrReadDeviceCredential().catch((error) => {
-      pendingDeviceCredential = null;
-      throw error;
-    });
-  }
-  return pendingDeviceCredential;
+export async function getDeviceCredential(): Promise<string> {
+  return (await getDeviceIdentity()).credential;
 }
