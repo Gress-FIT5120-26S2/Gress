@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { supabase } from '../supabase.js';
 
 const DEVICE_ID_PATTERN = /^.{3,200}$/u;
@@ -43,6 +43,16 @@ export async function requireDevice(request, response, next) {
   const authenticated = await authenticateDeviceCredentials(deviceId, credential);
 
   if (!authenticated.fridgeUid) {
+    // Arthur: NarIyirm
+    // 中文：认证失败只记录不可逆的失败原因与请求关联号，便于 Vercel 排查，同时绝不把设备标识或凭证写入日志。
+    // EN: Authentication failures log only a non-sensitive reason and correlation ID for Vercel diagnosis, never device identifiers or credentials.
+    console.warn(JSON.stringify({
+      event: 'device_auth_failed',
+      method: request.method,
+      path: request.path,
+      reason: authenticated.error,
+      requestId: randomUUID(),
+    }));
     return response.status(401).json({ error: authenticated.error });
   }
 
