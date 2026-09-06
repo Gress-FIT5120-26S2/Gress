@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import {
   AccessibilityInfo,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -18,6 +19,7 @@ import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inve
 import { useI18n } from '../../i18n';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
+import { MAX_INVENTORY_NAME_LENGTH, MAX_INVENTORY_QUANTITY, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
 export type InventoryEntrySource = 'manual' | 'recognition';
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
@@ -78,7 +80,6 @@ type InventoryEntryFlowProps = {
 const STORAGE_OPTIONS: InventoryStorageZone[] = ['pantry', 'chilled', 'frozen'];
 const CATEGORY_OPTIONS: InventoryCategoryCode[] = ['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other'];
 const UNIT_OPTIONS: InventoryUnit[] = ['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box'];
-
 function formatDate(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -144,7 +145,10 @@ export function InventoryEntryFlow({
   const [restockError, setRestockError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [pendingSubmission, setPendingSubmission] = useState<InventoryEntrySubmission | null>(null);
+  const [confirmationReasons, setConfirmationReasons] = useState<string[]>([]);
   const latestNameRef = useRef('');
+  const unitLabel = copy.units[unit];
 
   useLayoutEffect(() => {
     if (!visible) return;
@@ -181,6 +185,8 @@ export function InventoryEntryFlow({
     setRestockError(null);
     setSaveError(null);
     setIsSaving(false);
+    setPendingSubmission(null);
+    setConfirmationReasons([]);
   }, [initialValues, visible]);
 
   useEffect(() => {
@@ -301,8 +307,17 @@ export function InventoryEntryFlow({
   const validateBasics = useCallback(() => {
     const parsedQuantity = Number(quantity);
     const parsedPrice = price.trim().length > 0 ? Number(price) : null;
-    const nextNameError = name.trim().length > 0 ? null : copy.validation.name;
-    const nextQuantityError = Number.isFinite(parsedQuantity) && parsedQuantity > 0 ? null : copy.validation.quantity;
+    const trimmedName = name.trim();
+    const nextNameError = trimmedName.length === 0
+      ? copy.validation.name
+      : trimmedName.length > MAX_INVENTORY_NAME_LENGTH
+        ? copy.validation.nameLength
+        : null;
+    const nextQuantityError = !Number.isFinite(parsedQuantity) || parsedQuantity <= 0
+      ? copy.validation.quantity
+      : parsedQuantity >= MAX_INVENTORY_QUANTITY
+        ? copy.validation.quantityLimit
+        : null;
     const nextPriceError = parsedPrice === null || (Number.isFinite(parsedPrice) && parsedPrice >= 0) ? null : copy.validation.price;
     setNameError(nextNameError);
     setQuantityError(nextQuantityError);
@@ -316,13 +331,31 @@ export function InventoryEntryFlow({
     setRestockError(null);
   }, []);
 
+  const submitInventory = useCallback(async (submission: InventoryEntrySubmission) => {
+    setIsSaving(true);
+    try {
+      await onSubmit(submission);
+      onClose();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : copy.validation.save;
+      console.error('Inventory save failed:', detail);
+      setSaveError(detail);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [copy.validation.save, onClose, onSubmit]);
+
   // Arthur: NarIyirm
   // 中文：保存按钮在此完成前端校验并组装 InventoryEntrySubmission；真正 HTTP 请求由父组件传入的 onSubmit 发起。
   // EN: The save button validates and builds InventoryEntrySubmission here; the parent-provided onSubmit performs the actual HTTP request.
   const handleSubmit = useCallback(async () => {
     const expiry = expiryEnabled ? parseLocalDateTime(expiryDate, expiryTime) : null;
     const nextExpiryError = expiryEnabled && (!expiry || expiry.getTime() < Date.now()) ? copy.validation.expiry : null;
-    const nextRestockError = restockEnabled && targetQuantity <= minimumQuantity ? copy.validation.restock : null;
+    const nextRestockError = restockEnabled && (minimumQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity >= MAX_INVENTORY_QUANTITY)
+      ? copy.validation.restockLimit
+      : restockEnabled && targetQuantity <= minimumQuantity
+        ? copy.validation.restock
+        : null;
     setExpiryError(nextExpiryError);
     setRestockError(nextRestockError);
     setSaveError(null);
@@ -357,27 +390,38 @@ export function InventoryEntryFlow({
       } : null,
     };
 
-    setIsSaving(true);
-    try {
-      await onSubmit(submission);
-      onClose();
-    } catch (error) {
-      const detail = error instanceof Error ? error.message : copy.validation.save;
-      console.error('Inventory save failed:', detail);
-      setSaveError(detail);
-    } finally {
-      setIsSaving(false);
+    // Arthur: NarIyirm
+    // 中文：未匹配食材资料或数量虽合法但偏大时暂停一次，让用户复核；确认只放行本次提交，硬上限仍不可绕过。
+    // EN: Pause once when the name is unverified or the valid quantity is unusually large; confirmation releases only this submission and never bypasses hard limits.
+    const reasons = [
+      ...(!suggestion ? [copy.confirmation.unverifiedName(submission.batch.name)] : []),
+      ...(needsLargeQuantityConfirmation(numericQuantity, unit) ? [copy.confirmation.largeQuantity(numericQuantity, unitLabel)] : []),
+    ];
+    if (reasons.length > 0) {
+      Keyboard.dismiss();
+      setPendingSubmission(submission);
+      setConfirmationReasons(reasons);
+      return;
     }
-  }, [categoryCode, copy.validation, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, onClose, onSubmit, price, quantity, restockEnabled, source, storageZone, suggestion, targetQuantity, unit, validateBasics, warningDays]);
+
+    await submitInventory(submission);
+  }, [categoryCode, copy.confirmation, copy.validation, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays]);
+
+  const confirmSubmission = useCallback(() => {
+    if (!pendingSubmission) return;
+    const submission = pendingSubmission;
+    setPendingSubmission(null);
+    setConfirmationReasons([]);
+    void submitInventory(submission);
+  }, [pendingSubmission, submitInventory]);
 
   const topInset = presentation === 'embedded' ? 0 : Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 47;
-  const unitLabel = copy.units[unit];
 
   return (
     <InventoryEntryPresentation blurTarget={blurTarget} onClose={onClose} presentation={presentation} reduceMotion={reduceMotion} visible={visible}>
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalRoot}>
           <View style={[styles.header, presentation === 'embedded' && styles.embeddedHeader, { paddingTop: topInset + 8 }]}>
-            <Pressable accessibilityRole="button" onPress={onClose} style={({ pressed }) => [styles.headerButton, pressed ? styles.pressed : null]}>
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.headerButton, pressed ? styles.pressed : null]}>
               <Text style={styles.headerButtonText}>{copy.cancel}</Text>
             </Pressable>
             <View pointerEvents="none" style={styles.headerTitleWrap}>
@@ -515,6 +559,36 @@ export function InventoryEntryFlow({
             </Pressable>
             {saveError ? <Text style={styles.footerError}>{saveError}</Text> : null}
           </View>
+          {pendingSubmission ? (
+            <View accessibilityViewIsModal style={styles.confirmLayer}>
+              <View style={styles.confirmCard}>
+                <View style={styles.confirmHeader}>
+                  <View style={styles.confirmIcon}><Ionicons name="alert-circle" size={23} color="#D87519" /></View>
+                  <View style={styles.confirmHeaderCopy}>
+                    <Text style={styles.confirmTitle}>{copy.confirmation.title}</Text>
+                    <Text style={styles.confirmDescription}>{copy.confirmation.description}</Text>
+                  </View>
+                </View>
+                <View style={styles.confirmReasons}>
+                  {confirmationReasons.map((reason) => (
+                    <View key={reason} style={styles.confirmReasonRow}>
+                      <Ionicons name="alert-circle-outline" size={18} color="#C86D1C" />
+                      <Text style={styles.confirmReasonText}>{reason}</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.confirmActions}>
+                  <Pressable accessibilityRole="button" onPress={confirmSubmission} style={({ pressed }) => [styles.confirmButton, pressed ? styles.pressed : null]}>
+                    <Ionicons name="checkmark-circle" size={19} color="#FFFFFF" />
+                    <Text style={styles.confirmButtonText}>{copy.confirmation.continue}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => { setPendingSubmission(null); setConfirmationReasons([]); }} style={({ pressed }) => [styles.reviewButton, pressed ? styles.pressed : null]}>
+                    <Text style={styles.reviewButtonText}>{copy.confirmation.review}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : null}
         </KeyboardAvoidingView>
     </InventoryEntryPresentation>
   );
@@ -625,5 +699,20 @@ const styles = StyleSheet.create({
   primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
   disabledButton: { opacity: 0.55 },
   footerError: { position: 'absolute', right: 16, bottom: 4, left: 16, color: '#C83D4C', fontSize: 10.5, fontWeight: '700', textAlign: 'center' },
+  confirmLayer: { ...StyleSheet.absoluteFill, zIndex: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 26, backgroundColor: 'rgba(23,32,29,0.42)' },
+  confirmCard: { width: '100%', maxWidth: 370, padding: 18, borderRadius: 20, backgroundColor: '#FFFFFF', shadowColor: '#14241E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 12 },
+  confirmHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  confirmHeaderCopy: { flex: 1, minWidth: 0 },
+  confirmIcon: { width: 42, height: 42, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#FFF2E3' },
+  confirmTitle: { color: '#172E26', fontSize: 18, fontWeight: '900', lineHeight: 23 },
+  confirmDescription: { marginTop: 4, color: '#55685F', fontSize: 13, lineHeight: 18 },
+  confirmReasons: { gap: 8, marginTop: 15 },
+  confirmReasonRow: { minHeight: 44, flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: '#FFF8F1' },
+  confirmReasonText: { flex: 1, color: '#47372A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  confirmActions: { gap: 9, marginTop: 17 },
+  reviewButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#F0F3F1' },
+  reviewButtonText: { color: '#40564D', fontSize: 14, fontWeight: '800' },
+  confirmButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, backgroundColor: '#FF812B' },
+  confirmButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
 });

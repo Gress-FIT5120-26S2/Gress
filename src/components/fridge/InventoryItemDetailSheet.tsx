@@ -34,9 +34,11 @@ import {
   type InventoryUnit,
 } from '../inventory-entry/InventoryEntryFlow';
 import { PresetFoodIcon } from './PresetFoodIcon';
+import { needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
 type InventoryItemDetailSheetProps = {
   batchUid: string | null;
+  initialBatch?: InventoryBatchDetail | null;
   blurTarget?: RefObject<View | null>;
   onChanged: () => void | Promise<void>;
   onClose: () => void;
@@ -45,6 +47,7 @@ type InventoryItemDetailSheetProps = {
 };
 
 const EASE_SHEET = Easing.bezier(0.32, 0.72, 0, 1);
+const GRABBER_TOUCH_WIDTH = 160;
 const CATEGORY_EMOJI: Record<InventoryCategoryCode, string> = {
   meat: '🥚',
   vegetables: '🥬',
@@ -84,6 +87,7 @@ function formatEntryTime(date: Date) {
 // EN: This is the inventory card's detail and quick-mutation surface; FridgeScreen supplies batchUid and inventoryApi handles detail, quantity, restock, and archive calls.
 export function InventoryItemDetailSheet({
   batchUid,
+  initialBatch,
   onChanged,
   onClose,
   onSaveEdit,
@@ -115,6 +119,7 @@ export function InventoryItemDetailSheet({
   const [loadError, setLoadError] = useState(false);
   const [quantityError, setQuantityError] = useState<string | null>(null);
   const [isClosing, setIsClosing] = useState(false);
+  const [showQuantityConfirmation, setShowQuantityConfirmation] = useState(false);
   const [restockEnabled, setRestockEnabled] = useState(false);
   const [minimumQuantity, setMinimumQuantity] = useState(1);
   const [targetQuantity, setTargetQuantity] = useState(2);
@@ -147,11 +152,11 @@ export function InventoryItemDetailSheet({
   }, []);
 
   // Arthur: NarIyirm
-  // 中文：弹窗打开时按 batchUid 延迟加载完整批次和 version；列表快照因此可以保持轻量。
-  // EN: Opening the sheet lazily loads the full batch and version by batchUid, keeping the list snapshot lightweight.
-  const loadBatch = useCallback(async () => {
+  // 中文：弹窗优先展示列表快照，再按 batchUid 后台校准完整批次和 version。
+  // EN: The sheet presents its list snapshot first, then reconciles the full batch and version by batchUid in the background.
+  const loadBatch = useCallback(async (showLoading = true) => {
     if (!batchUid) return;
-    setIsLoading(true);
+    if (showLoading) setIsLoading(true);
     setLoadError(false);
     try {
       const result = await getInventoryBatchDetail(batchUid);
@@ -159,18 +164,20 @@ export function InventoryItemDetailSheet({
     } catch {
       setLoadError(true);
     } finally {
-      setIsLoading(false);
+      if (showLoading) setIsLoading(false);
     }
   }, [applyLoadedBatch, batchUid]);
 
   useEffect(() => {
     if (!visible || !batchUid) return;
-    setBatch(null);
+    if (initialBatch) applyLoadedBatch(initialBatch);
+    else setBatch(null);
     setQuantityError(null);
     setRestockError(null);
     setRemoveError(null);
     setShowRemoveConfirm(false);
     setIsClosing(false);
+    setShowQuantityConfirmation(false);
     setIsEditing(false);
     hasAutoExpandedAtContentEnd.current = false;
     afterCloseRef.current = null;
@@ -190,9 +197,12 @@ export function InventoryItemDetailSheet({
         if (finished) currentTranslate.current = previewOffset;
       });
     });
-    void loadBatch();
+    // Arthur: NarIyirm
+    // 中文：列表快照先即时填充详情，后台请求再校准 version 和共享修改，避免打开弹窗时长时间白屏。
+    // EN: The list snapshot fills the detail immediately, then a background request reconciles its version and shared edits without a long blank sheet.
+    void loadBatch(!initialBatch);
     return () => cancelAnimationFrame(frame);
-  }, [batchUid, dismissedOffset, loadBatch, previewOffset, reducedMotion, translateY, visible]);
+  }, [applyLoadedBatch, batchUid, dismissedOffset, initialBatch, loadBatch, previewOffset, reducedMotion, translateY, visible]);
 
   useEffect(() => {
     if (!visible) return;
@@ -279,8 +289,14 @@ export function InventoryItemDetailSheet({
   // Arthur: NarIyirm
   // 中文：关闭动画与数量保存并行执行；仅在草稿变化时提交一次 expectedVersion，失败则弹窗回到可操作位置。
   // EN: Closing animation and quantity persistence run together; a changed draft submits expectedVersion once, and failures return the sheet to an interactive position.
-  const requestClose = useCallback(async (afterClose?: () => void, releaseVelocity = 0) => {
+  const requestClose = useCallback(async (afterClose?: () => void, releaseVelocity = 0, confirmedLargeQuantity = false) => {
     if (isClosing) return;
+    if (!confirmedLargeQuantity && batch && draftQuantity !== batch.remainingQuantity && needsLargeQuantityConfirmation(draftQuantity, batch.unit as InventoryUnit)) {
+      setShowQuantityConfirmation(true);
+      animateToDetent(previewOffset);
+      return;
+    }
+    setShowQuantityConfirmation(false);
     setIsClosing(true);
     setQuantityError(null);
     afterCloseRef.current = afterClose ?? null;
@@ -301,7 +317,10 @@ export function InventoryItemDetailSheet({
           remainingQuantity: result.batch.remainingQuantity,
           version: result.batch.version,
         } : current);
-        await onChanged();
+        // Arthur: NarIyirm
+        // 中文：数量 mutation 成功就允许抽屉关闭，完整列表对账在后台执行，避免关闭按钮被网络刷新长时间锁住。
+        // EN: Once the quantity mutation succeeds, let the sheet close while full-list reconciliation runs in the background so refresh latency cannot lock the close action.
+        void Promise.resolve(onChanged()).catch(() => undefined);
       }
       await closingAnimation;
       finishClose();
@@ -315,8 +334,8 @@ export function InventoryItemDetailSheet({
 
   const panResponder = useMemo(() => PanResponder.create({
       // Arthur: NarIyirm
-      // 中文：手指在横条落下时立即由抽屉接管，避免首次移动前被系统或相邻控件截走。
-      // EN: The sheet claims the touch as it lands on the grabber, preventing the first movement from being intercepted by the system or nearby controls.
+      // 中文：只有居中的把手热区会在按下时接管手势；该区域与左侧 Close/Cancel 分离，因此既能稳定拖拽也不会吞掉按钮点击。
+      // EN: Only the centered grabber target claims the gesture on touch; it is separated from the left Close/Cancel control so dragging stays reliable without swallowing button presses.
       onStartShouldSetPanResponder: () => !isClosing,
       onMoveShouldSetPanResponder: (_event, gesture) => !isClosing && Math.abs(gesture.dy) > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
       onMoveShouldSetPanResponderCapture: (_event, gesture) => !isClosing && Math.abs(gesture.dy) > 3 && Math.abs(gesture.dy) > Math.abs(gesture.dx),
@@ -486,7 +505,12 @@ export function InventoryItemDetailSheet({
     if (!batch) return;
     const updatedBatch = await onSaveEdit(batch, submission);
     applyLoadedBatch(updatedBatch);
-  }, [applyLoadedBatch, batch, onSaveEdit]);
+    // Arthur: NarIyirm
+    // 中文：编辑保存成功后直接收起整个详情抽屉，不再退回详情页让用户二次关闭。
+    // EN: A successful edit dismisses the entire detail sheet instead of returning to the detail view for a second close action.
+    await animateClosed();
+    finishClose();
+  }, [animateClosed, applyLoadedBatch, batch, finishClose, onSaveEdit]);
 
   const unitLabel = batch ? (t.fridge.manualEntry.units[batch.unit as keyof typeof t.fridge.manualEntry.units] ?? batch.unit) : '';
   const categoryLabel = batch
@@ -512,7 +536,7 @@ export function InventoryItemDetailSheet({
   return (
     <Modal
       animationType="none"
-      onRequestClose={() => void requestClose()}
+      onRequestClose={() => showQuantityConfirmation ? setShowQuantityConfirmation(false) : void requestClose()}
       presentationStyle="overFullScreen"
       statusBarTranslucent
       transparent
@@ -537,7 +561,10 @@ export function InventoryItemDetailSheet({
             {/* Arthur: NarIyirm
                 中文：只有顶部横条注册抽屉手势，内容区始终保留给滚动，避免阅读详情时误触改变弹窗高度。
                 EN: Only the top grabber registers sheet gestures, leaving the content area to scroll without accidental detent changes. */}
-            <View {...panResponder.panHandlers} style={styles.grabberTouchTarget}>
+            <View
+              {...panResponder.panHandlers}
+              style={[styles.grabberTouchTarget, { left: Math.max(0, (width - GRABBER_TOUCH_WIDTH) / 2) }]}
+            >
               <View style={styles.grabber} />
             </View>
             {!isEditing ? (
@@ -688,6 +715,30 @@ export function InventoryItemDetailSheet({
           ) : null}
         </Animated.View>
 
+        {showQuantityConfirmation && batch ? (
+          <View accessibilityViewIsModal style={styles.confirmLayer}>
+            <Pressable accessibilityLabel={copy.quantityConfirmation.review} onPress={() => setShowQuantityConfirmation(false)} style={StyleSheet.absoluteFill} />
+            <View style={styles.confirmCard}>
+              <View style={styles.confirmHeader}>
+                <View style={styles.quantityConfirmIcon}><Ionicons name="alert-circle" size={25} color="#D87519" /></View>
+                <View style={styles.confirmTitleWrap}>
+                  <Text style={styles.confirmTitle}>{copy.quantityConfirmation.title}</Text>
+                  <Text style={styles.confirmDescription}>{copy.quantityConfirmation.description}</Text>
+                </View>
+              </View>
+              <View style={styles.quantityConfirmValue}>
+                <Text style={styles.quantityConfirmValueText}>{formatQuantity(draftQuantity)} {unitLabel}</Text>
+              </View>
+              <View style={styles.confirmActions}>
+                <Pressable accessibilityRole="button" onPress={() => setShowQuantityConfirmation(false)} style={styles.keepButton}><Text style={styles.keepText}>{copy.quantityConfirmation.review}</Text></Pressable>
+                <Pressable accessibilityRole="button" onPress={() => void requestClose(undefined, 0, true)} style={styles.quantityConfirmButton}>
+                  <Text style={styles.confirmRemoveText}>{copy.quantityConfirmation.continue}</Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        ) : null}
+
         {showRemoveConfirm && batch ? (
           <View style={styles.confirmLayer}>
             <Pressable accessibilityLabel={copy.keep} onPress={() => setShowRemoveConfirm(false)} style={StyleSheet.absoluteFill} />
@@ -761,7 +812,7 @@ const styles = StyleSheet.create({
   sheet: { position: 'absolute', right: 0, left: 0, overflow: 'hidden', borderWidth: 1, borderColor: '#D5DEDA', borderRadius: 34, borderCurve: 'continuous', backgroundColor: '#F7F9F8', shadowColor: '#10271F', shadowOffset: { width: 0, height: -8 }, shadowOpacity: 0.14, shadowRadius: 24, elevation: 18 },
   dragArea: { height: 66, justifyContent: 'center', paddingHorizontal: 22, paddingTop: 8 },
   editingDragArea: { height: 34, paddingTop: 0 },
-  grabberTouchTarget: { position: 'absolute', zIndex: 5, top: 0, right: 0, left: 0, height: 42, alignItems: 'center', justifyContent: 'center' },
+  grabberTouchTarget: { position: 'absolute', zIndex: 5, top: 0, width: GRABBER_TOUCH_WIDTH, height: 42, alignItems: 'center', justifyContent: 'center' },
   grabber: { width: 52, height: 5, borderRadius: 3, backgroundColor: '#929998' },
   closeButton: { width: 82, minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.72)' },
   closeText: { color: '#172720', fontSize: 17, fontWeight: '700' },
@@ -823,6 +874,7 @@ const styles = StyleSheet.create({
   confirmCard: { gap: 17, padding: 20, borderRadius: 28, borderCurve: 'continuous', backgroundColor: '#FBFCFB', shadowColor: '#17201D', shadowOffset: { width: 0, height: 12 }, shadowOpacity: 0.22, shadowRadius: 28, elevation: 24 },
   confirmHeader: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   dangerIcon: { width: 51, height: 51, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#FFE8EC' },
+  quantityConfirmIcon: { width: 51, height: 51, alignItems: 'center', justifyContent: 'center', borderRadius: 16, backgroundColor: '#FFF2E3' },
   confirmTitleWrap: { flex: 1 },
   confirmTitle: { color: '#17231F', fontSize: 20, fontWeight: '800' },
   confirmDescription: { marginTop: 3, color: '#7A8581', fontSize: 12.5, lineHeight: 18 },
@@ -831,11 +883,14 @@ const styles = StyleSheet.create({
   confirmItemCopy: { flex: 1 },
   confirmItemName: { color: '#162720', fontSize: 19, fontWeight: '800' },
   confirmItemQuantity: { marginTop: 5, color: '#64756E', fontSize: 14, fontWeight: '700' },
+  quantityConfirmValue: { alignItems: 'center', justifyContent: 'center', minHeight: 68, borderRadius: 14, backgroundColor: '#FFF7EE' },
+  quantityConfirmValueText: { color: '#B85F13', fontSize: 27, fontWeight: '900' },
   warningBox: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13, borderRadius: 14, backgroundColor: '#FFF0F2' },
   warningText: { flex: 1, color: '#9C5A61', fontSize: 12.5, lineHeight: 18 },
   confirmActions: { flexDirection: 'row', gap: 10 },
   keepButton: { flex: 1, minHeight: 55, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: '#F0F1F3' },
   keepText: { color: '#6F7477', fontSize: 15, fontWeight: '800' },
   confirmRemoveButton: { flex: 1.15, minHeight: 55, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 18, backgroundColor: '#FF3047' },
+  quantityConfirmButton: { flex: 1.15, minHeight: 55, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: '#FF812B' },
   confirmRemoveText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 });

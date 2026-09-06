@@ -4,10 +4,11 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-04（Australia/Sydney）。
+- 最后核对日期：2026-09-07（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 19 份 migration；`20260903010000_api_security_hardening.sql` 新增跨实例 API 限流原子桶/RPC，固定补货函数 `search_path`，收紧 RLS 自动启用函数及未来 public 函数的默认执行权限；`20260904010000_fix_api_rate_limit_timestamp.sql` 修正首版限流函数变量名与 PostgreSQL `CURRENT_TIME` 表达式的冲突。两份 migration 已按顺序在开发项目验证并应用生产项目，两端远程 lint 与限流/补货 RPC 验证均通过。CLI 已恢复链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续迁移。
+- 本地 schema 历史共有 21 份 migration；`20260903010000_api_security_hardening.sql` 新增跨实例 API 限流原子桶/RPC，固定补货函数 `search_path`，收紧 RLS 自动启用函数及未来 public 函数的默认执行权限；`20260904010000_fix_api_rate_limit_timestamp.sql` 修正首版限流函数变量名与 PostgreSQL `CURRENT_TIME` 表达式的冲突。两份 migration 已按顺序在开发项目验证并应用生产项目，两端远程 lint 与限流/补货 RPC 验证均通过。CLI 已恢复链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
+- `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 远程 PostgreSQL lint 已通过，无 schema error。
 - 应用最新本地 migration 后共有 20 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
@@ -302,6 +303,8 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 当前详情修改约束：
 
 - 数量不能小于 0，也不能超过该批次的 `initial_quantity`。
+- 新增、完整编辑与快捷数量修改都要求数量小于 1000；名称最长 120 个字符，单位必须来自 App 支持的固定集合。
+- App 对低于硬上限但明显偏大的数量，以及没有命中食材参考库的名称进行二次确认；用户确认可继续保存，但不能绕过硬上限。
 - 数量降到 0 时批次转为 `consumed`；从 0 增加时可恢复为 `active`。
 - 修改请求携带 `expectedVersion`；版本不一致时 Express 返回 `409`，避免共享冰箱中的并发覆盖。
 - 普通删除是软删除：批次转为 `archived`、剩余数量归零并保留流水，不物理删除历史记录。
@@ -604,14 +607,14 @@ GET /api/restock
 
 - 设备 bootstrap：按 `Device-ID` 初始化并返回当前冰箱与默认分类。
 - 设备个人资料：`GET /api/profile` 只读取当前已鉴权设备；`PATCH /api/profile` 只允许修改当前设备 1–32 字符的昵称。头像使用稳定产品令牌，App 不上传照片。Expo 的常驻 `ProfileDataProvider` 会在开场期间并行预取资料和 `GET /api/fridges/context`，跨 Tab 保留在内存中，并在冰箱同步事件后静默刷新；个人页不使用持久化资料缓存，也不在每次进入时重复请求。服务端昵称为空时，界面显示设置提示而非本地默认昵称。
-- 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
+- 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。批次快照同时包含详情弹窗首屏所需的数量、版本、开封时间、分类名和补货规则，点击卡片时先即时展示快照，再在后台用单批次接口校准共享修改。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：只有用户明确点击后，`POST /api/food-presets/generate` 才调用 Gemini 生成标准名、双语别名、分类、储存区、参考天数和说明；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
 - 新增库存：表单会提交命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`；新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`，并在同一事务保存批次级临期提前天数。历史无法可靠匹配的批次继续保留 null preset；已有有效期批次回填为 3 天。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
-- 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会立即写入带操作者昵称和批次详情的 `shared` 通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统投递只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员，投递失败不回滚库存 mutation。
+- 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会在返回 mutation 成功前写入带操作者昵称和批次详情的 `shared` 站内通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统 Push 只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员；Vercel 通过 `waitUntil` 在响应后完成该投递和审计，本地长驻 Express 在后台执行，投递失败不回滚库存 mutation。
 - 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请，以及不含真实 `device_id` 的昵称、头像令牌与成员顺序。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
 - 邀请失败状态：加入 RPC 会先读取邀请码真实状态，再分别返回 `invite_not_found`、`invite_expired`、`invite_used`、`invite_revoked`；Express 保留这些稳定错误码，Expo 负责显示对应中英文提示。只有格式错误或确实不存在的码显示无效/未找到。
 - 前台静默同步：`GET /api/sync/state` 返回当前冰箱模式、四个领域版本，以及共享模式下的 Realtime endpoint、publishable key 和高熵频道能力值。数据库 Broadcast 变化后只通知当前已挂载页面静默重拉相关接口；连接正常时每 30 秒对账，未配置或断线时共享模式回退每 6 秒探测，个人模式保持 30 秒。App 回前台会重建频道并立即对账，网络错误最长 60 秒退避。该方案不依赖 Vercel Function 实例内存，也不需要 Redis。
@@ -681,7 +684,7 @@ PUT    /api/inventory/batches/:batchUid/restock-rule
 DELETE /api/inventory/batches/:batchUid
 ```
 
-这些接口由 `20260830010000_inventory_detail_mutations.sql` 中的数据库函数保证数量更新与事件写入处于同一事务，并通过 `version` 做共享编辑冲突检测。前端详情弹窗调用 `src/services/inventoryApi.ts`，不得绕过 Express。
+这些接口由 `20260830010000_inventory_detail_mutations.sql` 中的数据库函数保证数量更新与事件写入处于同一事务，并通过 `version` 做共享编辑冲突检测。前端详情弹窗调用 `src/services/inventoryApi.ts`，不得绕过 Express。完整编辑仅在补货阈值真正变化时调用第二个补货 mutation；成功后直接关闭整个详情弹窗并在冰箱页显示成功提示，库存列表继续后台对账。
 
 批次详情还会按 `preset_uid` 返回与库存列表一致的远程 icon URL 和 Emoji fallback；列表卡片、详情顶部及删除确认框共用 `PresetFoodIcon` 渲染与失败回退逻辑。
 
