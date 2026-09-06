@@ -46,7 +46,7 @@ export type InventoryBatchDetail = InventoryBatch & {
 };
 
 export type InventorySnapshot = {
-  batches: InventoryBatch[];
+  batches: InventoryBatchDetail[];
   categories: Array<{
     code: string | null;
     colour: string | null;

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { waitUntil } from '@vercel/functions';
 import { supabase } from '../supabase.js';
 import {
   CLOUDFLARE_ICON_MODEL,
@@ -13,6 +14,9 @@ import { consumeRateLimit, rateLimitPolicies } from '../middleware/rateLimit.js'
 const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
 const STORAGE_ZONES = new Set(['chilled', 'frozen', 'pantry']);
+const INVENTORY_UNITS = new Set(['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box']);
+const MAX_INVENTORY_QUANTITY = 1000;
+const MAX_INVENTORY_NAME_LENGTH = 120;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESET_ICON_BUCKET = 'food-preset-icons';
 
@@ -39,8 +43,8 @@ function getExpiryWarningDays(body) {
 }
 
 // Arthur: NarIyirm
-// 中文：库存写入成功后创建共享事件并等待系统通知投递；通知失败不会把已提交的库存操作伪装成失败。
-// EN: After a successful inventory write, create the shared event and await system delivery; notification failure never misrepresents the committed inventory action as failed.
+// 中文：库存写入后先持久化共享站内事件，外部 Push 在响应后执行，避免 Expo 网络延迟阻塞用户的保存状态。
+// EN: Persist the shared in-app event first, then deliver external push after the response so Expo network latency never blocks the user's save state.
 async function notifySharedInventory(deviceId, batchUid, action) {
   const { data: notificationUid, error } = await supabase.rpc('record_shared_inventory_notification', {
     p_action: action,
@@ -51,7 +55,17 @@ async function notifySharedInventory(deviceId, batchUid, action) {
     console.error('Shared inventory notification could not be recorded:', error.message);
     return;
   }
-  await deliverSharedNotification(notificationUid, deviceId);
+  if (!notificationUid) return;
+
+  const delivery = deliverSharedNotification(notificationUid, deviceId).catch((deliveryError) => {
+    console.error('Shared inventory push delivery failed:', deliveryError?.message ?? 'unknown error');
+  });
+
+  if (process.env.VERCEL) {
+    waitUntil(delivery);
+  } else {
+    void delivery;
+  }
 }
 
 function findPresetMatch(presets, query) {
@@ -111,13 +125,13 @@ async function resolveFridge(deviceId) {
 // Arthur: NarIyirm
 // 中文：GET /api/inventory 和 bootstrap 共用此读取器；并行查询冰箱、分类、活跃批次与规则，再组装前端 InventorySnapshot。
 // EN: GET /api/inventory and bootstrap share this reader, which queries fridge, categories, active batches, and rules in parallel before building InventorySnapshot.
-async function getInventorySnapshot(deviceId) {
-  const fridgeUid = await resolveFridge(deviceId);
+async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
+  const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
     supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
     supabase.from('food_categories').select('category_uid, name, system_code, colour, icon').eq('fridge_uid', fridgeUid).order('created_at'),
-    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
-    supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
+    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
+    supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, target_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
   ]);
 
   const failed = [fridgeResult, categoriesResult, batchesResult, rulesResult].find(({ error }) => error);
@@ -158,20 +172,30 @@ async function getInventorySnapshot(deviceId) {
       const preset = batch.preset_uid ? presetByUid.get(batch.preset_uid) : null;
       return {
         categoryCode: categoryByUid.get(batch.category_uid)?.system_code ?? 'other',
+        categoryName: categoryByUid.get(batch.category_uid)?.name ?? 'Other',
         currency: batch.currency,
         expiresAt: batch.expires_at,
         expiryWarningDays: batch.expiry_warning_days,
         id: batch.batch_uid,
         iconEmoji: preset?.icon_emoji ?? null,
         iconUrl: getPresetIconUrl(preset?.icon_path),
+        initialQuantity: Number(batch.initial_quantity),
+        lifecycleState: batch.lifecycle_state,
         name: batch.name,
         needsRestock: Boolean(rule && totalByNameAndUnit.get(key) <= Number(rule.minimum_quantity)),
+        openedAt: batch.opened_at,
         presetUid: batch.preset_uid,
         purchasePrice: batch.purchase_price === null ? null : Number(batch.purchase_price),
         remainingQuantity: Number(batch.remaining_quantity),
+        restockRule: rule ? {
+          enabled: Boolean(rule.is_enabled),
+          minimumQuantity: Number(rule.minimum_quantity),
+          targetQuantity: Number(rule.target_quantity),
+        } : null,
         stockedAt: batch.stocked_at,
         storageZone: batch.storage_zone,
         unit: batch.unit,
+        version: batch.version,
       };
     }),
   };
@@ -180,11 +204,11 @@ async function getInventorySnapshot(deviceId) {
 // Arthur: NarIyirm
 // 中文：单批次详情在此补读 version、初始数量、preset 图标和名称级补货规则；调用方是 GET /inventory/batches/:batchUid。
 // EN: Single-batch detail adds version, initial quantity, preset icon, and the name-level restock rule for GET /inventory/batches/:batchUid.
-async function getInventoryBatchDetail(deviceId, batchUid) {
+async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUid = null) {
   // Arthur: NarIyirm
   // 中文：详情按 preset_uid 补读与列表相同的图标，同时加载批次版本、初始数量和名称级补货规则。
   // EN: Detail resolves the same preset icon as the list while loading the batch version, stocked quantity, and name-level restock rule.
-  const fridgeUid = await resolveFridge(deviceId);
+  const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
   const batchResult = await supabase
     .from('inventory_batches')
     .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version')
@@ -283,7 +307,7 @@ inventoryRouter.get('/inventory', async (request, response) => {
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
 
   try {
-    return response.json(await getInventorySnapshot(deviceId));
+    return response.json(await getInventorySnapshot(deviceId, request.fridgeUid));
   } catch (error) {
     console.error('Inventory read failed:', error.message);
     return response.status(503).json({ message: 'The inventory service is unavailable.' });
@@ -297,7 +321,7 @@ inventoryRouter.get('/inventory/batches/:batchUid', async (request, response) =>
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
 
   try {
-    const batch = await getInventoryBatchDetail(deviceId, batchUid);
+    const batch = await getInventoryBatchDetail(deviceId, batchUid, request.fridgeUid);
     return batch ? response.json({ batch }) : response.status(404).json({ message: 'Inventory batch not found.' });
   } catch (error) {
     console.error('Inventory detail read failed:', error.message);
@@ -315,8 +339,8 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
   const expectedVersion = asNumber(request.body?.expectedVersion);
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
-  if (remainingQuantity === null || remainingQuantity < 0 || !Number.isInteger(expectedVersion)) {
-    return sendInvalidRequest(response, 'A non-negative quantity and batch version are required.');
+  if (remainingQuantity === null || remainingQuantity < 0 || remainingQuantity >= MAX_INVENTORY_QUANTITY || !Number.isInteger(expectedVersion)) {
+    return sendInvalidRequest(response, 'A quantity from 0 up to, but not including, 1000 and a batch version are required.');
   }
 
   try {
@@ -356,11 +380,11 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   const expiryWarningDays = getExpiryWarningDays(body);
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
-  if (!name || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
+  if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
     return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
   }
-  if (remainingQuantity === null || remainingQuantity < 0 || typeof body.unit !== 'string' || !body.unit.trim()) {
-    return sendInvalidRequest(response, 'A non-negative quantity and unit are required.');
+  if (remainingQuantity === null || remainingQuantity < 0 || remainingQuantity >= MAX_INVENTORY_QUANTITY || !INVENTORY_UNITS.has(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity from 0 up to, but not including, 1000 and a supported unit are required.');
   }
   if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
   if (!Number.isInteger(expectedVersion)) return sendInvalidRequest(response, 'A batch version is required.');
@@ -387,7 +411,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
     });
     if (error) throw error;
 
-    const batch = await getInventoryBatchDetail(deviceId, batchUid);
+    const batch = await getInventoryBatchDetail(deviceId, batchUid, request.fridgeUid);
     await notifySharedInventory(deviceId, batchUid, 'updated');
     return response.json({ batch });
   } catch (error) {
@@ -406,7 +430,7 @@ inventoryRouter.put('/inventory/batches/:batchUid/restock-rule', async (request,
   const targetQuantity = enabled ? asNumber(request.body?.targetQuantity) : null;
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
-  if (enabled && (minimumQuantity === null || targetQuantity === null || minimumQuantity < 0 || targetQuantity <= minimumQuantity)) {
+  if (enabled && (minimumQuantity === null || targetQuantity === null || minimumQuantity < 0 || minimumQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity <= minimumQuantity)) {
     return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
   }
 
@@ -568,11 +592,11 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   const presetUid = body.presetUid === null || body.presetUid === undefined ? null : body.presetUid;
   const expiryWarningDays = getExpiryWarningDays(body);
 
-  if (!name || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
+  if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
     return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
   }
-  if (quantity === null || quantity <= 0 || typeof body.unit !== 'string' || !body.unit.trim()) {
-    return sendInvalidRequest(response, 'A positive quantity and unit are required.');
+  if (quantity === null || quantity <= 0 || quantity >= MAX_INVENTORY_QUANTITY || !INVENTORY_UNITS.has(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity above 0 and below 1000 with a supported unit is required.');
   }
   if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
@@ -581,7 +605,7 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
     return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
   }
-  if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockTarget <= restockMinimum)) {
+  if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockMinimum >= MAX_INVENTORY_QUANTITY || restockTarget >= MAX_INVENTORY_QUANTITY || restockTarget <= restockMinimum)) {
     return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
   }
   if (presetUid !== null && (typeof presetUid !== 'string' || !UUID_PATTERN.test(presetUid))) {

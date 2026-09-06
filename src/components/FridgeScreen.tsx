@@ -1,5 +1,6 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState, type RefObject } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
 import {
   createInventoryBatch,
@@ -69,6 +70,8 @@ const FILTERS: FilterOption[] = [
   { key: 'expiring', icon: 'time-outline', tone: '#D27619', tint: '#FFF2E3' },
   { key: 'restock', icon: 'bag-handle-outline', tone: '#168FA8', tint: '#E8F9FA' },
 ];
+
+const FILTER_SWIPE_HINT_KEY = 'kitchmemo.fridge.filter-swipe-hint.v1';
 
 const CATEGORIES: FoodCategory[] = ['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other'];
 
@@ -152,6 +155,8 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [isRefreshingInventory, setIsRefreshingInventory] = useState(false);
+  const [isSyncingInventory, setIsSyncingInventory] = useState(false);
+  const inventoryLoadRef = useRef<Promise<void> | null>(null);
   const [hasInventoryLoadError, setHasInventoryLoadError] = useState(false);
   const [isSpaceMenuVisible, setIsSpaceMenuVisible] = useState(false);
   const [sharingContext, setSharingContext] = useState<FridgeAccessContext | null>(null);
@@ -159,6 +164,20 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
   const [isAssistantVisible, setIsAssistantVisible] = useState(false);
+  const [saveConfirmationVisible, setSaveConfirmationVisible] = useState(false);
+  const [showFilterSwipeHint, setShowFilterSwipeHint] = useState(false);
+  const filterSwipeHintDismissedRef = useRef(false);
+
+  useEffect(() => {
+    let mounted = true;
+    // Arthur: NarIyirm
+    // 中文：滑动提示只对尚未发现横向筛选栏的设备显示一次，读取失败时保持界面安静，不阻塞库存加载。
+    // EN: The swipe hint appears once for devices that have not discovered the horizontal filter rail; storage failures stay quiet and never block inventory loading.
+    void AsyncStorage.getItem(FILTER_SWIPE_HINT_KEY).then((value) => {
+      if (mounted && !filterSwipeHintDismissedRef.current && value !== 'seen') setShowFilterSwipeHint(true);
+    }).catch(() => undefined);
+    return () => { mounted = false; };
+  }, []);
 
   // Arthur: NarIyirm
   // 中文：初次进入、下拉刷新和后台同步共用此加载器；最终调用 inventoryApi.getInventorySnapshot 并替换页面 snapshot。
@@ -166,16 +185,29 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const loadInventory = useCallback(async (mode: InventoryLoadMode = 'background') => {
     if (mode === 'initial') setIsLoadingInventory(true);
     if (mode === 'manual') setIsRefreshingInventory(true);
+    if (mode === 'background') setIsSyncingInventory(true);
     try {
-      const nextSnapshot = await getInventorySnapshot();
-      setSnapshot(nextSnapshot);
-      setHasInventoryLoadError(false);
+      // Arthur: NarIyirm
+      // 中文：Realtime、保存后对账和手动刷新共用同一个在途请求，避免同一次库存变更重复下载完整快照。
+      // EN: Realtime, post-save reconciliation, and manual refresh share one in-flight request so one inventory mutation cannot download the full snapshot repeatedly.
+      if (!inventoryLoadRef.current) {
+        inventoryLoadRef.current = getInventorySnapshot()
+          .then((nextSnapshot) => {
+            setSnapshot(nextSnapshot);
+            setHasInventoryLoadError(false);
+          })
+          .finally(() => {
+            inventoryLoadRef.current = null;
+          });
+      }
+      await inventoryLoadRef.current;
     } catch (error) {
       setHasInventoryLoadError(true);
       throw error;
     } finally {
       if (mode === 'initial') setIsLoadingInventory(false);
       if (mode === 'manual') setIsRefreshingInventory(false);
+      if (mode === 'background') setIsSyncingInventory(false);
     }
   }, []);
 
@@ -225,7 +257,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     // EN: After sharing succeeds, refresh both access state and inventory so name, mode, and merged data become visible in the same screen cycle.
     setSharingContext(nextContext);
     requestImmediateSyncProbe();
-    await loadInventory();
+    void loadInventory('background').catch(() => undefined);
   }, [loadInventory]);
 
   const inventory = useMemo<InventoryItem[]>(() => (snapshot?.batches ?? []).map((batch) => {
@@ -246,6 +278,15 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const currentScopeLabel = snapshot?.fridge.mode === 'shared'
     ? snapshot.fridge.name
     : t.fridge.scopes.personal;
+  const selectedBatch = selectedBatchUid
+    ? snapshot?.batches.find((batch) => batch.id === selectedBatchUid) ?? null
+    : null;
+
+  useEffect(() => {
+    if (!saveConfirmationVisible) return;
+    const timer = setTimeout(() => setSaveConfirmationVisible(false), 2200);
+    return () => clearTimeout(timer);
+  }, [saveConfirmationVisible]);
 
   // Arthur: NarIyirm
   // 中文：界面语言只改变展示文案，筛选始终使用稳定的内部键，避免切换语言时丢失当前条件。
@@ -280,6 +321,12 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     setSearchTerm('');
     setActiveFilter(null);
     setActiveCategory(null);
+  }, []);
+
+  const dismissFilterSwipeHint = useCallback(() => {
+    filterSwipeHintDismissedRef.current = true;
+    setShowFilterSwipeHint(false);
+    void AsyncStorage.setItem(FILTER_SWIPE_HINT_KEY, 'seen').catch(() => undefined);
   }, []);
 
   const openAddSheet = useCallback(() => setIsAddSheetVisible(true), []);
@@ -360,8 +407,8 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     setEntrySource('manual');
   }, []);
   // Arthur: NarIyirm
-  // 中文：新增表单的提交终点；调用 inventoryApi.createInventoryBatch，成功后重新读取 GET /api/inventory 更新页面。
-  // EN: This is the create-form endpoint; it calls inventoryApi.createInventoryBatch and then rereads GET /api/inventory to refresh the screen.
+  // 中文：新增表单只等待权威写入，成功后立即关闭保存态，完整快照在后台静默对账。
+  // EN: The create form waits only for the authoritative write, then leaves the save state immediately while the full snapshot reconciles silently.
   const saveInventoryEntry = useCallback(async (submission: InventoryEntrySubmission) => {
     // Arthur: NarIyirm
     // 中文：手动录入和识别录入共用同一提交对象；后端根据 Device-ID 决定写入的冰箱。
@@ -384,12 +431,12 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       storageZone: submission.batch.storageZone,
       unit: submission.batch.unit,
     });
-    await loadInventory();
+    void loadInventory('background').catch(() => undefined);
   }, [loadInventory]);
 
   // Arthur: NarIyirm
-  // 中文：同一详情抽屉中的编辑表单提交当前批次 version，合并更新后的详情与补货规则，再刷新背后的库存列表。
-  // EN: The editor inside the detail sheet submits its current batch version, merges the updated detail and restock rule, then refreshes the inventory behind it.
+  // 中文：详情编辑仍依次保存批次和补货规则，但列表对账不再延长表单的“正在保存”状态。
+  // EN: Detail edits still save the batch and restock rule in order, but list reconciliation no longer extends the form's saving state.
   const saveEditedInventoryEntry = useCallback(async (editingBatch: InventoryBatchDetail, submission: InventoryEntrySubmission) => {
     const updated = await updateInventoryBatch(editingBatch.id, {
       categoryCode: submission.batch.categoryCode,
@@ -402,13 +449,24 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       storageZone: submission.batch.storageZone,
       unit: submission.batch.unit,
     });
-    const restock = await setInventoryRestockRule(editingBatch.id, submission.restockRule ? {
+    const nextRestockRule = submission.restockRule ? {
       enabled: true,
       minimumQuantity: submission.restockRule.minimumQuantity,
       targetQuantity: submission.restockRule.targetQuantity,
-    } : null);
-    await loadInventory();
-    return { ...updated.batch, restockRule: restock.restockRule };
+    } : null;
+    const currentRestockRule = editingBatch.restockRule;
+    const restockUnchanged = nextRestockRule?.enabled === currentRestockRule?.enabled
+      && nextRestockRule?.minimumQuantity === currentRestockRule?.minimumQuantity
+      && nextRestockRule?.targetQuantity === currentRestockRule?.targetQuantity;
+    // Arthur: NarIyirm
+    // 中文：补货阈值没有变化时不再发送第二个 mutation，录屏中只修改有效期的保存因此只需一次网络往返。
+    // EN: Skip the second mutation when restock thresholds are unchanged, so expiry-only edits in the recording need a single network round trip.
+    const restockRule = restockUnchanged
+      ? currentRestockRule
+      : (await setInventoryRestockRule(editingBatch.id, nextRestockRule)).restockRule;
+    void loadInventory('background').catch(() => undefined);
+    setSaveConfirmationVisible(true);
+    return { ...updated.batch, restockRule };
   }, [loadInventory]);
 
   const renderInventoryItem = useCallback(({ item }: ListRenderItemInfo<InventoryItem>) => {
@@ -469,20 +527,44 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
           <FridgeAssistantButton onPress={() => setIsAssistantVisible(true)} />
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filterRow}>
-          {FILTERS.map((filter) => (
-            <FridgeFilterChip
-              key={filter.key}
-              count={filterCounts[filter.key]}
-              icon={filter.icon}
-              label={t.fridge.filters[filter.key]}
-              onPress={() => setActiveFilter((current) => current === filter.key ? null : filter.key)}
-              selected={activeFilter === filter.key}
-              tint={filter.tint}
-              tone={filter.tone}
-            />
-          ))}
-        </ScrollView>
+        <View style={styles.filterBar}>
+          <FridgeFilterChip
+            count={inventory.length}
+            icon="apps-outline"
+            label={t.fridge.filters.all}
+            onPress={clearFilters}
+            selected={!hasActiveConditions}
+            tint="#EEEFFD"
+            tone="#6255D9"
+          />
+          <View style={styles.scrollableFilters}>
+            <ScrollView
+              contentContainerStyle={styles.filterRow}
+              horizontal
+              onScrollBeginDrag={dismissFilterSwipeHint}
+              showsHorizontalScrollIndicator={false}
+            >
+              {FILTERS.map((filter) => (
+                <FridgeFilterChip
+                  key={filter.key}
+                  count={filterCounts[filter.key]}
+                  icon={filter.icon}
+                  label={t.fridge.filters[filter.key]}
+                  onPress={() => setActiveFilter((current) => current === filter.key ? null : filter.key)}
+                  selected={activeFilter === filter.key}
+                  tint={filter.tint}
+                  tone={filter.tone}
+                />
+              ))}
+            </ScrollView>
+            {showFilterSwipeHint ? (
+              <View accessibilityLabel={t.fridge.filterSwipeHint} pointerEvents="none" style={styles.filterSwipeHint}>
+                <Text style={styles.filterSwipeHintText}>{t.fridge.filterSwipeHint}</Text>
+                <Ionicons name="arrow-forward" size={14} color="#276D70" />
+              </View>
+            ) : null}
+          </View>
+        </View>
       </View>
 
       <View style={styles.content}>
@@ -515,7 +597,12 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
           <View style={styles.sectionHeading}>
             <View style={styles.headingCopy}>
               <Text numberOfLines={1} style={styles.heading}>{sectionTitle}</Text>
-              <Text numberOfLines={1} style={styles.subheading}>{t.fridge.itemCount(visibleItems.length, hasActiveConditions)}</Text>
+              <View style={styles.inventoryStatusRow}>
+                <Text numberOfLines={1} style={styles.subheading}>{t.fridge.itemCount(visibleItems.length, hasActiveConditions)}</Text>
+                {isSyncingInventory ? (
+                  <ActivityIndicator accessibilityLabel={t.status.connecting} color="#168ACB" size="small" />
+                ) : null}
+              </View>
             </View>
             <View style={styles.headingActions}>
               {hasActiveConditions ? (
@@ -595,11 +682,18 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       <InventoryItemDetailSheet
         batchUid={selectedBatchUid}
         blurTarget={blurTarget}
+        initialBatch={selectedBatch}
         onChanged={loadInventory}
         onClose={() => setSelectedBatchUid(null)}
         onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
       />
+      {saveConfirmationVisible ? (
+        <View accessibilityLiveRegion="polite" style={styles.saveConfirmation}>
+          <Ionicons color="#FFFFFF" name="checkmark-circle" size={20} />
+          <Text style={styles.saveConfirmationText}>{t.fridge.itemDetail.saveSuccess}</Text>
+        </View>
+      ) : null}
       <FridgeSpaceMenu
         context={sharingContext}
         failed={hasSharingContextError}
@@ -651,7 +745,11 @@ const styles = StyleSheet.create({
   fridgeSwitcherText: { flex: 1, color: '#24566E', fontSize: 13, fontWeight: '800' },
   searchField: { flex: 1, minWidth: 0, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 12, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 0, color: '#203C33', fontSize: 14, fontWeight: '600' },
-  filterRow: { gap: 8, paddingTop: 13, paddingHorizontal: 16, paddingRight: 30 },
+  filterBar: { minHeight: 49, flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 13, paddingLeft: 16 },
+  scrollableFilters: { flex: 1, minWidth: 0 },
+  filterRow: { gap: 8, paddingRight: 30 },
+  filterSwipeHint: { position: 'absolute', right: 8, top: 3, minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 15, backgroundColor: '#E5F5F3' },
+  filterSwipeHintText: { color: '#276D70', fontSize: 11.5, fontWeight: '800' },
   content: { flex: 1, flexDirection: 'row', paddingBottom: 106 },
   categoryRail: { width: 102, flexGrow: 0, flexShrink: 0, paddingTop: 16, backgroundColor: '#FBFDFC' },
   categoryHeading: { paddingHorizontal: 13, color: '#6A7B74', fontSize: 12, fontWeight: '800' },
@@ -660,6 +758,7 @@ const styles = StyleSheet.create({
   sectionHeading: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 11 },
   headingCopy: { flex: 1, minWidth: 0, gap: 3 },
   heading: { color: '#173D31', fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
+  inventoryStatusRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 7 },
   subheading: { color: '#61766D', fontSize: 12, fontWeight: '600' },
   headingActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   clearButton: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFF1E3' },
@@ -668,6 +767,8 @@ const styles = StyleSheet.create({
   cardRow: { justifyContent: 'space-between', gap: 10 },
   emptyList: { flexGrow: 1, paddingBottom: 16 },
   loadingState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center' },
+  saveConfirmation: { position: 'absolute', zIndex: 30, right: 18, bottom: 112, left: 120, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 16, borderRadius: 14, backgroundColor: '#168A6B', boxShadow: '0 3px 8px rgba(22, 90, 75, 0.2)' },
+  saveConfirmationText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   emptyState: { flex: 1, minHeight: 300, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 18, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
   emptyIcon: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center', borderRadius: 34, borderCurve: 'continuous', backgroundColor: '#EDF6F2' },
   emptyTitle: { marginTop: 17, color: '#1B3D33', fontSize: 18, fontWeight: '800', textAlign: 'center' },
