@@ -1,6 +1,7 @@
 import express from 'express';
 import { inventoryRouter } from './routes/inventory.js';
 import { recognitionRouter } from './routes/recognition.js';
+import { barcodeProductsRouter } from './routes/barcodeProducts.js';
 import { supabase } from './supabase.js';
 import cartRouter from './routes/cart.js';
 import restockRouter from './routes/restock.js';
@@ -50,10 +51,15 @@ app.use(
   databaseRateLimit(rateLimitPolicies.photoRecognition, (request) => request.deviceId),
 );
 app.use(
+  '/api/barcode-products',
+  databaseRateLimit(rateLimitPolicies.barcodeLookup, (request) => request.deviceId),
+);
+app.use(
   '/api/fridges/join',
   databaseRateLimit(rateLimitPolicies.fridgeJoin, (request) => request.deviceId),
 );
 app.use('/api', inventoryRouter);
+app.use('/api', barcodeProductsRouter);
 app.use('/api', cartRouter);
 app.use('/api', restockRouter);
 app.use('/api', notificationsRouter);

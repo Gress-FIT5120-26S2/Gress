@@ -501,8 +501,8 @@ inventoryRouter.get('/food-presets/suggestion', async (request, response) => {
 });
 
 // Arthur: NarIyirm
-// 中文：只有用户明确点击“一键生成”才调用两个免费模型；标准名和别名二次命中时直接复用已有 preset 与图标。
-// EN: The two free models run only after an explicit one-click action; a second canonical/alias match reuses the existing preset and icon.
+// 中文：只有用户明确触发“一键生成”或条码扫描补全时才调用两个免费模型；标准名和别名二次命中时直接复用已有 preset 与图标。
+// EN: The two free models run only after an explicit one-tap generation or barcode enrichment scan; a second canonical/alias match reuses the existing preset and icon.
 inventoryRouter.post('/food-presets/generate', async (request, response) => {
   const deviceId = getDeviceId(request);
   const inputName = typeof request.body?.name === 'string' ? request.body.name.trim() : '';

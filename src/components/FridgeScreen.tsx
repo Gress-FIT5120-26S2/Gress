@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } fro
 import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
 import {
   createInventoryBatch,
+  generateFoodPreset,
   getFoodPresetSuggestion,
   getInventorySnapshot,
   setInventoryRestockRule,
@@ -12,6 +13,7 @@ import {
   type InventorySnapshot,
 } from '../services/inventoryApi';
 import type { PhotoRecognitionResult } from '../services/recognitionApi';
+import type { BarcodeProduct } from '../services/barcodeApi';
 import { getFridgeAccessContext, type FridgeAccessContext } from '../services/sharingApi';
 import { requestImmediateSyncProbe, subscribeToSync } from '../services/realtimeSync';
 import { useI18n } from '../i18n';
@@ -29,6 +31,11 @@ import {
   type InventoryEntrySubmission,
 } from './inventory-entry/InventoryEntryFlow';
 import { PhotoRecognitionCamera } from './inventory-entry/PhotoRecognitionCamera';
+import {
+  BarcodeResultReview,
+  buildBarcodeInitialValues,
+  type BarcodeDraft,
+} from './inventory-entry/BarcodeResultReview';
 import {
   buildRecognitionInitialValues,
   RecognitionResultReview,
@@ -149,6 +156,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
   const [isRecognitionCameraVisible, setIsRecognitionCameraVisible] = useState(false);
   const [recognitionDraft, setRecognitionDraft] = useState<RecognitionDraft | null>(null);
+  const [barcodeDraft, setBarcodeDraft] = useState<BarcodeDraft | null>(null);
   const [recognitionInitialValues, setRecognitionInitialValues] = useState<InventoryEntryInitialValues | undefined>();
   const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
@@ -342,6 +350,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     }
     if (method === 'camera') {
       setRecognitionDraft(null);
+      setBarcodeDraft(null);
       setRecognitionInitialValues(undefined);
       setIsRecognitionCameraVisible(true);
     }
@@ -389,6 +398,29 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     setIsRecognitionCameraVisible(false);
   }, [t.fridge.photoRecognition.foodNames]);
 
+  const handleBarcodeProduct = useCallback(async (product: BarcodeProduct) => {
+    let suggestion = null;
+    let enrichmentSource: BarcodeDraft['enrichmentSource'] = null;
+    try {
+      const presetResult = await getFoodPresetSuggestion(product.name);
+      suggestion = presetResult.suggestion;
+      if (suggestion) {
+        enrichmentSource = 'preset';
+      } else {
+        const generatedResult = await generateFoodPreset(product.name);
+        suggestion = generatedResult.suggestion;
+        enrichmentSource = generatedResult.generated ? 'ai' : 'preset';
+      }
+    } catch {
+      // Arthur: NarIyirm
+      // 中文：AI 补全失败不应覆盖已经成功的条码查询；用户仍可在共用表单中补齐图标之外的库存字段。
+      // EN: AI enrichment failure must not replace a successful barcode lookup; users can still complete inventory fields in the shared form.
+      suggestion = null;
+    }
+    setBarcodeDraft({ enrichmentSource, initialValues: buildBarcodeInitialValues(product, suggestion), product, suggestion });
+    setIsRecognitionCameraVisible(false);
+  }, []);
+
   const continueRecognitionEntry = useCallback((draft: RecognitionDraft) => {
     setRecognitionInitialValues(draft.initialValues);
     setRecognitionDraft(null);
@@ -398,6 +430,18 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
 
   const retakeRecognitionPhoto = useCallback(() => {
     setRecognitionDraft(null);
+    setIsRecognitionCameraVisible(true);
+  }, []);
+
+  const continueBarcodeEntry = useCallback((draft: BarcodeDraft) => {
+    setRecognitionInitialValues(draft.initialValues);
+    setBarcodeDraft(null);
+    setEntrySource('barcode');
+    setIsManualEntryVisible(true);
+  }, []);
+
+  const rescanBarcode = useCallback(() => {
+    setBarcodeDraft(null);
     setIsRecognitionCameraVisible(true);
   }, []);
 
@@ -667,7 +711,9 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
         visible={isManualEntryVisible}
       />
       <PhotoRecognitionCamera
+        barcodeEnabled
         onClose={() => setIsRecognitionCameraVisible(false)}
+        onBarcodeProduct={handleBarcodeProduct}
         onManualFallback={openManualFallback}
         onRecognised={handlePhotoRecognised}
         visible={isRecognitionCameraVisible}
@@ -687,6 +733,13 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
         onClose={() => setSelectedBatchUid(null)}
         onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
+      />
+      <BarcodeResultReview
+        draft={barcodeDraft}
+        onClose={() => setBarcodeDraft(null)}
+        onContinue={continueBarcodeEntry}
+        onRescan={rescanBarcode}
+        visible={barcodeDraft !== null}
       />
       {saveConfirmationVisible ? (
         <View accessibilityLiveRegion="polite" style={styles.saveConfirmation}>

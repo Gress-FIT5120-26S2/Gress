@@ -140,8 +140,8 @@ export function getFoodPresetSuggestion(query: string): Promise<{ suggestion: Fo
 }
 
 // Arthur: NarIyirm
-// 中文：只有预设查询未命中且用户明确点击后才调用生成接口；服务端负责 Gemini、Cloudflare、去背景和全局 preset 缓存。
-// EN: Call generation only after a preset miss and an explicit user action; the server owns Gemini, Cloudflare, background removal, and global preset caching.
+// 中文：预设查询未命中后，由用户触发的一键生成或条码扫描流程调用此接口；服务端负责 Gemini、Cloudflare、去背景和全局 preset 缓存。
+// EN: After a preset miss, an explicit one-tap generation or barcode scan flow calls this endpoint; the server owns Gemini, Cloudflare, background removal, and global preset caching.
 export function generateFoodPreset(query: string): Promise<{ generated: boolean; suggestion: FoodPresetSuggestion }> {
   return requestApi<{ generated: boolean; suggestion: FoodPresetSuggestion }>('/api/food-presets/generate', {
     body: JSON.stringify({ name: query }),

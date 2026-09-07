@@ -27,6 +27,11 @@ export const rateLimitPolicies = Object.freeze({
     scope: 'photo-recognition-device',
     windowSeconds: positiveInteger(process.env.PHOTO_RECOGNITION_RATE_LIMIT_WINDOW_SECONDS, 60 * 60),
   },
+  barcodeLookup: {
+    limit: positiveInteger(process.env.BARCODE_LOOKUP_RATE_LIMIT_MAX, 60),
+    scope: 'barcode-lookup-device',
+    windowSeconds: positiveInteger(process.env.BARCODE_LOOKUP_RATE_LIMIT_WINDOW_SECONDS, 60 * 60),
+  },
   fridgeJoin: {
     limit: positiveInteger(process.env.FRIDGE_JOIN_RATE_LIMIT_MAX, 10),
     scope: 'fridge-join-device',
