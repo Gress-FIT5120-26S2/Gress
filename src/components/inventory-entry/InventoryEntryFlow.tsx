@@ -21,7 +21,7 @@ import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
 import { MAX_INVENTORY_NAME_LENGTH, MAX_INVENTORY_QUANTITY, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
-export type InventoryEntrySource = 'manual' | 'recognition';
+export type InventoryEntrySource = 'manual' | 'recognition' | 'barcode';
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
 export type InventoryCategoryCode = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
 export type InventoryUnit = 'item' | 'g' | 'kg' | 'ml' | 'L' | 'bag' | 'bottle' | 'box';

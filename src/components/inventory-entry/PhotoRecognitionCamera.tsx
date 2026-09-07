@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { CameraView, useCameraPermissions, type CameraType, type FlashMode } from 'expo-camera';
+import { CameraView, useCameraPermissions, type BarcodeScanningResult, type CameraType, type FlashMode } from 'expo-camera';
 import { Image } from 'expo-image';
 import { ImageManipulator, SaveFormat } from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
@@ -16,29 +16,37 @@ import {
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import { recogniseFoodPhoto, type PhotoRecognitionResult } from '../../services/recognitionApi';
+import { lookupBarcodeProduct, type BarcodeProduct } from '../../services/barcodeApi';
+import { getApiErrorCode } from '../../services/apiClient';
 
-type RecognitionStage = 'camera' | 'recognising' | 'unknown' | 'error';
+type RecognitionStage = 'camera' | 'recognising' | 'barcodeLookup' | 'barcodeNotFound' | 'barcodeInvalid' | 'unknown' | 'error';
+type CaptureMode = 'photo' | 'barcode';
 
 type PhotoRecognitionCameraProps = {
   onClose: () => void;
   onManualFallback: () => void;
   onRecognised: (result: PhotoRecognitionResult, photoUri: string) => void | Promise<void>;
+  barcodeEnabled?: boolean;
+  onBarcodeProduct?: (product: BarcodeProduct) => void | Promise<void>;
   visible: boolean;
 };
 
 const FLASH_SEQUENCE: FlashMode[] = ['auto', 'on', 'off'];
 
 // Arthur: NarIyirm
-// 中文：拍照识别流程入口；负责相机/相册与图片规范化，识别请求在 recognitionApi，结果交回 FridgeScreen 继续预填。
-// EN: This starts photo recognition, handling camera/gallery and image normalization while recognitionApi sends the request and FridgeScreen receives the prefill result.
+// 中文：智能识别入口在同一相机中编排拍照与商品条码；两种结果都交回 FridgeScreen 核对后进入共用表单。
+// EN: This smart entry point orchestrates photos and product barcodes in one camera; both results return to FridgeScreen for review before the shared form.
 export function PhotoRecognitionCamera({
   onClose,
   onManualFallback,
   onRecognised,
+  barcodeEnabled = false,
+  onBarcodeProduct,
   visible,
 }: PhotoRecognitionCameraProps) {
   const { t } = useI18n();
   const copy = t.fridge.photoRecognition;
+  const barcodeCopy = t.fridge.barcodeRecognition;
   const cameraRef = useRef<CameraView>(null);
   const [permission, requestPermission] = useCameraPermissions();
   const [stage, setStage] = useState<RecognitionStage>('camera');
@@ -47,6 +55,8 @@ export function PhotoRecognitionCamera({
   const [facing, setFacing] = useState<CameraType>('back');
   const [flash, setFlash] = useState<FlashMode>('auto');
   const [showSupportedFoods, setShowSupportedFoods] = useState(false);
+  const [mode, setMode] = useState<CaptureMode>('photo');
+  const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
 
   useEffect(() => {
     if (!visible) return;
@@ -54,6 +64,8 @@ export function PhotoRecognitionCamera({
     setCapturedUri(null);
     setCameraReady(false);
     setShowSupportedFoods(false);
+    setMode('photo');
+    setScannedBarcode(null);
   }, [visible]);
 
   // Arthur: NarIyirm
@@ -117,6 +129,33 @@ export function PhotoRecognitionCamera({
     setShowSupportedFoods(false);
   }, []);
 
+  const selectMode = useCallback((nextMode: CaptureMode) => {
+    setMode(nextMode);
+    setCapturedUri(null);
+    setScannedBarcode(null);
+    setStage('camera');
+  }, []);
+
+  // Arthur: NarIyirm
+  // 中文：原生扫描回调先锁定本次条码并显示查询状态，再通过 Express 获取清洗后的商品资料，避免连续帧重复请求。
+  // EN: The native scan callback locks the barcode and shows lookup state before Express returns normalized product data, preventing duplicate requests across frames.
+  const scanBarcode = useCallback(async ({ data }: BarcodeScanningResult) => {
+    if (mode !== 'barcode' || stage !== 'camera' || !onBarcodeProduct) return;
+    const barcode = data.trim();
+    setScannedBarcode(barcode);
+    setStage('barcodeLookup');
+    try {
+      const result = await lookupBarcodeProduct(barcode);
+      if (!result.found || !result.product) {
+        setStage('barcodeNotFound');
+        return;
+      }
+      await onBarcodeProduct(result.product);
+    } catch (error) {
+      setStage(getApiErrorCode(error) === 'invalid_barcode' ? 'barcodeInvalid' : 'error');
+    }
+  }, [mode, onBarcodeProduct, stage]);
+
   const cycleFlash = useCallback(() => {
     setFlash((current) => FLASH_SEQUENCE[(FLASH_SEQUENCE.indexOf(current) + 1) % FLASH_SEQUENCE.length]);
   }, []);
@@ -141,13 +180,15 @@ export function PhotoRecognitionCamera({
     >
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        {isCameraAvailable && stage === 'camera' ? (
+        {isCameraAvailable && (stage === 'camera' || stage === 'barcodeLookup') ? (
           <CameraView
-            active={visible}
+            active={visible && stage === 'camera'}
+            barcodeScannerSettings={mode === 'barcode' ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] } : undefined}
             facing={facing}
             flash={flash}
             mode="picture"
             onCameraReady={() => setCameraReady(true)}
+            onBarcodeScanned={mode === 'barcode' && stage === 'camera' ? scanBarcode : undefined}
             ref={cameraRef}
             style={StyleSheet.absoluteFill}
           />
@@ -167,7 +208,7 @@ export function PhotoRecognitionCamera({
           >
             <Ionicons color="#FFFFFF" name="close" size={23} />
           </Pressable>
-          <Text style={styles.title}>{copy.cameraTitle}</Text>
+          <Text style={styles.title}>{mode === 'barcode' ? barcodeCopy.cameraTitle : copy.cameraTitle}</Text>
           {isCameraAvailable && stage === 'camera' ? (
             <Pressable
               accessibilityLabel={flashLabel}
@@ -206,30 +247,37 @@ export function PhotoRecognitionCamera({
         {isCameraAvailable && stage === 'camera' ? (
           <>
             <View style={[styles.modeSwitch, { top: topInset + 64 }]}>
-              <View style={styles.modeSelected}>
-                <Ionicons color="#174E43" name="scan-outline" size={17} />
-                <Text style={styles.modeSelectedText}>{copy.photoMode}</Text>
-              </View>
-              <View accessibilityLabel={copy.barcodeComing} accessibilityState={{ disabled: true }} style={styles.modeDisabled}>
-                <Ionicons color="#D2D7D4" name="barcode-outline" size={17} />
-                <Text style={styles.modeDisabledText}>{copy.barcodeMode}</Text>
-                <Text style={styles.soonText}>{copy.soon}</Text>
-              </View>
+              <Pressable accessibilityRole="button" onPress={() => selectMode('photo')} style={mode === 'photo' ? styles.modeSelected : styles.modeAvailable}>
+                <Ionicons color={mode === 'photo' ? '#174E43' : '#D2D7D4'} name="scan-outline" size={17} />
+                <Text style={mode === 'photo' ? styles.modeSelectedText : styles.modeAvailableText}>{copy.photoMode}</Text>
+              </Pressable>
+              {barcodeEnabled ? (
+                <Pressable accessibilityRole="button" onPress={() => selectMode('barcode')} style={mode === 'barcode' ? styles.modeSelected : styles.modeAvailable}>
+                  <Ionicons color={mode === 'barcode' ? '#174E43' : '#D2D7D4'} name="barcode-outline" size={17} />
+                  <Text style={mode === 'barcode' ? styles.modeSelectedText : styles.modeAvailableText}>{copy.barcodeMode}</Text>
+                </Pressable>
+              ) : (
+                <View accessibilityLabel={copy.barcodeComing} accessibilityState={{ disabled: true }} style={styles.modeDisabled}>
+                  <Ionicons color="#D2D7D4" name="barcode-outline" size={17} />
+                  <Text style={styles.modeDisabledText}>{copy.barcodeMode}</Text>
+                  <Text style={styles.soonText}>{copy.soon}</Text>
+                </View>
+              )}
             </View>
-            <View pointerEvents="none" style={styles.guideWrap}>
-              <View style={styles.guideFrame}>
+            <View pointerEvents="none" style={[styles.guideWrap, mode === 'barcode' ? styles.barcodeGuideWrap : null]}>
+              <View style={mode === 'barcode' ? styles.barcodeGuideFrame : styles.guideFrame}>
                 <View style={[styles.corner, styles.cornerTopLeft]} />
                 <View style={[styles.corner, styles.cornerTopRight]} />
                 <View style={[styles.corner, styles.cornerBottomLeft]} />
                 <View style={[styles.corner, styles.cornerBottomRight]} />
               </View>
               <View style={styles.hintPill}>
-                <Ionicons color="#FFFFFF" name="sparkles-outline" size={14} />
-                <Text style={styles.cameraHint}>{copy.cameraHint}</Text>
+                <Ionicons color="#FFFFFF" name={mode === 'barcode' ? 'barcode-outline' : 'sparkles-outline'} size={14} />
+                <Text style={styles.cameraHint}>{mode === 'barcode' ? barcodeCopy.cameraHint : copy.cameraHint}</Text>
               </View>
             </View>
             <View style={styles.zoomPill}><Text style={styles.zoomText}>1×</Text></View>
-            <View style={styles.captureBar}>
+            {mode === 'photo' ? <View style={styles.captureBar}>
               <Pressable
                 accessibilityLabel={copy.choosePhotos}
                 accessibilityRole="button"
@@ -257,7 +305,14 @@ export function PhotoRecognitionCamera({
                 <Ionicons color="#FFFFFF" name="camera-reverse-outline" size={27} />
                 <Text style={styles.dockLabel}>{copy.flip}</Text>
               </Pressable>
-            </View>
+            </View> : (
+              <View style={styles.barcodeBottomBar}>
+                <Pressable accessibilityRole="button" onPress={onManualFallback} style={({ pressed }) => [styles.manualBarcodeButton, pressed ? styles.pressed : null]}>
+                  <Ionicons color="#FFFFFF" name="create-outline" size={18} />
+                  <Text style={styles.dockLabel}>{copy.useManualShort}</Text>
+                </Pressable>
+              </View>
+            )}
           </>
         ) : null}
 
@@ -271,12 +326,22 @@ export function PhotoRecognitionCamera({
           </View>
         ) : null}
 
-        {stage === 'unknown' || stage === 'error' ? (
+        {stage === 'barcodeLookup' ? (
+          <View accessibilityLiveRegion="polite" style={styles.analysisState}>
+            <View style={styles.analysisMark}><Ionicons color="#FFFFFF" name="search-outline" size={28} /></View>
+            <ActivityIndicator color="#FFFFFF" />
+            <Text style={styles.analysisText}>{barcodeCopy.lookingUp}</Text>
+            <Text style={styles.analysisDetail}>{barcodeCopy.lookingUpDetail}</Text>
+            {scannedBarcode ? <Text style={styles.barcodeValue}>{scannedBarcode}</Text> : null}
+          </View>
+        ) : null}
+
+        {stage === 'unknown' || stage === 'barcodeNotFound' || stage === 'barcodeInvalid' || stage === 'error' ? (
           <View style={styles.resultFallback}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.fallbackEyebrow}>{stage === 'unknown' ? copy.tryAgainEyebrow : copy.connectionEyebrow}</Text>
-            <Text style={styles.fallbackTitle}>{stage === 'unknown' ? copy.unknownTitle : copy.errorTitle}</Text>
-            <Text style={styles.fallbackDescription}>{stage === 'unknown' ? copy.unknownDescription : copy.errorDescription}</Text>
+            <Text style={styles.fallbackEyebrow}>{stage === 'unknown' ? copy.tryAgainEyebrow : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundEyebrow : mode === 'barcode' ? barcodeCopy.errorEyebrow : copy.connectionEyebrow}</Text>
+            <Text style={styles.fallbackTitle}>{stage === 'unknown' ? copy.unknownTitle : stage === 'barcodeNotFound' ? barcodeCopy.notFoundTitle : stage === 'barcodeInvalid' ? barcodeCopy.invalidTitle : mode === 'barcode' ? barcodeCopy.errorTitle : copy.errorTitle}</Text>
+            <Text style={styles.fallbackDescription}>{stage === 'unknown' ? copy.unknownDescription : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundDescription : mode === 'barcode' ? barcodeCopy.errorDescription : copy.errorDescription}</Text>
             {stage === 'unknown' ? (
               <View style={styles.tipsRow}>
                 <Tip icon="restaurant-outline" label={copy.tipOneItem} />
@@ -288,14 +353,18 @@ export function PhotoRecognitionCamera({
               <Text style={styles.supportedFoods}>{copy.supportedFoodsList}</Text>
             ) : null}
             <Pressable accessibilityRole="button" onPress={retry} style={({ pressed }) => [styles.retryButton, pressed ? styles.pressed : null]}>
-              <Ionicons color="#FFFFFF" name="camera-outline" size={19} />
-              <Text style={styles.primaryButtonText}>{copy.retry}</Text>
+              <Ionicons color="#FFFFFF" name={mode === 'barcode' ? 'barcode-outline' : 'camera-outline'} size={19} />
+              <Text style={styles.primaryButtonText}>{mode === 'barcode' ? barcodeCopy.retry : copy.retry}</Text>
             </Pressable>
             <View style={styles.quietActions}>
-              <Pressable accessibilityRole="button" onPress={() => { void choosePhoto(); }} style={styles.quietButton}>
+              {mode === 'photo' ? <Pressable accessibilityRole="button" onPress={() => { void choosePhoto(); }} style={styles.quietButton}>
                 <Ionicons color="#315C51" name="images-outline" size={18} />
                 <Text style={styles.quietButtonText}>{copy.choosePhotos}</Text>
-              </Pressable>
+              </Pressable> : null}
+              {mode === 'barcode' ? <Pressable accessibilityRole="button" onPress={() => selectMode('photo')} style={styles.quietButton}>
+                <Ionicons color="#315C51" name="camera-outline" size={18} />
+                <Text style={styles.quietButtonText}>{barcodeCopy.tryPhotoRecognition}</Text>
+              </Pressable> : null}
               <View style={styles.quietDivider} />
               <Pressable accessibilityRole="button" onPress={onManualFallback} style={styles.quietButton}>
                 <Ionicons color="#315C51" name="create-outline" size={18} />
@@ -346,11 +415,15 @@ const styles = StyleSheet.create({
   modeSwitch: { position: 'absolute', alignSelf: 'center', flexDirection: 'row', padding: 4, borderRadius: 17, backgroundColor: 'rgba(12, 34, 28, 0.68)' },
   modeSelected: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 13, backgroundColor: '#F3F7F4' },
   modeSelectedText: { color: '#174E43', fontSize: 12.5, fontWeight: '800' },
+  modeAvailable: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 14, borderRadius: 13 },
+  modeAvailableText: { color: '#D2D7D4', fontSize: 12.5, fontWeight: '700' },
   modeDisabled: { minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 12 },
   modeDisabledText: { color: '#D2D7D4', fontSize: 12.5, fontWeight: '700' },
   soonText: { color: '#FFFFFF', fontSize: 8, fontWeight: '800', paddingHorizontal: 5, paddingVertical: 3, borderRadius: 7, overflow: 'hidden', backgroundColor: 'rgba(255,255,255,0.14)' },
   guideWrap: { position: 'absolute', right: 28, left: 28, top: '25%', alignItems: 'center' },
+  barcodeGuideWrap: { top: '33%' },
   guideFrame: { width: '100%', aspectRatio: 1, maxHeight: 420 },
+  barcodeGuideFrame: { position: 'relative', width: '100%', height: 190 },
   corner: { position: 'absolute', width: 54, height: 54, borderColor: 'rgba(255,255,255,0.94)' },
   cornerTopLeft: { top: 0, left: 0, borderTopWidth: 3, borderLeftWidth: 3, borderTopLeftRadius: 18 },
   cornerTopRight: { top: 0, right: 0, borderTopWidth: 3, borderRightWidth: 3, borderTopRightRadius: 18 },
@@ -361,6 +434,8 @@ const styles = StyleSheet.create({
   zoomPill: { position: 'absolute', bottom: Platform.OS === 'ios' ? 165 : 151, alignSelf: 'center', minWidth: 38, minHeight: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: 'rgba(8, 28, 23, 0.64)' },
   zoomText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800' },
   captureBar: { position: 'absolute', right: 0, bottom: 0, left: 0, minHeight: Platform.OS === 'ios' ? 142 : 128, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingHorizontal: 35, paddingTop: 16, paddingBottom: Platform.OS === 'ios' ? 30 : 18, backgroundColor: 'rgba(5, 22, 18, 0.54)' },
+  barcodeBottomBar: { position: 'absolute', right: 0, bottom: 0, left: 0, minHeight: Platform.OS === 'ios' ? 112 : 96, alignItems: 'center', paddingTop: 16, backgroundColor: 'rgba(5, 22, 18, 0.54)' },
+  manualBarcodeButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 22, borderRadius: 16, backgroundColor: 'rgba(255,255,255,0.14)' },
   dockButton: { width: 70, minHeight: 64, alignItems: 'center', justifyContent: 'center', gap: 5 },
   dockLabel: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '700' },
   shutterOuter: { width: 80, height: 80, alignItems: 'center', justifyContent: 'center', borderRadius: 40, borderWidth: 3, borderColor: '#FFFFFF', backgroundColor: 'rgba(245,130,32,0.9)' },
@@ -371,6 +446,8 @@ const styles = StyleSheet.create({
   analysisState: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center', gap: 13 },
   analysisMark: { width: 68, height: 68, alignItems: 'center', justifyContent: 'center', marginBottom: 2, borderRadius: 34, backgroundColor: 'rgba(18, 146, 154, 0.88)' },
   analysisText: { color: '#FFFFFF', fontSize: 16, fontWeight: '800' },
+  analysisDetail: { maxWidth: 310, color: 'rgba(255,255,255,0.82)', fontSize: 12.5, lineHeight: 18, textAlign: 'center' },
+  barcodeValue: { marginTop: 5, color: '#77DCE2', fontSize: 14, fontWeight: '800', letterSpacing: 1.1 },
   resultFallback: { position: 'absolute', right: 0, bottom: 0, left: 0, alignItems: 'center', paddingHorizontal: 22, paddingTop: 10, paddingBottom: Platform.OS === 'ios' ? 30 : 20, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#F8FAF8' },
   sheetHandle: { width: 42, height: 5, marginBottom: 17, borderRadius: 3, backgroundColor: '#D8DFDB' },
   fallbackEyebrow: { color: '#147E8C', fontSize: 11, fontWeight: '900', letterSpacing: 1.2, textTransform: 'uppercase' },
