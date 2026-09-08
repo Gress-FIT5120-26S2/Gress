@@ -48,7 +48,12 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<KitchenNotification | null>(null);
   const handledNotificationIdRef = useRef<string | null>(null);
+  const onCountsChangeRef = useRef(onCountsChange);
+  onCountsChangeRef.current = onCountsChange;
 
+  // Arthur: NarIyirm
+  // 中文：加载函数与父层回调的引用解耦，防止回调变化让挂载 effect 反复请求并触发限流。
+  // EN: Loading is decoupled from the parent callback reference so callback changes cannot retrigger the mount effect and flood the API.
   const load = useCallback(async (silent = false) => {
     if (!silent) setLoading(true);
     setFailed(false);
@@ -57,13 +62,13 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
       setItems(snapshot.items);
       setUnreadCount(snapshot.unreadCount);
       setBadgeCount(snapshot.badgeCount);
-      onCountsChange?.(snapshot.badgeCount, snapshot.unreadCount);
+      onCountsChangeRef.current?.(snapshot.badgeCount, snapshot.unreadCount);
     } catch {
       setFailed(true);
     } finally {
       if (!silent) setLoading(false);
     }
-  }, [onCountsChange]);
+  }, []);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => subscribeToSync(['notifications', 'inventory', 'fridge'], () => { void load(true); }), [load]);
@@ -77,9 +82,9 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
     const nextBadge = Math.max(0, badgeCount - 1);
     setUnreadCount(nextUnread);
     setBadgeCount(nextBadge);
-    onCountsChange?.(nextBadge, nextUnread);
+    onCountsChangeRef.current?.(nextBadge, nextUnread);
     try { await markNotificationRead(item.id); } catch { void load(); }
-  }, [badgeCount, load, onCountsChange, unreadCount]);
+  }, [badgeCount, load, unreadCount]);
 
   useEffect(() => {
     if (!initialNotificationId || handledNotificationIdRef.current === initialNotificationId) return;
