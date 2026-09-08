@@ -14,14 +14,15 @@ type FloatingTabBarProps = {
 };
 
 // Arthur: NarIyirm
-// 中文：个人身份功能完成后重新开放“我的”；成就仍等真实统计接口完成后再进入主导航。
-// EN: Reopen Me now that device identity is implemented; Wins stays hidden until its real metrics API is ready.
-type BottomTab = Exclude<AppTab, 'notifications' | 'achievements'>;
+// 中文：通知保留为二级页面；成就与报告从这里重新进入主导航，方便后续持续开发与验收。
+// EN: Notifications remains a secondary screen; Wins and reports return to the primary navigation for ongoing development and review.
+type BottomTab = Exclude<AppTab, 'notifications'>;
 
 const tabs: Array<{ key: BottomTab; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: 'home', icon: 'home-outline' },
   { key: 'shopping', icon: 'cart-outline' },
   { key: 'fridge', icon: 'cube-outline' },
+  { key: 'achievements', icon: 'trophy-outline' },
   { key: 'profile', icon: 'person-outline' },
 ];
 

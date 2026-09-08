@@ -19,7 +19,7 @@ import { recogniseFoodPhoto, type PhotoRecognitionResult } from '../../services/
 import { lookupBarcodeProduct, type BarcodeProduct } from '../../services/barcodeApi';
 import { getApiErrorCode } from '../../services/apiClient';
 
-type RecognitionStage = 'camera' | 'recognising' | 'barcodeLookup' | 'barcodeNotFound' | 'barcodeInvalid' | 'unknown' | 'error';
+type RecognitionStage = 'camera' | 'recognising' | 'barcodeLookup' | 'barcodeNotFound' | 'barcodeInvalid' | 'barcodeRateLimited' | 'unknown' | 'error';
 type CaptureMode = 'photo' | 'barcode';
 
 type PhotoRecognitionCameraProps = {
@@ -48,6 +48,7 @@ export function PhotoRecognitionCamera({
   const copy = t.fridge.photoRecognition;
   const barcodeCopy = t.fridge.barcodeRecognition;
   const cameraRef = useRef<CameraView>(null);
+  const barcodeScanLockedRef = useRef(false);
   const [permission, requestPermission] = useCameraPermissions();
   const [stage, setStage] = useState<RecognitionStage>('camera');
   const [cameraReady, setCameraReady] = useState(false);
@@ -66,6 +67,7 @@ export function PhotoRecognitionCamera({
     setShowSupportedFoods(false);
     setMode('photo');
     setScannedBarcode(null);
+    barcodeScanLockedRef.current = false;
   }, [visible]);
 
   // Arthur: NarIyirm
@@ -124,12 +126,14 @@ export function PhotoRecognitionCamera({
   }, [recogniseUri]);
 
   const retry = useCallback(() => {
+    barcodeScanLockedRef.current = false;
     setCapturedUri(null);
     setStage('camera');
     setShowSupportedFoods(false);
   }, []);
 
   const selectMode = useCallback((nextMode: CaptureMode) => {
+    barcodeScanLockedRef.current = false;
     setMode(nextMode);
     setCapturedUri(null);
     setScannedBarcode(null);
@@ -140,7 +144,11 @@ export function PhotoRecognitionCamera({
   // 中文：原生扫描回调先锁定本次条码并显示查询状态，再通过 Express 获取清洗后的商品资料，避免连续帧重复请求。
   // EN: The native scan callback locks the barcode and shows lookup state before Express returns normalized product data, preventing duplicate requests across frames.
   const scanBarcode = useCallback(async ({ data }: BarcodeScanningResult) => {
-    if (mode !== 'barcode' || stage !== 'camera' || !onBarcodeProduct) return;
+    if (barcodeScanLockedRef.current || mode !== 'barcode' || stage !== 'camera' || !onBarcodeProduct) return;
+    // Arthur: NarIyirm
+    // 中文：ref 在同一渲染帧内同步上锁，避免相机连续回调在 React stage 更新前并发发送相同条码请求。
+    // EN: This ref locks synchronously within the current render frame so repeated camera callbacks cannot race ahead of the React stage update.
+    barcodeScanLockedRef.current = true;
     const barcode = data.trim();
     setScannedBarcode(barcode);
     setStage('barcodeLookup');
@@ -152,7 +160,8 @@ export function PhotoRecognitionCamera({
       }
       await onBarcodeProduct(result.product);
     } catch (error) {
-      setStage(getApiErrorCode(error) === 'invalid_barcode' ? 'barcodeInvalid' : 'error');
+      const errorCode = getApiErrorCode(error);
+      setStage(errorCode === 'invalid_barcode' ? 'barcodeInvalid' : errorCode === 'rate_limited' ? 'barcodeRateLimited' : 'error');
     }
   }, [mode, onBarcodeProduct, stage]);
 
@@ -336,12 +345,12 @@ export function PhotoRecognitionCamera({
           </View>
         ) : null}
 
-        {stage === 'unknown' || stage === 'barcodeNotFound' || stage === 'barcodeInvalid' || stage === 'error' ? (
+        {stage === 'unknown' || stage === 'barcodeNotFound' || stage === 'barcodeInvalid' || stage === 'barcodeRateLimited' || stage === 'error' ? (
           <View style={styles.resultFallback}>
             <View style={styles.sheetHandle} />
-            <Text style={styles.fallbackEyebrow}>{stage === 'unknown' ? copy.tryAgainEyebrow : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundEyebrow : mode === 'barcode' ? barcodeCopy.errorEyebrow : copy.connectionEyebrow}</Text>
-            <Text style={styles.fallbackTitle}>{stage === 'unknown' ? copy.unknownTitle : stage === 'barcodeNotFound' ? barcodeCopy.notFoundTitle : stage === 'barcodeInvalid' ? barcodeCopy.invalidTitle : mode === 'barcode' ? barcodeCopy.errorTitle : copy.errorTitle}</Text>
-            <Text style={styles.fallbackDescription}>{stage === 'unknown' ? copy.unknownDescription : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundDescription : mode === 'barcode' ? barcodeCopy.errorDescription : copy.errorDescription}</Text>
+            <Text style={styles.fallbackEyebrow}>{stage === 'unknown' ? copy.tryAgainEyebrow : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundEyebrow : stage === 'barcodeRateLimited' ? barcodeCopy.rateLimitedEyebrow : mode === 'barcode' ? barcodeCopy.errorEyebrow : copy.connectionEyebrow}</Text>
+            <Text style={styles.fallbackTitle}>{stage === 'unknown' ? copy.unknownTitle : stage === 'barcodeNotFound' ? barcodeCopy.notFoundTitle : stage === 'barcodeInvalid' ? barcodeCopy.invalidTitle : stage === 'barcodeRateLimited' ? barcodeCopy.rateLimitedTitle : mode === 'barcode' ? barcodeCopy.errorTitle : copy.errorTitle}</Text>
+            <Text style={styles.fallbackDescription}>{stage === 'unknown' ? copy.unknownDescription : stage === 'barcodeNotFound' || stage === 'barcodeInvalid' ? barcodeCopy.notFoundDescription : stage === 'barcodeRateLimited' ? barcodeCopy.rateLimitedDescription : mode === 'barcode' ? barcodeCopy.errorDescription : copy.errorDescription}</Text>
             {stage === 'unknown' ? (
               <View style={styles.tipsRow}>
                 <Tip icon="restaurant-outline" label={copy.tipOneItem} />

@@ -310,7 +310,7 @@ export function InventoryItemDetailSheet({
         // Arthur: NarIyirm
         // 中文：拖动期间只更新本地草稿；关闭前一次性提交并携带版本号，避免每一帧都请求后端或覆盖共享成员的新修改。
         // EN: Dragging changes only a local draft; closing commits once with a version so frames never trigger requests or overwrite a shared member's newer edit.
-        const result = await updateInventoryBatchQuantity(batch.id, draftQuantity, batch.version);
+        const result = await updateInventoryBatchQuantity(batch.id, draftQuantity, batch.version, batch.unit);
         setBatch((current) => current ? {
           ...current,
           lifecycleState: result.batch.lifecycleState,
@@ -442,7 +442,7 @@ export function InventoryItemDetailSheet({
         enabled: true,
         minimumQuantity,
         targetQuantity,
-      } : null);
+      } : null, batch.unit);
       setBatch((current) => current ? { ...current, restockRule: result.restockRule } : current);
       await onChanged();
     } catch {

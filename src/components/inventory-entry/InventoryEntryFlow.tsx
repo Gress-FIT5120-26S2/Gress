@@ -19,7 +19,7 @@ import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inve
 import { useI18n } from '../../i18n';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
-import { MAX_INVENTORY_NAME_LENGTH, MAX_INVENTORY_QUANTITY, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
+import { getMaxInventoryQuantity, MAX_INVENTORY_NAME_LENGTH, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
 export type InventoryEntrySource = 'manual' | 'recognition' | 'barcode';
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
@@ -315,15 +315,15 @@ export function InventoryEntryFlow({
         : null;
     const nextQuantityError = !Number.isFinite(parsedQuantity) || parsedQuantity <= 0
       ? copy.validation.quantity
-      : parsedQuantity >= MAX_INVENTORY_QUANTITY
-        ? copy.validation.quantityLimit
+      : parsedQuantity >= getMaxInventoryQuantity(unit)
+        ? copy.validation.quantityLimit(getMaxInventoryQuantity(unit), unitLabel)
         : null;
     const nextPriceError = parsedPrice === null || (Number.isFinite(parsedPrice) && parsedPrice >= 0) ? null : copy.validation.price;
     setNameError(nextNameError);
     setQuantityError(nextQuantityError);
     setPriceError(nextPriceError);
     return !nextNameError && !nextQuantityError && !nextPriceError;
-  }, [copy.validation, name, price, quantity]);
+  }, [copy.validation, name, price, quantity, unit, unitLabel]);
 
   const updateMinimumQuantity = useCallback((value: number) => {
     setMinimumQuantity(value);
@@ -351,8 +351,9 @@ export function InventoryEntryFlow({
   const handleSubmit = useCallback(async () => {
     const expiry = expiryEnabled ? parseLocalDateTime(expiryDate, expiryTime) : null;
     const nextExpiryError = expiryEnabled && (!expiry || expiry.getTime() < Date.now()) ? copy.validation.expiry : null;
-    const nextRestockError = restockEnabled && (minimumQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity >= MAX_INVENTORY_QUANTITY)
-      ? copy.validation.restockLimit
+    const maxQuantity = getMaxInventoryQuantity(unit);
+    const nextRestockError = restockEnabled && (minimumQuantity >= maxQuantity || targetQuantity >= maxQuantity)
+      ? copy.validation.restockLimit(maxQuantity, unitLabel)
       : restockEnabled && targetQuantity <= minimumQuantity
         ? copy.validation.restock
         : null;
