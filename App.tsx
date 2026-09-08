@@ -162,10 +162,10 @@ function KitchMemoApp() {
   }, []);
 
   useEffect(() => {
-    if (activeTab !== 'home' && activeTab !== 'notifications') return;
+    if (activeTab !== 'home') return;
     // Arthur: NarIyirm
-    // 中文：提醒与冰箱助手已解耦；未读数只供首页信箱和独立通知页使用。
-    // EN: Reminders are decoupled from the fridge assistant; unread state now serves only the home mailbox and standalone inbox.
+    // 中文：根节点只在首页刷新角标；通知页挂载时会自行读取同一快照并回传计数，避免重复请求。
+    // EN: The root refreshes badges only on Home; the mounted inbox reads the same snapshot and reports counts back, avoiding duplicate requests.
     fetchNotifications()
       .then((snapshot) => {
         setUnreadNotificationCount(snapshot.unreadCount);
@@ -179,7 +179,7 @@ function KitchMemoApp() {
   }, [activeTab, language]);
 
   useEffect(() => subscribeToSync(['notifications', 'home'], () => {
-    if (activeTab !== 'home' && activeTab !== 'notifications') return;
+    if (activeTab !== 'home') return;
     void fetchNotifications()
       .then((snapshot) => {
         setUnreadNotificationCount(snapshot.unreadCount);
@@ -350,6 +350,15 @@ function KitchMemoApp() {
     handleCinematicNavigate('notifications');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
+  // Arthur: NarIyirm
+  // 中文：通知页的加载 effect 依赖这个回调；保持引用稳定可避免每次计数更新都重新触发列表请求。
+  // EN: The inbox loading effect depends on this callback; a stable reference prevents count updates from retriggering list requests.
+  const handleNotificationCountsChange = useCallback((badgeCount: number, unreadCount: number) => {
+    setNotificationBadgeCount(badgeCount);
+    setUnreadNotificationCount(unreadCount);
+    void setSystemNotificationBadge(badgeCount).catch(() => undefined);
+  }, []);
+
   const openSystemNotification = useCallback((notificationId?: string) => {
     setNotificationReturnTab('home');
     setNotificationTargetId(notificationId ?? null);
@@ -431,11 +440,7 @@ function KitchMemoApp() {
             <NotificationInbox
               initialNotificationId={notificationTargetId}
               onBack={() => setActiveTab(notificationReturnTab)}
-              onCountsChange={(badgeCount, unreadCount) => {
-                setNotificationBadgeCount(badgeCount);
-                setUnreadNotificationCount(unreadCount);
-                void setSystemNotificationBadge(badgeCount).catch(() => undefined);
-              }}
+              onCountsChange={handleNotificationCountsChange}
             />
           ) : activeTab === 'profile' ? (
             <ProfileScreen
