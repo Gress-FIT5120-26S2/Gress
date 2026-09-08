@@ -583,6 +583,7 @@ POST /api/food-presets/generate
 POST /api/photo-recognition
 GET /api/barcode-products/:barcode
 POST /api/inventory/batches
+POST /api/inventory/categories
 GET /api/inventory/batches/:batchUid
 PATCH /api/inventory/batches/:batchUid/quantity
 PATCH /api/inventory/batches/:batchUid
@@ -614,6 +615,7 @@ GET /api/restock
 - 新增库存：表单会提交命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`；新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`，并在同一事务保存批次级临期提前天数。历史无法可靠匹配的批次继续保留 null preset；已有有效期批次回填为 3 天。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 条码识别：Expo Camera 读取 EAN-13、EAN-8、UPC-A 或 UPC-E 后，通过已鉴权的 `GET /api/barcode-products/:barcode` 查询 Express。服务端验证 GTIN 校验位，以自定义 User-Agent 请求 Open Food Facts v3.6，只返回清洗后的名称、品牌、包装规格、分类映射、储存建议和 HTTPS 产品图；进程内缓存命中与未命中结果 24 小时，并使用数据库设备级限流保护上游。查询结果只进入可编辑核对页，再复用 `InventoryEntryFlow` 保存；第三方 `expiration_date` 不作为当前实物有效期，价格和包装日期继续由用户确认。
+- 自定义分类：`food_categories` 的非默认记录属于当前冰箱；`POST /api/inventory/categories` 限制每个冰箱最多 12 个自定义分类，并复用 Cloudflare 图标生成与透明 PNG 标准化流程。图标路径持久化在分类记录中，`GET /api/inventory` 与库存快照一次返回分类及公开 URL，进入冰箱页不会触发或等待 AI。
 - 识别预填：模型支持 banana、bittermelon、cucumber、eggplant、orange、papaya、pineapple、tomato，并返回 `fresh`、`semi_fresh` 或 `rotten`。前端用识别名称查询 `food_presets`，再以新鲜度调整基础保质期，仅预填可编辑表单且不会自动提交；未知结果、缺少预设或请求失败都允许回退手动填写。
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
 - 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会在返回 mutation 成功前写入带操作者昵称和批次详情的 `shared` 站内通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统 Push 只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员；Vercel 通过 `waitUntil` 在响应后完成该投递和审计，本地长驻 Express 在后台执行，投递失败不回滚库存 mutation。
@@ -624,6 +626,7 @@ GET /api/restock
 尚未实现：
 
 - 明确的丢弃（`discard`）入口
+- 库存数量硬上限按单位执行：`g`/`ml` 小于 1,000,000，`item`/`bag`/`bottle`/`box`/`kg`/`L` 小于 1,000；前端、Express 与数据库约束保持一致。
 
 ## 14. 建议的接口开发顺序
 

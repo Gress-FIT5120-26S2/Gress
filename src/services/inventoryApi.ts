@@ -12,6 +12,7 @@ export type InventoryCategoryCode =
 
 export type InventoryBatch = {
   categoryCode: InventoryCategoryCode;
+  categoryId: string;
   currency: string;
   expiresAt: string | null;
   expiryWarningDays: number | null;
@@ -51,7 +52,9 @@ export type InventorySnapshot = {
     code: string | null;
     colour: string | null;
     icon: string | null;
+    iconUrl: string | null;
     id: string;
+    isDefault: boolean;
     name: string;
   }>;
   fridge: {
@@ -60,6 +63,8 @@ export type InventorySnapshot = {
     uid: string;
   };
 };
+
+export type InventoryCategory = InventorySnapshot['categories'][number];
 
 export type CreateInventoryBatchInput = {
   categoryCode: InventoryCategoryCode;
@@ -108,6 +113,13 @@ export type FoodPresetSuggestion = {
 // EN: The fridge screen reads its full snapshot here; GET /api/inventory lets inventory.js aggregate batches, categories, and restock state.
 export function getInventorySnapshot(): Promise<InventorySnapshot> {
   return requestApi<InventorySnapshot>('/api/inventory');
+}
+
+export function createInventoryCategory(name: string): Promise<{ category: InventoryCategory }> {
+  return requestApi<{ category: InventoryCategory }>('/api/inventory/categories', {
+    body: JSON.stringify({ name }),
+    method: 'POST',
+  });
 }
 
 const EXPIRING_WINDOW_DAYS = 3;
@@ -166,9 +178,10 @@ export function updateInventoryBatchQuantity(
   batchUid: string,
   remainingQuantity: number,
   expectedVersion: number,
+  unit: string,
 ): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }> {
   return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/quantity`, {
-    body: JSON.stringify({ expectedVersion, remainingQuantity }),
+    body: JSON.stringify({ expectedVersion, remainingQuantity, unit }),
     method: 'PATCH',
   });
 }
@@ -192,9 +205,10 @@ export function updateInventoryBatch(
 export function setInventoryRestockRule(
   batchUid: string,
   rule: InventoryRestockRule | null,
+  unit: string,
 ): Promise<{ restockRule: InventoryRestockRule | null }> {
   return requestApi<{ restockRule: InventoryRestockRule | null }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/restock-rule`, {
-    body: JSON.stringify(rule ?? { enabled: false }),
+    body: JSON.stringify(rule ? { ...rule, unit } : { enabled: false, unit }),
     method: 'PUT',
   });
 }

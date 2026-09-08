@@ -10,6 +10,7 @@ import {
   setInventoryRestockRule,
   updateInventoryBatch,
   type InventoryBatchDetail,
+  type InventoryCategory,
   type InventorySnapshot,
 } from '../services/inventoryApi';
 import type { PhotoRecognitionResult } from '../services/recognitionApi';
@@ -19,6 +20,7 @@ import { requestImmediateSyncProbe, subscribeToSync } from '../services/realtime
 import { useI18n } from '../i18n';
 import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
+import { CreateCategoryModal } from './fridge/CreateCategoryModal';
 import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
 import { FridgeAssistantButton } from './fridge/FridgeAssistantButton';
@@ -50,6 +52,7 @@ type FoodCategory = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' |
 type InventoryLoadMode = 'background' | 'initial' | 'manual';
 
 type InventoryItem = {
+  categoryId: string;
   id: string;
   category: FoodCategory;
   storage: StorageZone;
@@ -79,6 +82,7 @@ const FILTERS: FilterOption[] = [
 ];
 
 const FILTER_SWIPE_HINT_KEY = 'kitchmemo.fridge.filter-swipe-hint.v1';
+const CATEGORY_RAIL_COLLAPSED_KEY = 'kitchmemo.fridge.category-rail-collapsed.v1';
 
 const CATEGORIES: FoodCategory[] = ['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other'];
 
@@ -90,6 +94,11 @@ const CATEGORY_STYLE: Record<FoodCategory, { tone: string; tint: string }> = {
   condiments: { tone: '#D46A1C', tint: '#FFF1E9' },
   drinks: { tone: '#148AA0', tint: '#E8F8FA' },
   other: { tone: '#697784', tint: '#F0F3F5' },
+};
+
+const CATEGORY_ICONS: Record<FoodCategory, keyof typeof Ionicons.glyphMap> = {
+  meat: 'restaurant-outline', vegetables: 'leaf-outline', fruit: 'nutrition-outline', staples: 'fast-food-outline',
+  condiments: 'flask-outline', drinks: 'water-outline', other: 'cube-outline',
 };
 
 const isStatusMatch = (item: InventoryItem, filter: FridgeFilter | null) => {
@@ -151,7 +160,9 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(initialFilter);
-  const [activeCategory, setActiveCategory] = useState<FoodCategory | null>(null);
+  const [activeCategory, setActiveCategory] = useState<string | null>(null);
+  const [categoryRailCollapsed, setCategoryRailCollapsed] = useState(false);
+  const [isCreateCategoryVisible, setIsCreateCategoryVisible] = useState(false);
   const [isAddSheetVisible, setIsAddSheetVisible] = useState(false);
   const [isManualEntryVisible, setIsManualEntryVisible] = useState(false);
   const [isRecognitionCameraVisible, setIsRecognitionCameraVisible] = useState(false);
@@ -185,6 +196,12 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       if (mounted && !filterSwipeHintDismissedRef.current && value !== 'seen') setShowFilterSwipeHint(true);
     }).catch(() => undefined);
     return () => { mounted = false; };
+  }, []);
+
+  useEffect(() => {
+    void AsyncStorage.getItem(CATEGORY_RAIL_COLLAPSED_KEY).then((value) => {
+      if (value === 'true') setCategoryRailCollapsed(true);
+    }).catch(() => undefined);
   }, []);
 
   // Arthur: NarIyirm
@@ -273,6 +290,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     return {
       amount: `${formatQuantity(batch.remainingQuantity)} ${t.fridge.manualEntry.units[batch.unit as keyof typeof t.fridge.manualEntry.units] ?? batch.unit}`,
       category,
+      categoryId: batch.categoryId,
       daysLeft: getDaysLeft(batch.expiresAt),
       emoji: batch.iconEmoji ?? CATEGORY_EMOJI[category],
       id: batch.id,
@@ -283,6 +301,15 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       storage: batch.storageZone,
     };
   }), [snapshot, t.fridge.manualEntry.units]);
+  const categories = useMemo<InventoryCategory[]>(() => snapshot?.categories ?? CATEGORIES.map((code) => ({
+    code,
+    colour: CATEGORY_STYLE[code].tone,
+    icon: CATEGORY_ICONS[code],
+    iconUrl: null,
+    id: `default:${code}`,
+    isDefault: true,
+    name: t.fridge.categories[code],
+  })), [snapshot?.categories, t.fridge.categories]);
   const currentScopeLabel = snapshot?.fridge.mode === 'shared'
     ? snapshot.fridge.name
     : t.fridge.scopes.personal;
@@ -304,7 +331,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     return inventory.filter((item) => {
       const localizedName = item.name.toLocaleLowerCase();
       const matchesName = normalizedQuery.length === 0 || localizedName.includes(normalizedQuery);
-      return matchesName && isStatusMatch(item, activeFilter) && (!activeCategory || item.category === activeCategory);
+      return matchesName && isStatusMatch(item, activeFilter) && (!activeCategory || item.categoryId === activeCategory);
     });
   }, [activeCategory, activeFilter, inventory, searchTerm, t]);
 
@@ -312,23 +339,36 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     () => Object.fromEntries(FILTERS.map(({ key }) => [key, inventory.filter((item) => isStatusMatch(item, key)).length])) as Record<FridgeFilter, number>,
     [inventory],
   );
-  const categoryCounts = useMemo(
-    () => Object.fromEntries(CATEGORIES.map((category) => [category, inventory.filter((item) => item.category === category).length])) as Record<FoodCategory, number>,
-    [inventory],
-  );
+  const categoryCounts = useMemo(() => Object.fromEntries(categories.map((category) => [category.id, inventory.filter((item) => item.categoryId === category.id).length])) as Record<string, number>, [categories, inventory]);
+  const activeCategoryRecord = activeCategory ? categories.find((category) => category.id === activeCategory) ?? null : null;
+  const railCategoryCode = activeCategoryRecord?.code && isFoodCategory(activeCategoryRecord.code) ? activeCategoryRecord.code : null;
   const hasActiveConditions = activeFilter !== null || activeCategory !== null || searchTerm.trim().length > 0;
   const sectionTitle = searchTerm.trim().length > 0
     ? t.fridge.titles.search
     : activeFilter
       ? t.fridge.titleFor(t.fridge.filters[activeFilter])
       : activeCategory
-        ? t.fridge.titleFor(t.fridge.categories[activeCategory])
+        ? t.fridge.titleFor(activeCategoryRecord?.code && isFoodCategory(activeCategoryRecord.code) ? t.fridge.categories[activeCategoryRecord.code] : activeCategoryRecord?.name ?? '')
         : t.fridge.titles.all;
 
   const clearFilters = useCallback(() => {
     setSearchTerm('');
     setActiveFilter(null);
     setActiveCategory(null);
+  }, []);
+
+  const toggleCategoryRail = useCallback(() => {
+    setCategoryRailCollapsed((current) => {
+      const next = !current;
+      void AsyncStorage.setItem(CATEGORY_RAIL_COLLAPSED_KEY, String(next)).catch(() => undefined);
+      return next;
+    });
+  }, []);
+
+  const handleCategoryCreated = useCallback((category: InventoryCategory) => {
+    setSnapshot((current) => current ? { ...current, categories: [...current.categories, category] } : current);
+    setActiveCategory(category.id);
+    setIsCreateCategoryVisible(false);
   }, []);
 
   const dismissFilterSwipeHint = useCallback(() => {
@@ -507,7 +547,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
     // EN: Skip the second mutation when restock thresholds are unchanged, so expiry-only edits in the recording need a single network round trip.
     const restockRule = restockUnchanged
       ? currentRestockRule
-      : (await setInventoryRestockRule(editingBatch.id, nextRestockRule)).restockRule;
+      : (await setInventoryRestockRule(editingBatch.id, nextRestockRule, submission.batch.unit)).restockRule;
     void loadInventory('background').catch(() => undefined);
     setSaveConfirmationVisible(true);
     return { ...updated.batch, restockRule };
@@ -612,28 +652,45 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       </View>
 
       <View style={styles.content}>
-        <View style={styles.categoryRail}>
-          <Text numberOfLines={1} style={styles.categoryHeading}>{t.fridge.categoryHeading}</Text>
-          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.categoryList}>
+        <View style={[styles.categoryRail, categoryRailCollapsed ? styles.categoryRailCollapsed : null]}>
+          <View style={[styles.categoryRailActions, categoryRailCollapsed ? styles.categoryRailActionsCollapsed : null]}>
+            <Pressable accessibilityLabel={categoryRailCollapsed ? t.fridge.categoryRail.expand : t.fridge.categoryRail.collapse} accessibilityRole="button" onPress={toggleCategoryRail} style={styles.categoryRailIconButton}>
+              <Ionicons color="#315C51" name={categoryRailCollapsed ? 'chevron-forward' : 'chevron-back'} size={19} />
+            </Pressable>
+          </View>
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.categoryList, categoryRailCollapsed ? styles.categoryListCollapsed : null]}>
             <FridgeCategoryButton
-              count={inventory.length}
-              label={t.fridge.categories.all}
-              onPress={() => setActiveCategory(null)}
-              selected={activeCategory === null}
-              tint="#EEEFFD"
-              tone="#6255D9"
+              collapsed={categoryRailCollapsed}
+              count={activeCategoryRecord ? categoryCounts[activeCategoryRecord.id] ?? 0 : inventory.length}
+              icon={railCategoryCode ? CATEGORY_ICONS[railCategoryCode] : activeCategoryRecord ? 'sparkles-outline' : 'grid-outline'}
+              iconUrl={activeCategoryRecord?.iconUrl}
+              label={railCategoryCode ? t.fridge.categories[railCategoryCode] : activeCategoryRecord?.name ?? t.fridge.categories.all}
+              onPress={categoryRailCollapsed ? toggleCategoryRail : () => setActiveCategory(null)}
+              selected={categoryRailCollapsed || activeCategory === null}
+              tint={railCategoryCode ? CATEGORY_STYLE[railCategoryCode].tint : '#EEEFFD'}
+              tone={activeCategoryRecord?.colour ?? '#6255D9'}
             />
-            {CATEGORIES.map((category) => (
+            {!categoryRailCollapsed ? categories.map((category) => {
+              const code = category.code && isFoodCategory(category.code) ? category.code : 'other';
+              const tone = category.colour ?? CATEGORY_STYLE[code].tone;
+              return (
               <FridgeCategoryButton
-                key={category}
-                count={categoryCounts[category]}
-                label={t.fridge.categories[category]}
-                onPress={() => setActiveCategory((current) => current === category ? null : category)}
-                selected={activeCategory === category}
-                tint={CATEGORY_STYLE[category].tint}
-                tone={CATEGORY_STYLE[category].tone}
+                key={category.id}
+                count={categoryCounts[category.id] ?? 0}
+                icon={CATEGORY_ICONS[code]}
+                iconUrl={category.iconUrl}
+                label={category.code && isFoodCategory(category.code) ? t.fridge.categories[category.code] : category.name}
+                onPress={() => setActiveCategory((current) => current === category.id ? null : category.id)}
+                selected={activeCategory === category.id}
+                tint={CATEGORY_STYLE[code].tint}
+                tone={tone}
               />
-            ))}
+              );
+            }) : null}
+            <Pressable accessibilityLabel={t.fridge.categoryRail.add} accessibilityRole="button" onPress={() => setIsCreateCategoryVisible(true)} style={({ pressed }) => [styles.categoryAddListButton, categoryRailCollapsed ? styles.categoryAddListButtonCollapsed : null, pressed ? styles.pressed : null]}>
+              <Ionicons color="#FFFFFF" name="add" size={21} />
+              {!categoryRailCollapsed ? <Text numberOfLines={1} style={styles.categoryAddListText}>{t.fridge.categoryRail.addShort}</Text> : null}
+            </Pressable>
           </ScrollView>
         </View>
 
@@ -734,6 +791,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
         onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
       />
+      <CreateCategoryModal copy={t.fridge.customCategory} onClose={() => setIsCreateCategoryVisible(false)} onCreated={handleCategoryCreated} visible={isCreateCategoryVisible} />
       <BarcodeResultReview
         draft={barcodeDraft}
         onClose={() => setBarcodeDraft(null)}
@@ -804,9 +862,16 @@ const styles = StyleSheet.create({
   filterSwipeHint: { position: 'absolute', right: 8, top: 3, minHeight: 30, flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 9, borderRadius: 15, backgroundColor: '#E5F5F3' },
   filterSwipeHintText: { color: '#276D70', fontSize: 11.5, fontWeight: '800' },
   content: { flex: 1, flexDirection: 'row', paddingBottom: 106 },
-  categoryRail: { width: 102, flexGrow: 0, flexShrink: 0, paddingTop: 16, backgroundColor: '#FBFDFC' },
-  categoryHeading: { paddingHorizontal: 13, color: '#6A7B74', fontSize: 12, fontWeight: '800' },
-  categoryList: { gap: 9, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 18 },
+  categoryRail: { width: 82, flexGrow: 0, flexShrink: 0, paddingTop: 10, backgroundColor: '#FBFDFC' },
+  categoryRailCollapsed: { width: 52 },
+  categoryRailActions: { minHeight: 42, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 7 },
+  categoryRailActionsCollapsed: { justifyContent: 'flex-start', paddingHorizontal: 9 },
+  categoryRailIconButton: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#EAF0ED' },
+  categoryAddListButton: { width: 68, minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 3, borderRadius: 13, backgroundColor: '#F58220' },
+  categoryAddListButtonCollapsed: { width: 44 },
+  categoryAddListText: { color: '#FFFFFF', fontSize: 10.5, fontWeight: '900' },
+  categoryList: { gap: 5, paddingHorizontal: 7, paddingTop: 6, paddingBottom: 18 },
+  categoryListCollapsed: { alignItems: 'center', paddingHorizontal: 4 },
   inventoryArea: { flex: 1, minWidth: 0, paddingTop: 18, paddingRight: 14, paddingLeft: 8 },
   sectionHeading: { minHeight: 50, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 11 },
   headingCopy: { flex: 1, minWidth: 0, gap: 3 },

@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
 import { waitUntil } from '@vercel/functions';
 import { supabase } from '../supabase.js';
 import {
@@ -15,10 +16,14 @@ const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
 const STORAGE_ZONES = new Set(['chilled', 'frozen', 'pantry']);
 const INVENTORY_UNITS = new Set(['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box']);
-const MAX_INVENTORY_QUANTITY = 1000;
 const MAX_INVENTORY_NAME_LENGTH = 120;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESET_ICON_BUCKET = 'food-preset-icons';
+const CATEGORY_COLOURS = ['#147E8C', '#32915C', '#D94C8B', '#A8732D', '#D46A1C', '#6255D9'];
+
+function getMaxInventoryQuantity(unit) {
+  return unit === 'g' || unit === 'ml' ? 1_000_000 : 1_000;
+}
 
 function getDeviceId(request) {
   const deviceId = request.get('Device-ID')?.trim();
@@ -85,6 +90,11 @@ function getPresetIconUrl(iconPath) {
   return supabase.storage.from(PRESET_ICON_BUCKET).getPublicUrl(iconPath).data.publicUrl;
 }
 
+function getCategoryColour(name) {
+  const index = [...name].reduce((total, character) => total + character.codePointAt(0), 0) % CATEGORY_COLOURS.length;
+  return CATEGORY_COLOURS[index];
+}
+
 function toPresetSuggestion(preset) {
   return {
     aliases: preset.aliases,
@@ -129,7 +139,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
   const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
     supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
-    supabase.from('food_categories').select('category_uid, name, system_code, colour, icon').eq('fridge_uid', fridgeUid).order('created_at'),
+    supabase.from('food_categories').select('category_uid, name, system_code, colour, icon, icon_path, is_default').eq('fridge_uid', fridgeUid).order('created_at'),
     supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
     supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, target_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
   ]);
@@ -163,7 +173,9 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
       code: category.system_code,
       colour: category.colour,
       icon: category.icon,
+      iconUrl: getPresetIconUrl(category.icon_path),
       id: category.category_uid,
+      isDefault: category.is_default,
       name: category.name,
     })),
     batches: batches.map((batch) => {
@@ -172,6 +184,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
       const preset = batch.preset_uid ? presetByUid.get(batch.preset_uid) : null;
       return {
         categoryCode: categoryByUid.get(batch.category_uid)?.system_code ?? 'other',
+        categoryId: batch.category_uid,
         categoryName: categoryByUid.get(batch.category_uid)?.name ?? 'Other',
         currency: batch.currency,
         expiresAt: batch.expires_at,
@@ -314,6 +327,53 @@ inventoryRouter.get('/inventory', async (request, response) => {
   }
 });
 
+// Arthur: NarIyirm
+// 中文：自定义分类由当前冰箱拥有，图标只在创建时生成并持久化；库存快照随后一次返回分类，页面进入时不会等待 AI。
+// EN: A custom category belongs to the current fridge and generates its persisted icon only at creation; later inventory snapshots return it without making page entry wait for AI.
+inventoryRouter.post('/inventory/categories', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const name = typeof request.body?.name === 'string' ? request.body.name.trim() : '';
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!name || name.length > 24) return sendInvalidRequest(response, 'A category name between 1 and 24 characters is required.');
+
+  try {
+    const existing = await supabase.from('food_categories').select('category_uid').eq('fridge_uid', request.fridgeUid).eq('normalized_name', normaliseName(name)).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data) return response.status(409).json({ error: 'category_exists' });
+    const countResult = await supabase.from('food_categories').select('category_uid', { count: 'exact', head: true }).eq('fridge_uid', request.fridgeUid).eq('is_default', false);
+    if (countResult.error) throw countResult.error;
+    if ((countResult.count ?? 0) >= 12) return response.status(400).json({ error: 'category_limit_reached' });
+    if (!await consumeRateLimit({ identifier: deviceId, policy: rateLimitPolicies.aiGeneration, request, response })) return undefined;
+
+    const categoryUid = randomUUID();
+    const iconPath = `categories/${request.fridgeUid}/${categoryUid}/v${ICON_PROMPT_VERSION}.png`;
+    const iconBuffer = await generateFoodPresetIcon(name);
+    const uploadResult = await supabase.storage.from(PRESET_ICON_BUCKET).upload(iconPath, iconBuffer, { cacheControl: '31536000', contentType: 'image/png', upsert: false });
+    if (uploadResult.error) throw uploadResult.error;
+
+    const insertResult = await supabase.from('food_categories').insert({
+      category_uid: categoryUid,
+      colour: getCategoryColour(name),
+      created_by_device_id: deviceId,
+      fridge_uid: request.fridgeUid,
+      icon: 'sparkles-outline',
+      icon_path: iconPath,
+      icon_source: 'ai_generated',
+      is_default: false,
+      name,
+    }).select('category_uid, name, system_code, colour, icon, icon_path, is_default').single();
+    if (insertResult.error) {
+      await supabase.storage.from(PRESET_ICON_BUCKET).remove([iconPath]);
+      throw insertResult.error;
+    }
+    const category = insertResult.data;
+    return response.status(201).json({ category: { code: category.system_code, colour: category.colour, icon: category.icon, iconUrl: getPresetIconUrl(category.icon_path), id: category.category_uid, isDefault: category.is_default, name: category.name } });
+  } catch (error) {
+    console.error('Custom category generation failed:', error.message);
+    return response.status(503).json({ error: 'category_generation_unavailable' });
+  }
+});
+
 inventoryRouter.get('/inventory/batches/:batchUid', async (request, response) => {
   const deviceId = getDeviceId(request);
   const { batchUid } = request.params;
@@ -337,10 +397,11 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
   const { batchUid } = request.params;
   const remainingQuantity = asNumber(request.body?.remainingQuantity);
   const expectedVersion = asNumber(request.body?.expectedVersion);
+  const unit = typeof request.body?.unit === 'string' ? request.body.unit.trim() : '';
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
-  if (remainingQuantity === null || remainingQuantity < 0 || remainingQuantity >= MAX_INVENTORY_QUANTITY || !Number.isInteger(expectedVersion)) {
-    return sendInvalidRequest(response, 'A quantity from 0 up to, but not including, 1000 and a batch version are required.');
+  if (remainingQuantity === null || remainingQuantity < 0 || !INVENTORY_UNITS.has(unit) || remainingQuantity >= getMaxInventoryQuantity(unit) || !Number.isInteger(expectedVersion)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit and a batch version are required.');
   }
 
   try {
@@ -383,8 +444,8 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
     return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
   }
-  if (remainingQuantity === null || remainingQuantity < 0 || remainingQuantity >= MAX_INVENTORY_QUANTITY || !INVENTORY_UNITS.has(body.unit)) {
-    return sendInvalidRequest(response, 'A quantity from 0 up to, but not including, 1000 and a supported unit are required.');
+  if (remainingQuantity === null || remainingQuantity < 0 || !INVENTORY_UNITS.has(body.unit) || remainingQuantity >= getMaxInventoryQuantity(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
   }
   if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
   if (!Number.isInteger(expectedVersion)) return sendInvalidRequest(response, 'A batch version is required.');
@@ -430,7 +491,7 @@ inventoryRouter.put('/inventory/batches/:batchUid/restock-rule', async (request,
   const targetQuantity = enabled ? asNumber(request.body?.targetQuantity) : null;
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
   if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
-  if (enabled && (minimumQuantity === null || targetQuantity === null || minimumQuantity < 0 || minimumQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity >= MAX_INVENTORY_QUANTITY || targetQuantity <= minimumQuantity)) {
+  if (enabled && (minimumQuantity === null || targetQuantity === null || minimumQuantity < 0 || minimumQuantity >= getMaxInventoryQuantity(request.body?.unit) || targetQuantity >= getMaxInventoryQuantity(request.body?.unit) || targetQuantity <= minimumQuantity)) {
     return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
   }
 
@@ -595,8 +656,8 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
     return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
   }
-  if (quantity === null || quantity <= 0 || quantity >= MAX_INVENTORY_QUANTITY || !INVENTORY_UNITS.has(body.unit)) {
-    return sendInvalidRequest(response, 'A quantity above 0 and below 1000 with a supported unit is required.');
+  if (quantity === null || quantity <= 0 || !INVENTORY_UNITS.has(body.unit) || quantity >= getMaxInventoryQuantity(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
   }
   if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
@@ -605,7 +666,7 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
     return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
   }
-  if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockMinimum >= MAX_INVENTORY_QUANTITY || restockTarget >= MAX_INVENTORY_QUANTITY || restockTarget <= restockMinimum)) {
+  if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockMinimum >= getMaxInventoryQuantity(body.unit) || restockTarget >= getMaxInventoryQuantity(body.unit) || restockTarget <= restockMinimum)) {
     return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
   }
   if (presetUid !== null && (typeof presetUid !== 'string' || !UUID_PATTERN.test(presetUid))) {
