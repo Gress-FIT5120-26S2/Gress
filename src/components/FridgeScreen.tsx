@@ -52,7 +52,7 @@ type FoodCategory = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' |
 type InventoryLoadMode = 'background' | 'initial' | 'manual';
 
 type InventoryItem = {
-  categoryId: string;
+  categoryId?: string;
   id: string;
   category: FoodCategory;
   storage: StorageZone;
@@ -123,6 +123,19 @@ const CATEGORY_EMOJI: Record<FoodCategory, string> = {
 
 function isFoodCategory(value: string): value is FoodCategory {
   return CATEGORIES.includes(value as FoodCategory);
+}
+
+// Arthur: NarIyirm
+// 中文：默认分类使用跨环境稳定的 code，自定义分类才使用数据库 id，避免旧快照或不同环境 id 导致数量恒为零。
+// EN: Default categories use stable cross-environment codes, while custom categories use database ids so older snapshots or differing ids cannot zero their counts.
+function getCategoryFilterKey(category: InventoryCategory) {
+  return category.code && isFoodCategory(category.code) ? `code:${category.code}` : `id:${category.id}`;
+}
+
+function itemBelongsToCategory(item: InventoryItem, category: InventoryCategory) {
+  return category.code && isFoodCategory(category.code)
+    ? item.category === category.code
+    : item.categoryId === category.id;
 }
 
 function formatQuantity(value: number) {
@@ -328,20 +341,25 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   // EN: Language changes presentation copy only; stable internal keys preserve active filters when the language switches.
   const visibleItems = useMemo(() => {
     const normalizedQuery = searchTerm.trim().toLocaleLowerCase();
+    const selectedCategory = activeCategory
+      ? categories.find((category) => getCategoryFilterKey(category) === activeCategory)
+      : null;
     return inventory.filter((item) => {
       const localizedName = item.name.toLocaleLowerCase();
       const matchesName = normalizedQuery.length === 0 || localizedName.includes(normalizedQuery);
-      return matchesName && isStatusMatch(item, activeFilter) && (!activeCategory || item.categoryId === activeCategory);
+      return matchesName && isStatusMatch(item, activeFilter) && (!selectedCategory || itemBelongsToCategory(item, selectedCategory));
     });
-  }, [activeCategory, activeFilter, inventory, searchTerm, t]);
+  }, [activeCategory, activeFilter, categories, inventory, searchTerm]);
 
   const filterCounts = useMemo(
     () => Object.fromEntries(FILTERS.map(({ key }) => [key, inventory.filter((item) => isStatusMatch(item, key)).length])) as Record<FridgeFilter, number>,
     [inventory],
   );
-  const categoryCounts = useMemo(() => Object.fromEntries(categories.map((category) => [category.id, inventory.filter((item) => item.categoryId === category.id).length])) as Record<string, number>, [categories, inventory]);
-  const activeCategoryRecord = activeCategory ? categories.find((category) => category.id === activeCategory) ?? null : null;
-  const railCategoryCode = activeCategoryRecord?.code && isFoodCategory(activeCategoryRecord.code) ? activeCategoryRecord.code : null;
+  const categoryCounts = useMemo(() => Object.fromEntries(categories.map((category) => [
+    getCategoryFilterKey(category),
+    inventory.filter((item) => itemBelongsToCategory(item, category)).length,
+  ])) as Record<string, number>, [categories, inventory]);
+  const activeCategoryRecord = activeCategory ? categories.find((category) => getCategoryFilterKey(category) === activeCategory) ?? null : null;
   const hasActiveConditions = activeFilter !== null || activeCategory !== null || searchTerm.trim().length > 0;
   const sectionTitle = searchTerm.trim().length > 0
     ? t.fridge.titles.search
@@ -367,7 +385,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
 
   const handleCategoryCreated = useCallback((category: InventoryCategory) => {
     setSnapshot((current) => current ? { ...current, categories: [...current.categories, category] } : current);
-    setActiveCategory(category.id);
+    setActiveCategory(getCategoryFilterKey(category));
     setIsCreateCategoryVisible(false);
   }, []);
 
@@ -661,27 +679,43 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
           <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={[styles.categoryList, categoryRailCollapsed ? styles.categoryListCollapsed : null]}>
             <FridgeCategoryButton
               collapsed={categoryRailCollapsed}
-              count={activeCategoryRecord ? categoryCounts[activeCategoryRecord.id] ?? 0 : inventory.length}
-              icon={railCategoryCode ? CATEGORY_ICONS[railCategoryCode] : activeCategoryRecord ? 'sparkles-outline' : 'grid-outline'}
-              iconUrl={activeCategoryRecord?.iconUrl}
-              label={railCategoryCode ? t.fridge.categories[railCategoryCode] : activeCategoryRecord?.name ?? t.fridge.categories.all}
-              onPress={categoryRailCollapsed ? toggleCategoryRail : () => setActiveCategory(null)}
-              selected={categoryRailCollapsed || activeCategory === null}
-              tint={railCategoryCode ? CATEGORY_STYLE[railCategoryCode].tint : '#EEEFFD'}
-              tone={activeCategoryRecord?.colour ?? '#6255D9'}
+              count={inventory.length}
+              icon="grid-outline"
+              label={t.fridge.categories.all}
+              onPress={() => setActiveCategory(null)}
+              selected={activeCategory === null}
+              tint="#EEEFFD"
+              tone="#6255D9"
             />
+            {categoryRailCollapsed && activeCategoryRecord ? (() => {
+              const code = activeCategoryRecord.code && isFoodCategory(activeCategoryRecord.code) ? activeCategoryRecord.code : 'other';
+              return (
+                <FridgeCategoryButton
+                  collapsed
+                  count={categoryCounts[getCategoryFilterKey(activeCategoryRecord)] ?? 0}
+                  icon={CATEGORY_ICONS[code]}
+                  iconUrl={activeCategoryRecord.iconUrl}
+                  label={activeCategoryRecord.code && isFoodCategory(activeCategoryRecord.code) ? t.fridge.categories[activeCategoryRecord.code] : activeCategoryRecord.name}
+                  onPress={() => setActiveCategory(null)}
+                  selected
+                  tint={CATEGORY_STYLE[code].tint}
+                  tone={activeCategoryRecord.colour ?? CATEGORY_STYLE[code].tone}
+                />
+              );
+            })() : null}
             {!categoryRailCollapsed ? categories.map((category) => {
               const code = category.code && isFoodCategory(category.code) ? category.code : 'other';
               const tone = category.colour ?? CATEGORY_STYLE[code].tone;
+              const categoryKey = getCategoryFilterKey(category);
               return (
               <FridgeCategoryButton
                 key={category.id}
-                count={categoryCounts[category.id] ?? 0}
+                count={categoryCounts[categoryKey] ?? 0}
                 icon={CATEGORY_ICONS[code]}
                 iconUrl={category.iconUrl}
                 label={category.code && isFoodCategory(category.code) ? t.fridge.categories[category.code] : category.name}
-                onPress={() => setActiveCategory((current) => current === category.id ? null : category.id)}
-                selected={activeCategory === category.id}
+                onPress={() => setActiveCategory((current) => current === categoryKey ? null : categoryKey)}
+                selected={activeCategory === categoryKey}
                 tint={CATEGORY_STYLE[code].tint}
                 tone={tone}
               />

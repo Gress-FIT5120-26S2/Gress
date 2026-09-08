@@ -31,7 +31,11 @@ export const FridgeCategoryButton = memo(function FridgeCategoryButton({ collaps
         <Ionicons color={tone} name={icon} size={collapsed ? 22 : 21} />
         {iconUrl ? <Image cachePolicy="memory-disk" contentFit="contain" source={iconUrl} style={styles.image} transition={120} /> : null}
       </View>
-      {!collapsed ? <Text numberOfLines={1} style={[styles.label, { color: selected ? tone : '#435D54' }]}>{label}</Text> : null}
+      {!collapsed ? (
+        <Text adjustsFontSizeToFit minimumFontScale={0.68} numberOfLines={1} style={[styles.label, { color: selected ? tone : '#435D54' }]}>
+          {label}
+        </Text>
+      ) : null}
       <View style={[styles.countBadge, collapsed ? styles.countBadgeCollapsed : null, { backgroundColor: selected ? tone : '#E8EEEB' }]}>
         <Text style={[styles.count, { color: selected ? '#FFFFFF' : '#526A61' }]}>{count}</Text>
       </View>
@@ -40,11 +44,11 @@ export const FridgeCategoryButton = memo(function FridgeCategoryButton({ collaps
 });
 
 const styles = StyleSheet.create({
-  item: { position: 'relative', width: 68, minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 6, paddingRight: 4, borderRadius: 13, borderCurve: 'continuous' },
+  item: { position: 'relative', width: 68, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 7, paddingHorizontal: 3, paddingBottom: 4, borderRadius: 13, borderCurve: 'continuous' },
   itemCollapsed: { width: 44, height: 48, justifyContent: 'center', paddingHorizontal: 0 },
   iconWrap: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center' },
   image: { position: 'absolute', width: 23, height: 23 },
-  label: { flex: 1, minWidth: 0, paddingRight: 2, fontSize: 10.5, fontWeight: '800' },
+  label: { width: '100%', color: '#435D54', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   countBadge: { position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8 },
   countBadgeCollapsed: { top: 3, right: 2, minWidth: 15, height: 15 },
   count: { fontSize: 9, fontWeight: '900' },

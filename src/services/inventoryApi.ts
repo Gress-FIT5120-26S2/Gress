@@ -12,7 +12,7 @@ export type InventoryCategoryCode =
 
 export type InventoryBatch = {
   categoryCode: InventoryCategoryCode;
-  categoryId: string;
+  categoryId?: string;
   currency: string;
   expiresAt: string | null;
   expiryWarningDays: number | null;
