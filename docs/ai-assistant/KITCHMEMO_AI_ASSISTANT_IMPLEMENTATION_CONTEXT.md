@@ -6,6 +6,12 @@ This file is the implementation handoff for upgrading the fridge-page Spoonie as
 
 Last decision review: 2026-09-09, Australia/Sydney.
 
+Latest product-scope decision: version 1 explicitly excludes recipes, cooking instructions, meal generation, substitutions, and recipe ingredient-gap analysis. It includes inventory, expiry, history, restock, ownership, confirmation-gated actions, and reviewed food-storage and food-safety knowledge.
+
+This latest scope decision overrides any recipe-related examples that remain in the earlier Word planning documents. The evaluation baseline in `docs/ai-assistant/evaluation/` is the current product authority for version 1.
+
+Freshness-date decision: `useByAt` is a verified hard deadline and requires discard after it passes. `estimatedQualityUntil` is a non-editable system estimate derived deterministically from food preset, stocking time, storage zone, local Australian season, and versioned modifiers. The complete contract is `docs/ai-assistant/evaluation/FRESHNESS_DATE_CONTRACT.md`; it overrides the legacy single-field `expires_at` semantics.
+
 ## Product decision
 
 Implement the assistant in one complete delivery using:
@@ -14,8 +20,9 @@ Implement the assistant in one complete delivery using:
 - One user-level assistant request with Luna selecting declared tools through function calling. Do not add a separate intent-classification model.
 - Express as the only AI orchestration and authorization boundary.
 - Supabase PostgreSQL plus `pgvector` for global RAG knowledge.
+- `text-embedding-3-small` at 1536 dimensions as the version 1 embedding contract; change only after retrieval evaluation and deliberate re-embedding.
 - Hybrid retrieval using vector similarity, PostgreSQL full-text search, and metadata filters.
-- Existing deterministic rules as the authority for expiry, use-first and restock facts, and as the fallback when AI is unavailable.
+- Existing deterministic rules, extended with the locked freshness-date contract, as the authority for use-by, quality-window, use-first and restock facts, and as the fallback when AI is unavailable.
 - Strict schema-constrained model output, followed by server-side validation.
 - Read-only model tools. Suggested mutations require explicit user confirmation and then use existing Express endpoints.
 
@@ -76,7 +83,6 @@ Expo Fridge Assistant UI
 | Natural-language understanding | GPT-5.6 Luna |
 | Tool selection | GPT-5.6 Luna function calling |
 | Food storage and safety knowledge | Reviewed RAG knowledge |
-| Recipes and substitutions | Licensed structured recipe data and RAG |
 | Final authorization | Express |
 | Database writes | Existing endpoints after explicit user confirmation |
 
@@ -88,21 +94,25 @@ All tool arguments require JSON Schema validation. Limit each request to three t
 
 Return a compact current-fridge summary. Do not return internal device fields. Cap the number of rows and include only fields required for the question.
 
+### `get_inventory_items`
+
+Return filtered current-fridge items for exact quantities, locations, separate `useByAt` and `estimatedQualityUntil` values, and safe creator or owner labels. Never return a real device ID, and never combine incompatible units.
+
 ### `get_use_first_items`
 
-Return dated, unexpired batches ordered by expiry. It must always exclude expired batches regardless of model arguments.
+Return active batches ordered by the earliest applicable `useByAt` or `estimatedQualityUntil`. It must exclude hard-expired and quality-overdue batches from consumption-oriented recommendations regardless of model arguments, while preserving which timestamp caused the ordering.
 
 ### `get_expiring_items`
 
-Return batches expiring in a validated date range. Server time is authoritative.
+Return batches with an upcoming use-by deadline or system quality window in a validated date range. Each row identifies the reason; server time is authoritative.
 
 ### `get_expired_items`
 
-Return expired active batches for review. Tool metadata must mark them as ineligible for consumption recommendations.
+Return active batches whose verified `useByAt` has passed. Tool metadata must mark them `mustDiscard` and ineligible for consumption recommendations. A passed system quality estimate alone is not a hard-expired result.
 
 ### `get_missing_information`
 
-Return batches missing expiry or other supported editable information.
+Return batches missing enough preset or storage information for a system quality estimate, plus other supported editable information. A missing optional hard use-by label is not automatically an error.
 
 ### `get_restock_suggestions`
 
@@ -114,15 +124,15 @@ Return one batch only after current-fridge validation.
 
 ### `get_consumption_history`
 
-Return aggregated inventory-event trends for a bounded time range. Do not expose actor device identities.
+Return aggregated inventory-event trends for a bounded time range. Support explicit `personal` and `shared` scopes, label the scope in the result, keep stock events separate from consumption events, and do not expose actor device identities.
+
+### `get_cart_items`
+
+Return current-fridge shopping-list rows for duplicate detection and explanations. This tool is read-only and exposes safe member labels only.
 
 ### `search_food_knowledge`
 
 Run hybrid RAG retrieval. Safety-sensitive queries may use only enabled, reviewed, authoritative sources for the correct jurisdiction.
-
-### `search_recipes`
-
-Search licensed or first-party recipe records and return structured ingredient requirements, substitutions, servings, duration, and source details.
 
 ## Proposed API
 
@@ -217,7 +227,6 @@ Proposed tables:
 
 ### Optional supporting tables
 
-- `assistant_recipe_records`
 - `assistant_rag_evaluations`
 - `assistant_conversations`
 - `assistant_messages`
@@ -240,7 +249,6 @@ Every table and RPC must follow the project’s existing service-role-only busin
 Knowledge scope:
 
 - Authoritative Australian food-safety and storage guidance.
-- Licensed recipes and substitution guidance.
 - User-facing KitchMemo help and business rules.
 - Reviewed common-food storage knowledge with bilingual aliases.
 
@@ -268,10 +276,11 @@ Keep the system prompt in version-controlled server code and record `prompt_vers
 The prompt must state that:
 
 - Spoonie is KitchMemo’s fridge and kitchen assistant.
+- Version 1 does not provide recipes, meal generation, cooking instructions, substitutions, or recipe ingredient-gap analysis.
 - Tool results are the only authority for live inventory facts.
 - The model must not invent items, quantities, dates, batch IDs, citations, or preferences.
 - Expired batches cannot be recommended for consumption.
-- Recorded dates and quality estimates are not absolute food-safety guarantees.
+- A verified use-by value is the hard discard deadline; a system quality estimate is not a package safety label or safety guarantee.
 - Safety-sensitive claims require reviewed authoritative RAG citations.
 - Insufficient evidence must produce an explicit uncertainty response.
 - Output must match the specified JSON Schema.
@@ -317,7 +326,8 @@ Proposed server-only configuration:
 ```text
 OPENAI_API_KEY
 OPENAI_ASSISTANT_MODEL=gpt-5.6-luna
-OPENAI_EMBEDDING_MODEL=<selected after evaluation>
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+OPENAI_EMBEDDING_DIMENSIONS=1536
 ASSISTANT_PROMPT_VERSION=1
 ASSISTANT_MAX_TOOL_ROUNDS=3
 ASSISTANT_MAX_OUTPUT_TOKENS=<tested limit>
@@ -363,9 +373,9 @@ Build at least 150 golden cases before release. Include:
 - Multiple same-name batches with different dates.
 - Expired-item safety cases.
 - Restock thresholds and unit mismatch cases.
-- Recipe matching and missing ingredients.
+- Explicit out-of-scope recipe and cooking requests.
 - Food-safety questions with and without sufficient RAG evidence.
-- Prompt injection in user text, food names, recipe text, and RAG chunks.
+- Prompt injection in user text, food names, inventory content, and RAG chunks.
 - Fabricated batch IDs and citation IDs.
 - Cross-fridge access attempts.
 - Model timeout, 429, 5xx, invalid JSON, repeated tools, and unavailable RAG.
@@ -382,6 +392,8 @@ Release requirements:
 - Cost, latency, tool selection, retrieval quality, and failure rates are observable.
 
 ## Implementation order
+
+Current status on 2026-09-10: steps 1-5 are complete in the development environment and step 6 is partially implemented. The 160-case bilingual golden set, tool/date contracts, `text-embedding-3-small` 1536-dimension choice, freshness/history/RAG/audit migrations, and vector-operator fix are in place. `Gress-development` migration history matches local and remote lint reports no schema errors. Milk quality estimation returns 5 days in Australian summer and 7 days in winter. `server/data/assistant-knowledge/au-core-v1.json` contains 4 reviewed FSANZ sources, 8 bilingual documents and 16 chunks; `server/scripts/ingest-assistant-knowledge.js` validates and ingests them. Its dry-run passes, but embeddings have not been written because `OPENAI_API_KEY` is not configured. No assistant migration has been promoted to production. Finish step 6 after adding the key privately; do not repeat or rewrite the applied migrations.
 
 1. Inspect the current repository, migrations, assistant UI, inventory APIs, rate limiting, and test patterns.
 2. Read `BACKEND_DATA_CONTEXT.md` completely and recheck deployed migration history.
@@ -410,4 +422,3 @@ The assistant is complete only when users can ask free-form questions; GPT-5.6 L
 - Supabase AI and vectors: https://supabase.com/docs/guides/ai
 - Supabase hybrid search: https://supabase.com/docs/guides/ai/hybrid-search
 - Expo SDK 57: https://docs.expo.dev/versions/v57.0.0/
-
