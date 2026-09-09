@@ -4,16 +4,17 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-07（Australia/Sydney）。
+- 最后核对日期：2026-09-10（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 21 份 migration；`20260903010000_api_security_hardening.sql` 新增跨实例 API 限流原子桶/RPC，固定补货函数 `search_path`，收紧 RLS 自动启用函数及未来 public 函数的默认执行权限；`20260904010000_fix_api_rate_limit_timestamp.sql` 修正首版限流函数变量名与 PostgreSQL `CURRENT_TIME` 表达式的冲突。两份 migration 已按顺序在开发项目验证并应用生产项目，两端远程 lint 与限流/补货 RPC 验证均通过。CLI 已恢复链接开发项目。生产库曾经已存在个人资料与通知偏好结构但遗漏 migration 历史，已在核对 PostgREST 元数据后把 `20260902010000`、`20260902020000` 补记为 applied，再正常应用后续迁移。
+- 本地 schema 历史共有 28 份 migration。CLI 当前链接 `Gress-development`；2026-09-10 已把开发库中实际存在但漏记的 `20260907010000`、`20260908010000`、`20260908020000` 补记为 applied，并将五份助手 migration 应用到开发库。开发库迁移历史现与本地完全一致；生产库没有应用本轮助手 migration。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
-- 远程 PostgreSQL lint 已通过，无 schema error。
+- 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
 - 应用最新本地 migration 后共有 20 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
 - 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出和设备恢复；这些功能依赖的 migration 当前已在开发与生产项目同步应用。成就和分类管理接口尚未实现。
+- 已在开发库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。夏季/冬季牛奶只读 RPC 烟雾测试分别返回 5 天和 7 天，RAG RPC 可执行；这些 migration 仍须在 API、权限、回归测试完成后才能按同一顺序应用生产库。
 
 实际实现的权威来源：
 
@@ -27,6 +28,7 @@
 - Expo 库存业务 API：`src/services/inventoryApi.ts`
 - Expo 拍照识别 API：`src/services/recognitionApi.ts`
 - Express 拍照识别代理：`server/src/routes/recognition.js`
+- 助手权威知识清单与摄取器：`server/data/assistant-knowledge/au-core-v1.json`、`server/scripts/ingest-assistant-knowledge.js`
 
 本文档解释设计意图。字段或约束与本文档发生冲突时，以已部署 migration 为准，并同步更新本文档。
 
@@ -297,6 +299,16 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `lifecycle_state` | `inventory_lifecycle` | 默认 `active` |
 | `version` | `integer` | 默认 1，用于共享编辑乐观锁 |
 | `created_at` / `updated_at` | `timestamptz` | 审计时间 |
+
+开发库中的助手日期契约（由 `20260909010000` 实现；生产库尚未应用）：
+
+- `use_by_at`：包装或可靠识别得到的硬性安全截止时间；超过后必须丢弃，不能推荐食用。
+- `estimated_quality_until`：系统根据食材、入库时间、储存方式、本地澳洲季节和版本化品质档案自动计算；用户不能直接编辑，不是安全保证。
+- `quality_profile_uid`、`quality_estimate_version`、`quality_estimate_basis`：记录计算来源和可复现输入。
+- 旧 `expires_at` 暂时保留给现有客户端兼容；历史值来源不明确，不能批量视为 `use_by_at`。
+- 提醒和优先检查使用两个日期中更早的适用值，但回答必须说明来自硬性 use-by 还是系统品质窗口。
+
+品质档案计划存入 `food_quality_profiles`。澳洲版按设备 IANA 时区的本地月份使用气象季节；首版牛奶产品默认值为夏季 5 天、冬季 7 天，春秋暂用 6 天插值并保持未审核标记。没有季节档案时可以回退现有 `suggested_shelf_life_days`，但必须记录回退来源。
 
 关键规则：同名食材可以有多个批次。前端允许聚合展示，但消耗、丢弃和到期计算必须落到具体 `batch_uid`。
 
