@@ -29,6 +29,7 @@ router.get('/cart', requireFridge, async (req, res) => {
 router.post('/cart', requireFridge, async (req, res) => {
   const { name, category_uid, preset_uid, quantity, unit, source } = req.body;
   if (!name || !name.trim()) return res.status(400).json({ error: 'name_required' });
+  const src = source ?? 'manual';
   const { data, error } = await supabase
     .from('shopping_cart_items')
     .insert({
@@ -38,12 +39,35 @@ router.post('/cart', requireFridge, async (req, res) => {
       preset_uid: preset_uid ?? null,
       quantity: quantity ?? null,
       unit: unit ?? null,
-      source: source ?? 'manual',
+      source: src,
       added_by_device_id: req.deviceId,
-      owner_device_id: (source ?? 'manual') === 'manual' ? req.deviceId : null,
+      owner_device_id: src === 'manual' ? req.deviceId : null,
     })
     .select()
     .single();
+
+  // Arthur: NarIyirm
+  // 中文：非手动来源受 idx_cart_dedupe 约束，同名项已在清单里时 23505 会命中；
+  //       这时把已有行的数量/单位刷新为最新的补货差值，而不是让请求失败。
+  // EN: Non-manual sources hit idx_cart_dedupe (23505) when the item is already listed;
+  //     refresh the existing row's quantity/unit with the latest restock delta instead of failing.
+  if (error?.code === '23505' && src !== 'manual') {
+    const { data: updated, error: updateError } = await supabase
+      .from('shopping_cart_items')
+      .update({
+        quantity: quantity ?? null,
+        unit: unit ?? null,
+        preset_uid: preset_uid ?? null,
+        is_checked: false,
+      })
+      .eq('fridge_uid', req.fridgeUid)
+      .eq('source', src)
+      .ilike('name', name.trim())
+      .select()
+      .single();
+    if (updateError) return res.status(500).json({ error: updateError.message });
+    return res.status(200).json(updated);
+  }
   if (error) return res.status(500).json({ error: error.message });
   res.status(201).json(data);
 });

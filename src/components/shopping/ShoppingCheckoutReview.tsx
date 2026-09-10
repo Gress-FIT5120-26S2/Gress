@@ -15,7 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useI18n } from '../../i18n';
-import { InventoryEntryFlow, type InventoryEntrySubmission } from '../inventory-entry/InventoryEntryFlow';
+import { InventoryEntryFlow, type InventoryEntrySubmission, type InventoryUnit } from '../inventory-entry/InventoryEntryFlow';
 import { createInventoryBatch } from '../../services/inventoryApi';
 import type { CartItem } from '../../services/cartApi';
 
@@ -160,6 +160,9 @@ export function ShoppingCheckoutReview({
           initialValues={{
             name: editing.name,
             quantity: editing.quantity ? String(editing.quantity) : '1',
+            // 中文：把购物车里选好的单位带进库存录入表单，否则会退回默认的 "item"。
+            // EN: Carry the unit chosen in the cart into the inventory form; otherwise it falls back to the default "item".
+            ...(editing.unit ? { unit: editing.unit as InventoryUnit } : {}),
           }}
           onClose={() => setEditing(null)}
           onSubmit={(submission) => handleDraftSubmit(editing, submission)}
