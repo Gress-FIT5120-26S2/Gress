@@ -124,9 +124,18 @@ function RestockView({ onAdded }: { onAdded: () => void }) {
   }), [load]);
 
   const add = async (s: RestockSuggestion) => {
-    const qty = Math.max(s.target_quantity - s.current_quantity, 0) || undefined;
-    await addCartItem({ name: s.name, unit: s.unit, quantity: qty, source: 'restock' });
-    onAdded();
+    // 中文：补货差值 = 目标量 − 当前量；至少补 1，避免出现 0 或负数。
+    // EN: Restock delta = target − current; clamp to at least 1 so it is never 0 or negative.
+    const delta = Math.max(Math.round(s.target_quantity - s.current_quantity), 1);
+    try {
+      // 服务端对已在清单里的补货项做 upsert，这里不再因重复而报错。
+      // The server upserts restock items already on the list, so a repeat no longer errors.
+      await addCartItem({ name: s.name, unit: s.unit, quantity: delta, source: 'restock' });
+      onAdded();
+    } catch {
+      // 忽略：realtime 同步或下次刷新会兜底。
+      // Ignore: realtime sync or the next refresh reconciles.
+    }
   };
 
   if (loading) return <ActivityIndicator style={styles.spinner} />;
@@ -164,6 +173,14 @@ function CartView() {
   const [addVisible, setAddVisible] = useState(false);
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [peekVisible, setPeekVisible] = useState(false);
+  // 中文：待确认删除的购物项；非空时显示确认卡片，避免误删共享清单里的东西。
+  // EN: Cart item awaiting delete confirmation; while set, a confirm card is shown so shared-list items aren't removed by accident.
+  const [pendingDelete, setPendingDelete] = useState<CartItem | null>(null);
+
+  // 中文：把单位代码转成当前语言的短标签，未知代码就原样显示。
+  // EN: Turn a unit code into a short localized label, falling back to the raw code.
+  const unitLabel = (u: string | null) =>
+    u ? ((t.fridge.manualEntry.units as Record<string, string>)[u] ?? u) : '';
 
   // confirmed cart = the checked items (US5.4/US5.5 operate on these only)
   const checkedItems = useMemo(() => items.filter((i) => i.is_checked), [items]);
@@ -301,7 +318,7 @@ function CartView() {
             <Text style={[styles.name, styles.grow, item.is_checked && styles.done]}>
               {item.name}
             </Text>
-            {/* quantity stepper: −  [input]  ＋ */}
+            {/* quantity stepper: −  [input]  ＋  unit */}
             <View style={styles.qtyBox}>
               <Pressable hitSlop={6} onPress={() => changeQty(item, -1)}>
                 <Text style={styles.qtyBtn}>−</Text>
@@ -316,7 +333,8 @@ function CartView() {
                 <Text style={styles.qtyBtn}>＋</Text>
               </Pressable>
             </View>
-            <Pressable hitSlop={8} onPress={() => onDelete(item)}>
+            <Text style={styles.unitText} numberOfLines={1}>{unitLabel(item.unit)}</Text>
+            <Pressable hitSlop={8} onPress={() => setPendingDelete(item)}>
               <Text style={styles.remove}>✕</Text>
             </Pressable>
           </View>
@@ -343,6 +361,29 @@ function CartView() {
         visible={peekVisible}
         onClose={() => setPeekVisible(false)}
       />
+
+      {/* 中文：删除前的可视化确认，避免误删共享购物清单。 */}
+      {/* EN: Visual confirm before deleting so shared cart items aren't removed by mistake. */}
+      {pendingDelete ? (
+        <View style={styles.confirmLayer}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={() => setPendingDelete(null)} />
+          <View style={styles.confirmCard}>
+            <Text style={styles.confirmTitle}>{t.shopping.deleteTitle}</Text>
+            <Text style={styles.confirmBody}>{t.shopping.deleteBody(pendingDelete.name)}</Text>
+            <View style={styles.confirmActions}>
+              <Pressable style={styles.cancelBtn} onPress={() => setPendingDelete(null)}>
+                <Text style={styles.cancelText}>{t.shopping.deleteCancel}</Text>
+              </Pressable>
+              <Pressable
+                style={styles.confirmDeleteBtn}
+                onPress={() => { const it = pendingDelete; setPendingDelete(null); void onDelete(it); }}
+              >
+                <Text style={styles.confirmDeleteText}>{t.shopping.deleteConfirm}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      ) : null}
     </View>
   );
 }
@@ -410,15 +451,39 @@ const styles = StyleSheet.create({
     marginHorizontal: 8,
   },
   qtyBtn: { fontSize: 20, color: '#2e7d32', fontWeight: '800', width: 22, textAlign: 'center' },
+  // 中文：固定宽度，数字位数变化时 ＋ 按钮和单位列不再错位。
+  // EN: Fixed width so the ＋ button and unit column stay aligned as the digit count changes.
   qtyInput: {
-    minWidth: 34,
+    width: 40,
     textAlign: 'center',
     fontSize: 15,
     color: '#244A3E',
     fontWeight: '700',
     paddingVertical: 2,
   },
+  unitText: { width: 44, marginRight: 4, fontSize: 13, color: '#718078', fontWeight: '600' },
   remove: { color: '#c62828', fontSize: 16, paddingHorizontal: 6 },
+  confirmLayer: {
+    ...StyleSheet.absoluteFill,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 28,
+    backgroundColor: 'rgba(23,32,29,0.4)',
+  },
+  confirmCard: { width: '100%', borderRadius: 22, backgroundColor: '#FBFCFA', padding: 22, gap: 10 },
+  confirmTitle: { fontSize: 18, fontWeight: '800', color: '#173D31' },
+  confirmBody: { fontSize: 14, color: '#5A6E66', lineHeight: 20 },
+  confirmActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
+  cancelBtn: {
+    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#EDF1EF',
+  },
+  cancelText: { color: '#315C51', fontSize: 15, fontWeight: '800' },
+  confirmDeleteBtn: {
+    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#C62828',
+  },
+  confirmDeleteText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   smallBtn: {
     paddingHorizontal: 14,
     paddingVertical: 7,
