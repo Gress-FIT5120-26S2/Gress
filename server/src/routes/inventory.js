@@ -50,7 +50,7 @@ function getExpiryWarningDays(body) {
 // Arthur: NarIyirm
 // 中文：库存写入后先持久化共享站内事件，外部 Push 在响应后执行，避免 Expo 网络延迟阻塞用户的保存状态。
 // EN: Persist the shared in-app event first, then deliver external push after the response so Expo network latency never blocks the user's save state.
-async function notifySharedInventory(deviceId, batchUid, action) {
+export async function notifySharedInventory(deviceId, batchUid, action) {
   const { data: notificationUid, error } = await supabase.rpc('record_shared_inventory_notification', {
     p_action: action,
     p_batch_uid: batchUid,
