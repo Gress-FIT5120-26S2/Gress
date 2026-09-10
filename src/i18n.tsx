@@ -544,6 +544,10 @@ const zh = {
     restockEmpty: '暂时没有需要补货的东西',
     cartEmpty: '购物车是空的',
     remaining: (current: number, minimum: number, unit: string) => `剩 ${current}/${minimum} ${unit}`,
+    deleteTitle: '从购物车移除？',
+    deleteBody: (name: string) => `确定要移除“${name}”吗？`,
+    deleteCancel: '取消',
+    deleteConfirm: '移除',
     manual: {
       title: '加入购物车',
       nameLabel: '名称',
@@ -1297,6 +1301,10 @@ const en: Translation = {
     restockEmpty: 'Nothing to restock right now',
     cartEmpty: 'Your cart is empty',
     remaining: (current: number, minimum: number, unit: string) => `${current}/${minimum} ${unit} left`,
+    deleteTitle: 'Remove from cart?',
+    deleteBody: (name: string) => `Remove “${name}” from your cart?`,
+    deleteCancel: 'Cancel',
+    deleteConfirm: 'Remove',
     manual: {
       title: 'Add to cart',
       nameLabel: 'Name',
