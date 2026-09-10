@@ -46,3 +46,25 @@ server/.env.production
 /ios
 /android
 .vercel
+
+# Arthur: NarIyirm
+# 中文：演示文稿、文档渲染和本地工具环境仅保存在仓库外，避免把生成产物提交到 GitHub。
+# EN: Keep presentation, document-rendering, and local tool workspaces outside the repository.
+/.codex-document-build/
+/.codex-presentation-build/
+/.ppt-master-env/
+/output/
+/projects/
+/assets/presentation/
+/Build/
+/models/
+/branding/
+
+# Arthur: NarIyirm
+# 中文：docs 中保留可审阅的文本资料，忽略不适合版本控制的二进制办公文档。
+# EN: Keep reviewable text documentation in docs while excluding binary office artifacts.
+/docs/**/*.ppt
+/docs/**/*.pptx
+/docs/**/*.doc
+/docs/**/*.docx
+/docs/**/*.pdf

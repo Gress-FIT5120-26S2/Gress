@@ -6,7 +6,7 @@
 
 - 最后核对日期：2026-09-10（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 28 份 migration。CLI 当前链接 `Gress-development`；2026-09-10 已把开发库中实际存在但漏记的 `20260907010000`、`20260908010000`、`20260908020000` 补记为 applied，并将五份助手 migration 应用到开发库。开发库迁移历史现与本地完全一致；生产库没有应用本轮助手 migration。
+- 本地 schema 历史共有 31 份 migration。CLI 当前链接 `Gress-development`；2026-09-11 已将 `20260911010000_confirm_assistant_pending_actions.sql`、`20260911020000_harden_assistant_action_confirmation.sql` 与 `20260911030000_link_assistant_actions_to_messages.sql` 应用到开发库。开发库迁移历史与本地一致；生产库没有应用本轮助手 migration。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -14,7 +14,9 @@
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
 - 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出和设备恢复；这些功能依赖的 migration 当前已在开发与生产项目同步应用。成就和分类管理接口尚未实现。
-- 已在开发库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。夏季/冬季牛奶只读 RPC 烟雾测试分别返回 5 天和 7 天，RAG RPC 可执行；这些 migration 仍须在 API、权限、回归测试完成后才能按同一顺序应用生产库。
+- 已在开发库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。这些 migration、知识内容与 API 仍须完成整套端到端回归后才能应用生产库。
+
+- `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
 
 实际实现的权威来源：
 
@@ -470,6 +472,10 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 
 以 `(notification_uid, device_id)` 为主键记录一次系统投递结果：`sent`、`failed` 或 `suppressed`，以及 Expo ticket、错误码和尝试时间。该表用于幂等投递和服务端审计，不作为 App 通知列表的数据源。
 
+### 7.21 助手会话与动作
+
+`assistant_conversations` 和 `assistant_messages` 保存创建设备私有、默认 30 天有效的对话；共享冰箱成员权限不会自动授予其他成员的会话读取权。`assistant_feedback` 按消息和设备保存一份评价。`assistant_pending_actions.assistant_message_uid` 通过可空外键精确指向产生动作草案的助手消息，并由部分唯一索引保证每条回答最多一个动作；旧迁移产生的历史动作允许保持空值。Expo 的 AsyncStorage 只保存按 `fridge_uid` 分区的当前 `conversation_uid`，不保存对话正文，恢复时必须重新经过 Express 鉴权。
+
 ## 8. 派生状态
 
 顶部筛选状态按以下方式计算：
@@ -609,6 +615,12 @@ POST /api/notification-delivery/register
 GET /api/cart
 POST /api/cart
 GET /api/restock
+POST /api/assistant/messages
+GET  /api/assistant/conversations
+GET  /api/assistant/conversations/:conversationUid
+POST /api/assistant/messages/:messageUid/feedback
+POST /api/assistant/actions/:actionUid/confirm
+POST /api/assistant/actions/:actionUid/cancel
 ```
 
 该接口通过 Supabase Admin API 检查服务端连接，只返回：
@@ -624,6 +636,7 @@ GET /api/restock
 - 库存读取：返回当前冰箱、分类、活跃批次与计算后的 `needsRestock`。批次快照同时包含详情弹窗首屏所需的数量、版本、开封时间、分类名和补货规则，点击卡片时先即时展示快照，再在后台用单批次接口校准共享修改。首页临期文案和冰箱「快过期」标签都从这份快照计数：未过期且剩余天数不超过 3 天；没有临期批次时首页仍打开同一筛选，不请求新的 status 查询。库存变化通过 `inventory` / `home` 同步主题刷新该计数。
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：用户明确点击生成，或条码扫描命中商品但需要补全图标、分类、储存方式和参考保质期时，`POST /api/food-presets/generate` 才调用 Gemini；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
+- 冰箱助手服务端：`POST /api/assistant/messages` 使用 GPT-5.6 Luna 的 Responses API。Luna 在单次用户交互中最多选择 3 个只读工具；若使用工具，服务端执行后再发起一次结构化回答调用。工具只能读取当前已鉴权冰箱的库存、个人或共享历史、补货/购物清单状态和审核 RAG。服务端复核批次 ID、引用 URL、use-by 安全措辞与动作语义，并以 `store: false` 调用模型。写请求先生成 10 分钟有效的 `assistant_pending_actions`；只有同一创建设备向 confirm endpoint 明确提交 `confirm: true`，数据库才在单一事务中复核状态、期限和批次版本并执行。重复确认幂等返回、过期返回 `410`、取消或版本冲突返回 `409`。会话列表与详情接口只返回当前设备在当前冰箱创建且仍处于 30 天保留期内的记录；详情恢复结构化回答、反馈与服务端动作状态。`POST /api/assistant/messages/:messageUid/feedback` 只允许评价当前设备私有会话中的助手消息。
 - 新增库存：表单会提交命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`；新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`，并在同一事务保存批次级临期提前天数。历史无法可靠匹配的批次继续保留 null preset；已有有效期批次回填为 3 天。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 条码识别：Expo Camera 读取 EAN-13、EAN-8、UPC-A 或 UPC-E 后，通过已鉴权的 `GET /api/barcode-products/:barcode` 查询 Express。服务端验证 GTIN 校验位，以自定义 User-Agent 请求 Open Food Facts v3.6，只返回清洗后的名称、品牌、包装规格、分类映射、储存建议和 HTTPS 产品图；进程内缓存命中与未命中结果 24 小时，并使用数据库设备级限流保护上游。查询结果只进入可编辑核对页，再复用 `InventoryEntryFlow` 保存；第三方 `expiration_date` 不作为当前实物有效期，价格和包装日期继续由用户确认。
@@ -690,6 +703,19 @@ GET  /api/notification-preferences
 PATCH /api/notification-preferences
 POST /api/notification-delivery/register
 ```
+
+### 已完成开发环境接入：冰箱助手
+
+```text
+POST /api/assistant/messages
+GET  /api/assistant/conversations
+GET  /api/assistant/conversations/:conversationUid
+POST /api/assistant/messages/:messageUid/feedback
+POST /api/assistant/actions/:actionUid/confirm
+POST /api/assistant/actions/:actionUid/cancel
+```
+
+消息接口接受 `message`、`language` 和可选的 `conversationUid`，返回 `conversationUid`、`messageUid`、结构化 `answer`、可选 `pendingAction` 与 `fallback`。会话只对创建设备可见；共享冰箱成员可以通过工具读取其有权访问的共享数据，但不能读取其他成员的助手会话。Expo 关闭助手或进入库存详情时保留内存会话，App 重启后使用按冰箱保存的 UID 从详情接口恢复；历史页可以切换 30 天内的会话，“新对话”不删除旧历史。确认请求必须发送 `{ "confirm": true }`；取消不执行任何业务写入。原子 RPC 支持购物项、软归档、数量调整、标记用完、use-by 修改和补货规则，并复用现有库存 RPC 保持流水、乐观锁和同步版本语义。
 
 打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按各自保存的 `expiry_warning_days` 安排本地原生提醒，并在日期、提前天数、库存或设置变化后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。SDK 53+ 的 Android Expo Go 已移除远程 Push：`src/services/systemNotifications.ts` 不得从 `expo-notifications` 入口导入（入口加载时会红屏），只从子模块调度本地提醒，并跳过 `getExpoPushTokenAsync` 与 `setNotificationChannelAsync`（Channel 原生 provider 为空会 NPE）。本地提醒走系统默认频道。远程 Push 仍须用 EAS development/preview/production build。
 ### 已完成：库存批次详情与修改

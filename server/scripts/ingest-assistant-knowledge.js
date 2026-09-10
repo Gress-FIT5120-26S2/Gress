@@ -111,10 +111,9 @@ async function requireResult(operation, label) {
   return result.data;
 }
 
-async function ingestDocument(supabase, sourceUid, document) {
+async function ingestDocument(supabase, sourceUid, document, embeddings) {
   const rawContent = document.chunks.map((chunk) => chunk.content.trim()).join('\n\n');
   const contentHash = createHash('sha256').update(rawContent, 'utf8').digest('hex');
-  const embeddings = await createEmbeddings(document.chunks.map((chunk) => chunk.content.trim()));
 
   // Arthur: NarIyirm
   // 中文：先禁用文档再替换分块，避免网络或写入失败时检索到半更新内容。
@@ -188,6 +187,15 @@ async function main() {
   const supabase = createClient(supabaseUrl, supabaseSecret, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
+  const allChunks = manifest.sources.flatMap((source) => (
+    source.documents.flatMap((document) => document.chunks)
+  ));
+
+  // Arthur: NarIyirm
+  // 中文：先用一次批量请求生成全部向量，只有 OpenAI 完整成功后才开始数据库写入，避免额度或网络错误留下半成品。
+  // EN: Generate every vector in one batch before database writes begin, preventing quota or network failures from leaving partial ingestion state.
+  const allEmbeddings = await createEmbeddings(allChunks.map((chunk) => chunk.content.trim()));
+  let embeddingOffset = 0;
   let insertedChunks = 0;
 
   for (const source of manifest.sources) {
@@ -210,7 +218,17 @@ async function main() {
     );
 
     for (const document of source.documents) {
-      insertedChunks += await ingestDocument(supabase, sourceRow.source_uid, document);
+      const documentEmbeddings = allEmbeddings.slice(
+        embeddingOffset,
+        embeddingOffset + document.chunks.length,
+      );
+      embeddingOffset += document.chunks.length;
+      insertedChunks += await ingestDocument(
+        supabase,
+        sourceRow.source_uid,
+        document,
+        documentEmbeddings,
+      );
     }
     await requireResult(
       supabase.from('assistant_knowledge_sources').update({ is_enabled: true }).eq('source_uid', sourceRow.source_uid),

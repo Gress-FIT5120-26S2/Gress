@@ -18,6 +18,8 @@ npm run ingest:assistant-knowledge
 
 The script always uses `text-embedding-3-small` with 1536 dimensions. It disables a document while replacing its chunks and enables the parent source only after every bilingual document succeeds. Do not point `NODE_ENV=production` at this command until development retrieval evaluation passes.
 
+If OpenAI returns HTTP 429 on the first request, check the API project's billing balance and project limits. A ChatGPT or Codex subscription is not used as this server's API quota. The ingestion script generates all embeddings before beginning database writes, so a quota failure cannot expose partial knowledge documents.
+
 For each source update:
 
 1. Re-open the original authority page and review it manually.

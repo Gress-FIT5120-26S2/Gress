@@ -33,20 +33,15 @@ The detailed bilingual plans are in:
 
 ## Current state
 
-The existing `src/components/fridge/FridgeAssistantScreen.tsx` is rule based. It derives four answer groups from the in-memory inventory snapshot:
+`src/components/fridge/FridgeAssistantScreen.tsx` is connected to the authenticated assistant API through `src/services/assistantApi.ts`. Users can enter free-form questions or use the four retained quick prompts (`use_first`, `expired_review`, `missing_information`, and `restock`). Both paths call the same Luna-backed endpoint and continue within one conversation while the modal remains open.
 
-- `use_first`
-- `expired_review`
-- `missing_information`
-- `restock`
-
-Its typewriter behavior only simulates streaming. It currently makes no assistant-model request. Do not confuse this with the separate AI food-preset path, which already uses Gemini and Cloudflare Workers AI.
+The screen renders real assistant answers, risk levels, cited sources, linked inventory batches, retry states, and thumbs-up/down feedback. Write-like requests render a ten-minute confirmation card and call the dedicated confirm or cancel endpoint only after the user presses the corresponding button. Successful confirmation triggers the existing inventory reconciliation and shared sync; the existing inventory intake button and entry flow were not changed. Closing the assistant or opening an inventory detail no longer clears the in-memory conversation. AsyncStorage persists only the active conversation UID per fridge; app restart restoration and the history picker re-fetch private content through authenticated `GET /api/assistant/conversations` and `GET /api/assistant/conversations/:conversationUid`. A new-conversation sentinel prevents an explicitly blank conversation from silently reopening old history after restart. Do not confuse this assistant path with the separate AI food-preset path, which uses Gemini and Cloudflare Workers AI.
 
 ## Required architecture
 
 ```text
 Expo Fridge Assistant UI
-  -> POST /api/assistant/chat
+  -> POST /api/assistant/messages
   -> authenticate Device-ID and Device-Credential
   -> resolve the current fridge_uid on the server
   -> call GPT-5.6 Luna with declared read-only tools
@@ -54,7 +49,7 @@ Expo Fridge Assistant UI
   -> return tool results to Luna in the same response flow
   -> receive strict structured output
   -> validate item IDs, citations, safety rules, and actions
-  -> stream answer text and render real item cards and sources
+  -> return the validated answer and render real item cards and sources
 ```
 
 “One Luna call” means one user-level request without a separate classifier. The OpenAI tool protocol can still involve a model tool-call response, an Express tool result, and a final model response. This server-side loop is expected and must be capped.
@@ -393,7 +388,7 @@ Release requirements:
 
 ## Implementation order
 
-Current status on 2026-09-10: steps 1-5 are complete in the development environment and step 6 is partially implemented. The 160-case bilingual golden set, tool/date contracts, `text-embedding-3-small` 1536-dimension choice, freshness/history/RAG/audit migrations, and vector-operator fix are in place. `Gress-development` migration history matches local and remote lint reports no schema errors. Milk quality estimation returns 5 days in Australian summer and 7 days in winter. `server/data/assistant-knowledge/au-core-v1.json` contains 4 reviewed FSANZ sources, 8 bilingual documents and 16 chunks; `server/scripts/ingest-assistant-knowledge.js` validates and ingests them. Its dry-run passes, but embeddings have not been written because `OPENAI_API_KEY` is not configured. No assistant migration has been promoted to production. Finish step 6 after adding the key privately; do not repeat or rewrite the applied migrations.
+Current status on 2026-09-11: steps 1-10 and the server-side confirmation portion of step 11 are implemented in development. `POST /api/assistant/messages` uses GPT-5.6 Luna with strict structured output and at most three read-only tools. Write-like requests create ten-minute pending records. `POST /api/assistant/actions/:actionUid/confirm` requires `{ "confirm": true }`; `POST /api/assistant/actions/:actionUid/cancel` performs no business mutation. Migration `20260911010000_confirm_assistant_pending_actions.sql` atomically executes confirmed actions; `20260911030000_link_assistant_actions_to_messages.sql` links each new action to its source assistant message for exact state restoration. Both are development-only. `src/services/assistantApi.ts` types chat, history, feedback, confirm, and cancel calls. The Expo assistant preserves the current conversation across modal exits, restores it after app restart, lists up to 30 recent creator-private conversations, supports explicit new conversations, and rehydrates answer structure, feedback, citations, batch links, and action status from the server. TypeScript, Android Metro bundling, linked schema lint, orchestrator, RAG, action verification, and authenticated history list/detail/device-isolation verification pass. The full 160-case runner, failure injection, wider end-to-end testing, device UI testing, and production promotion remain. No assistant migration, knowledge content, or API has been promoted to production. Continue with step 11/12; do not repeat or rewrite applied migrations.
 
 1. Inspect the current repository, migrations, assistant UI, inventory APIs, rate limiting, and test patterns.
 2. Read `BACKEND_DATA_CONTEXT.md` completely and recheck deployed migration history.
@@ -409,6 +404,8 @@ Current status on 2026-09-10: steps 1-5 are complete in the development environm
 12. Run development database, API, security, RAG, model, and end-to-end tests.
 13. Apply the same verified migration and configuration to production only after development passes.
 14. Update deployment documentation, environment examples, and this handoff when contracts change.
+
+Latest hardening: `20260911020000_harden_assistant_action_confirmation.sql` preserves the already-applied migration and replaces the confirmation function without its unused local variable, while adding unit-aware restock caps at the database boundary. It is applied only to `Gress-development`; linked lint reports no schema errors and `verify:assistant-actions` still passes.
 
 ## Definition of done
 

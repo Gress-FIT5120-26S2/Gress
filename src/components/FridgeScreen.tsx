@@ -397,6 +397,13 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
 
   const openAddSheet = useCallback(() => setIsAddSheetVisible(true), []);
   const closeAddSheet = useCallback(() => setIsAddSheetVisible(false), []);
+  // Arthur: NarIyirm
+  // 中文：助手确认写操作后只触发既有库存对账与共享同步；原有入库入口和提交流程保持独立不变。
+  // EN: After an assistant action is confirmed, reuse inventory reconciliation and shared sync while leaving the existing intake flow independent and unchanged.
+  const handleAssistantDataChanged = useCallback(() => {
+    requestImmediateSyncProbe();
+    void loadInventory('background').catch(() => undefined);
+  }, [loadInventory]);
   const selectAddMethod = useCallback((method: AddItemMethod) => {
     // Arthur: NarIyirm
     // 中文：这个回调只会在选择窗完全卸载后触发，因此不会与手动录入的原生 Modal 重叠。
@@ -859,8 +866,10 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
       />
       <FridgeAssistantScreen
         batches={snapshot?.batches ?? []}
+        fridgeUid={snapshot?.fridge.uid ?? null}
         onAddItem={openAddSheet}
         onClose={() => setIsAssistantVisible(false)}
+        onDataChanged={handleAssistantDataChanged}
         onOpenItem={setSelectedBatchUid}
         visible={isAssistantVisible}
       />
