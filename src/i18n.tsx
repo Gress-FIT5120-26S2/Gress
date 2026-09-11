@@ -1,8 +1,9 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
+import { I18nContext, type AppLanguage } from './i18nContext';
 
-export type AppLanguage = 'zh' | 'en';
+export type { AppLanguage } from './i18nContext';
 
 const zh = {
   screens: {
@@ -744,6 +745,42 @@ const zh = {
       sharedVisibility: '共享成员能看到你的昵称和共同冰箱内容，但看不到设备凭证或完整设备标识。',
       security: '随机设备凭证保存在系统安全存储中，服务端只保存不可逆摘要。',
       close: '我知道了',
+    },
+  },
+  wins: {
+    eyebrow: '厨房成就',
+    title: 'Wins',
+    prototypeNote: '样板页 · 展示布局与文案，数据暂未接入',
+    level: {
+      title: '当前等级',
+      name: '节粮达人',
+      progress: (remaining: number) => `再需 ${remaining} XP 升级`,
+    },
+    impact: {
+      title: '环保里程碑',
+      wasteReduced: '已累计减少浪费',
+      wasteValue: (kg: number) => `${kg} 公斤食物`,
+      moneySaved: '节省开支',
+      moneyValue: (amount: number) => `¥ ${amount}`,
+    },
+    badges: {
+      title: '核心成就矩阵',
+      unlocked: '已解锁',
+      locked: '未解锁',
+      items: {
+        cleanPlate: { name: '光盘先锋', detail: '连续记录并吃完临期食材' },
+        fridgeCleaner: { name: '冰箱清道夫', detail: '清理过期库存并保持新鲜' },
+        ultimateSaver: { name: '终极省长', detail: '达成更高节粮里程碑后解锁' },
+      },
+    },
+    quests: {
+      title: '每日 / 每周挑战',
+      progress: (current: number, total: number) => `${current}/${total}`,
+      reward: (xp: number) => `+${xp} XP`,
+      items: {
+        cleanPlatePhoto: { title: '拍照上传今日“光盘”', detail: '今日挑战' },
+        clearExpired: { title: '本周未清空冰箱内过期食物', detail: '每周挑战' },
+      },
     },
   },
   settings: {
@@ -1545,6 +1582,42 @@ const en: Translation = {
       close: 'Got it',
     },
   },
+  wins: {
+    eyebrow: 'KITCHEN WINS',
+    title: 'Wins',
+    prototypeNote: 'Prototype layout and copy · live data not connected yet',
+    level: {
+      title: 'Current level',
+      name: 'Food Saver',
+      progress: (remaining: number) => `${remaining} XP to the next level`,
+    },
+    impact: {
+      title: 'Impact dashboard',
+      wasteReduced: 'Food waste avoided',
+      wasteValue: (kg: number) => `${kg} kg of food`,
+      moneySaved: 'Money saved',
+      moneyValue: (amount: number) => `A$${amount}`,
+    },
+    badges: {
+      title: 'Achievement matrix',
+      unlocked: 'Unlocked',
+      locked: 'Locked',
+      items: {
+        cleanPlate: { name: 'Clean Plate Pioneer', detail: 'Use expiring food before it is wasted' },
+        fridgeCleaner: { name: 'Fridge Scavenger', detail: 'Clear expired stock and keep the fridge fresh' },
+        ultimateSaver: { name: 'Ultimate Saver', detail: 'Unlock after reaching a higher savings milestone' },
+      },
+    },
+    quests: {
+      title: 'Daily / weekly quests',
+      progress: (current: number, total: number) => `${current}/${total}`,
+      reward: (xp: number) => `+${xp} XP`,
+      items: {
+        cleanPlatePhoto: { title: "Photograph today's clean plate", detail: 'Daily quest' },
+        clearExpired: { title: 'Clear expired fridge food this week', detail: 'Weekly quest' },
+      },
+    },
+  },
   settings: {
     open: 'Open settings',
     title: 'Settings',
@@ -1603,8 +1676,6 @@ type I18nContextValue = {
   t: Translation;
 };
 
-const I18nContext = createContext<I18nContextValue | null>(null);
-
 export function I18nProvider({ children }: { children: ReactNode }) {
   const [language, setLanguageState] = useState<AppLanguage>('zh');
   const [isReady, setIsReady] = useState(false);
@@ -1612,7 +1683,6 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let mounted = true;
 
-    // Arthur: NarIyirm
     // 中文：先恢复上次保存的语言，再挂载开场动画，避免英语用户启动时短暂看到中文。
     // EN: Restore the saved language before mounting the opener so English users never see a brief Chinese flash.
     AsyncStorage.getItem(LANGUAGE_STORAGE_KEY)
@@ -1636,12 +1706,17 @@ export function I18nProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo(() => ({ language, setLanguage, t: translations[language] }), [language]);
 
-  if (!isReady) return <View style={{ flex: 1, backgroundColor: '#F7FBF8' }} />;
-  return <I18nContext.Provider value={value}>{children}</I18nContext.Provider>;
+  // 中文：始终挂载 Provider；就绪前只挡内容，避免热更新或子树误渲染时抛出 useI18n 错误。
+  // EN: Always mount the Provider and only gate content until ready, so hot reload or stray renders cannot throw useI18n.
+  return (
+    <I18nContext.Provider value={value}>
+      {isReady ? children : <View style={{ flex: 1, backgroundColor: '#F7FBF8' }} />}
+    </I18nContext.Provider>
+  );
 }
 
 export function useI18n() {
   const context = useContext(I18nContext);
   if (!context) throw new Error('useI18n must be used inside I18nProvider');
-  return context;
+  return context as I18nContextValue;
 }
