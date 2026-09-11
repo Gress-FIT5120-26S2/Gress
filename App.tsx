@@ -4,7 +4,6 @@ import { BlurTargetView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
-import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
@@ -598,17 +597,15 @@ function KitchMemoApp() {
 
 export default function App() {
   return (
-    <GestureHandlerRootView style={styles.root}>
-      <SafeAreaProvider>
-        <RealtimeSyncProvider>
-          <I18nProvider>
-            <ProfileDataProvider>
-              <KitchMemoApp />
-            </ProfileDataProvider>
-          </I18nProvider>
-        </RealtimeSyncProvider>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <SafeAreaProvider style={styles.root}>
+      <RealtimeSyncProvider>
+        <I18nProvider>
+          <ProfileDataProvider>
+            <KitchMemoApp />
+          </ProfileDataProvider>
+        </I18nProvider>
+      </RealtimeSyncProvider>
+    </SafeAreaProvider>
   );
 }
 
