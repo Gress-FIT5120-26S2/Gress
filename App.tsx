@@ -17,6 +17,7 @@ import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { ProfileScreen } from './src/components/ProfileScreen';
+import { AchievementsScreen } from './src/components/AchievementsScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
@@ -458,7 +459,7 @@ function KitchMemoApp() {
               ? styles.homeContent
               : activeTab === 'fridge'
                 ? styles.fridgeContent
-                : activeTab === 'profile' || activeTab === 'notifications'
+                : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements'
                   ? styles.profileContent
                   : styles.standardContent,
             { opacity: screenOpacity, transform: [{ scale: screenScale }] },
@@ -512,6 +513,8 @@ function KitchMemoApp() {
                 setFirstUseJourneyState('pending');
               }}
             />
+          ) : activeTab === 'achievements' ? (
+            <AchievementsScreen />
           ) : activeTab !== 'home' ? (
             <>
               <View style={styles.glow} />
