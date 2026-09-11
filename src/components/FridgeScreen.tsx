@@ -183,6 +183,7 @@ export function FridgeScreen({
   const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(initialFilter);
+  const [filtersExpanded, setFiltersExpanded] = useState(initialFilter !== null);
   const [activeCategory, setActiveCategory] = useState<string | null>(null);
   const [categoryRailCollapsed, setCategoryRailCollapsed] = useState(false);
   const [isCreateCategoryVisible, setIsCreateCategoryVisible] = useState(false);
@@ -365,6 +366,16 @@ export function FridgeScreen({
     () => Object.fromEntries(FILTERS.map(({ key }) => [key, inventory.filter((item) => isStatusMatch(item, key)).length])) as Record<FridgeFilter, number>,
     [inventory],
   );
+  // 中文：全部芯片优先显示过期红点；没有过期时才显示临期橙点，提醒用户打开储存筛选。
+  // EN: The All chip prefers an expired red dot; only without expired stock does it show the expiring amber cue to open storage filters.
+  const allFilterBadgeColor = filterCounts.expired > 0
+    ? '#D94B51'
+    : filterCounts.expiring > 0
+      ? '#D27619'
+      : null;
+  const allFilterBadgeCount = filterCounts.expired > 0
+    ? filterCounts.expired
+    : filterCounts.expiring;
   const categoryCounts = useMemo(() => Object.fromEntries(categories.map((category) => [
     getCategoryFilterKey(category),
     inventory.filter((item) => itemBelongsToCategory(item, category)).length,
@@ -383,6 +394,20 @@ export function FridgeScreen({
     setSearchTerm('');
     setActiveFilter(null);
     setActiveCategory(null);
+    setFiltersExpanded(false);
+  }, []);
+
+  const handleAllFilterPress = useCallback(() => {
+    if (!filtersExpanded) {
+      setFiltersExpanded(true);
+      return;
+    }
+    clearFilters();
+  }, [clearFilters, filtersExpanded]);
+
+  const selectStorageFilter = useCallback((filter: FridgeFilter) => {
+    setFiltersExpanded(true);
+    setActiveFilter((current) => current === filter ? null : filter);
   }, []);
 
   const toggleCategoryRail = useCallback(() => {
@@ -659,41 +684,47 @@ export function FridgeScreen({
 
         <View style={styles.filterBar}>
           <FridgeFilterChip
+            badgeColor={allFilterBadgeColor}
+            badgeCount={allFilterBadgeCount}
             count={inventory.length}
+            expanded={filtersExpanded}
             icon="apps-outline"
             label={t.fridge.filters.all}
-            onPress={clearFilters}
+            onPress={handleAllFilterPress}
             selected={!hasActiveConditions}
+            showExpandCue
             tint="#EEEFFD"
             tone="#6255D9"
           />
-          <View style={styles.scrollableFilters}>
-            <ScrollView
-              contentContainerStyle={styles.filterRow}
-              horizontal
-              onScrollBeginDrag={dismissFilterSwipeHint}
-              showsHorizontalScrollIndicator={false}
-            >
-              {FILTERS.map((filter) => (
-                <FridgeFilterChip
-                  key={filter.key}
-                  count={filterCounts[filter.key]}
-                  icon={filter.icon}
-                  label={t.fridge.filters[filter.key]}
-                  onPress={() => setActiveFilter((current) => current === filter.key ? null : filter.key)}
-                  selected={activeFilter === filter.key}
-                  tint={filter.tint}
-                  tone={filter.tone}
-                />
-              ))}
-            </ScrollView>
-            {showFilterSwipeHint ? (
-              <View accessibilityLabel={t.fridge.filterSwipeHint} pointerEvents="none" style={styles.filterSwipeHint}>
-                <Text style={styles.filterSwipeHintText}>{t.fridge.filterSwipeHint}</Text>
-                <Ionicons name="arrow-forward" size={14} color="#276D70" />
-              </View>
-            ) : null}
-          </View>
+          {filtersExpanded ? (
+            <View style={styles.scrollableFilters}>
+              <ScrollView
+                contentContainerStyle={styles.filterRow}
+                horizontal
+                onScrollBeginDrag={dismissFilterSwipeHint}
+                showsHorizontalScrollIndicator={false}
+              >
+                {FILTERS.map((filter) => (
+                  <FridgeFilterChip
+                    key={filter.key}
+                    count={filterCounts[filter.key]}
+                    icon={filter.icon}
+                    label={t.fridge.filters[filter.key]}
+                    onPress={() => selectStorageFilter(filter.key)}
+                    selected={activeFilter === filter.key}
+                    tint={filter.tint}
+                    tone={filter.tone}
+                  />
+                ))}
+              </ScrollView>
+              {showFilterSwipeHint ? (
+                <View accessibilityLabel={t.fridge.filterSwipeHint} pointerEvents="none" style={styles.filterSwipeHint}>
+                  <Text style={styles.filterSwipeHintText}>{t.fridge.filterSwipeHint}</Text>
+                  <Ionicons name="arrow-forward" size={14} color="#276D70" />
+                </View>
+              ) : null}
+            </View>
+          ) : null}
         </View>
       </View>
 
