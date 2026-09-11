@@ -4,7 +4,7 @@
 
 This file is the implementation handoff for upgrading the fridge-page Spoonie assistant from deterministic canned answers to a genuine AI-supported assistant. A new agent should read this file first, then read `docs/data-architecture/BACKEND_DATA_CONTEXT.md` completely before changing any database, Express inventory path, device authentication, sharing, notifications, achievements, or assistant data contract.
 
-Last decision review: 2026-09-09, Australia/Sydney.
+Last decision review: 2026-09-11, Australia/Sydney.
 
 Latest product-scope decision: version 1 explicitly excludes recipes, cooking instructions, meal generation, substitutions, and recipe ingredient-gap analysis. It includes inventory, expiry, history, restock, ownership, confirmation-gated actions, and reviewed food-storage and food-safety knowledge.
 
@@ -36,6 +36,8 @@ The detailed bilingual plans are in:
 `src/components/fridge/FridgeAssistantScreen.tsx` is connected to the authenticated assistant API through `src/services/assistantApi.ts`. Users can enter free-form questions or use the four retained quick prompts (`use_first`, `expired_review`, `missing_information`, and `restock`). Both paths call the same Luna-backed endpoint and continue within one conversation while the modal remains open.
 
 The screen renders real assistant answers, risk levels, cited sources, linked inventory batches, retry states, and thumbs-up/down feedback. Write-like requests render a ten-minute confirmation card and call the dedicated confirm or cancel endpoint only after the user presses the corresponding button. Successful confirmation triggers the existing inventory reconciliation and shared sync; the existing inventory intake button and entry flow were not changed. Closing the assistant or opening an inventory detail no longer clears the in-memory conversation. AsyncStorage persists only the active conversation UID per fridge; app restart restoration and the history picker re-fetch private content through authenticated `GET /api/assistant/conversations` and `GET /api/assistant/conversations/:conversationUid`. A new-conversation sentinel prevents an explicitly blank conversation from silently reopening old history after restart. Do not confuse this assistant path with the separate AI food-preset path, which uses Gemini and Cloudflare Workers AI.
+
+The assistant entry is now app-level. `App.tsx` owns the single `FridgeAssistantScreen` instance so the fixed fridge entry and the movable mascot share the same in-memory conversation. Home intentionally has no Spoonie entry. The fridge keeps `FridgeAssistantButton` fixed in the existing toolbar with only a low-frequency two-pixel idle movement. Shopping, Achievements, and Profile render `src/components/assistant/SpooniePetEntry.tsx`, which reuses the canonical `assets/kitchmemo-assistant.png`, supports UI-thread dragging, left/right edge snapping, a short greeting before opening, light snap haptics, safe-area and tab-bar bounds, reduced-motion behaviour, and device-local position persistence. Native modals naturally cover the pet, so camera, entry, and settings flows are not obstructed. Inventory-card and empty-inventory actions from the global assistant close it, navigate to Fridge, and hand off to the existing detail or add flow.
 
 ## Required architecture
 

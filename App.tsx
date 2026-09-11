@@ -4,13 +4,15 @@ import { BlurTargetView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
-import { countExpiringBatches, getInventorySnapshot } from './src/services/inventoryApi';
+import { countExpiringBatches, getInventorySnapshot, type InventorySnapshot } from './src/services/inventoryApi';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
@@ -20,8 +22,10 @@ import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
 import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
-import { RealtimeSyncProvider, subscribeToSync } from './src/services/realtimeSync';
+import { RealtimeSyncProvider, requestImmediateSyncProbe, subscribeToSync } from './src/services/realtimeSync';
 import { addSystemNotificationResponseListener, openLastSystemNotification, refreshSystemNotificationDelivery, scheduleExpiryReminders, setSystemNotificationBadge } from './src/services/systemNotifications';
+import { SpooniePetEntry } from './src/components/assistant/SpooniePetEntry';
+import { FridgeAssistantScreen } from './src/components/fridge/FridgeAssistantScreen';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -73,6 +77,10 @@ function KitchMemoApp() {
   const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
   const [fridgeFocusFilter, setFridgeFocusFilter] = useState<FridgeFilter | null>(null);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+  const [assistantSnapshot, setAssistantSnapshot] = useState<InventorySnapshot | null>(null);
+  const [assistantBatchRequestUid, setAssistantBatchRequestUid] = useState<string | null>(null);
+  const [assistantAddRequestToken, setAssistantAddRequestToken] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [notificationReturnTab, setNotificationReturnTab] = useState<'home' | 'profile'>('home');
   const [notificationTargetId, setNotificationTargetId] = useState<string | null>(null);
@@ -197,6 +205,7 @@ function KitchMemoApp() {
     getInventorySnapshot()
       .then((snapshot) => {
         if (!mounted) return;
+        setAssistantSnapshot(snapshot);
         setExpiringCount(countExpiringBatches(snapshot.batches));
         void fetchNotificationPreferences()
           .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
@@ -211,6 +220,7 @@ function KitchMemoApp() {
   useEffect(() => subscribeToSync(['inventory', 'home'], () => {
     void getInventorySnapshot()
       .then((snapshot) => {
+        setAssistantSnapshot(snapshot);
         setExpiringCount(countExpiringBatches(snapshot.batches));
         void fetchNotificationPreferences()
           .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
@@ -397,6 +407,45 @@ function KitchMemoApp() {
     void AsyncStorage.setItem(FIRST_USE_JOURNEY_KEY, 'complete').catch(() => undefined);
   }, []);
 
+  const refreshAssistantSnapshot = useCallback(() => {
+    return getInventorySnapshot()
+      .then((snapshot) => {
+        setAssistantSnapshot(snapshot);
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Arthur: NarIyirm
+  // 中文：冰箱固定按钮和其他主页面的边缘勺勺共用唯一助手实例，因此切换入口不会复制或丢失会话状态。
+  // EN: The fixed fridge button and edge-docked Spoonie share one assistant instance, so changing entry points never duplicates or drops conversation state.
+  const openAssistant = useCallback(() => {
+    setAssistantVisible(true);
+    void refreshAssistantSnapshot();
+  }, [refreshAssistantSnapshot]);
+
+  const closeAssistant = useCallback(() => setAssistantVisible(false), []);
+  const clearAssistantBatchRequest = useCallback(() => setAssistantBatchRequestUid(null), []);
+
+  const handleAssistantDataChanged = useCallback(() => {
+    requestImmediateSyncProbe();
+    void refreshAssistantSnapshot();
+  }, [refreshAssistantSnapshot]);
+
+  const handleAssistantOpenItem = useCallback((batchUid: string) => {
+    setAssistantVisible(false);
+    setAssistantBatchRequestUid(batchUid);
+    setFridgeFocusFilter(null);
+    setActiveTab('fridge');
+  }, []);
+
+  const handleAssistantAddItem = useCallback(() => {
+    setAssistantVisible(false);
+    setAssistantAddRequestToken((current) => current + 1);
+    setFridgeFocusFilter(null);
+    setActiveTab('fridge');
+  }, []);
+
   return (
     <View style={styles.container}>
       {/* Arthur: NarIyirm
@@ -433,7 +482,15 @@ function KitchMemoApp() {
           ) : activeTab === 'home' && !isOpening ? (
             <KitchenLoading />
           ) : activeTab === 'fridge' ? (
-            <FridgeScreen blurTarget={blurTargetRef} initialFilter={fridgeFocusFilter} key={fridgeFocusFilter ?? 'unfiltered'} />
+            <FridgeScreen
+              assistantAddRequestToken={assistantAddRequestToken}
+              assistantBatchRequestUid={assistantBatchRequestUid}
+              blurTarget={blurTargetRef}
+              initialFilter={fridgeFocusFilter}
+              key={fridgeFocusFilter ?? 'unfiltered'}
+              onAssistantBatchRequestHandled={clearAssistantBatchRequest}
+              onOpenAssistant={openAssistant}
+            />
           ) : activeTab === 'shopping' ? (       
             <ShoppingScreen />                    
           ) : activeTab === 'notifications' ? (
@@ -487,6 +544,10 @@ function KitchMemoApp() {
               unreadCount={unreadNotificationCount}
             />
           ) : null}
+          <SpooniePetEntry
+            onOpen={openAssistant}
+            visible={!assistantVisible && (activeTab === 'shopping' || activeTab === 'achievements' || activeTab === 'profile')}
+          />
           <FloatingTabBar
             activeTab={activeTab}
             // Arthur: NarIyirm
@@ -513,6 +574,15 @@ function KitchMemoApp() {
           <Text style={styles.apiActivityText}>{t.status.connecting}</Text>
         </View>
       ) : null}
+      <FridgeAssistantScreen
+        batches={assistantSnapshot?.batches ?? []}
+        fridgeUid={assistantSnapshot?.fridge.uid ?? null}
+        onAddItem={handleAssistantAddItem}
+        onClose={closeAssistant}
+        onDataChanged={handleAssistantDataChanged}
+        onOpenItem={handleAssistantOpenItem}
+        visible={assistantVisible}
+      />
       <StatusBar style={!isFirstUseJourneyVisible && activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
@@ -528,13 +598,17 @@ function KitchMemoApp() {
 
 export default function App() {
   return (
-    <RealtimeSyncProvider>
-      <I18nProvider>
-        <ProfileDataProvider>
-          <KitchMemoApp />
-        </ProfileDataProvider>
-      </I18nProvider>
-    </RealtimeSyncProvider>
+    <GestureHandlerRootView style={styles.root}>
+      <SafeAreaProvider>
+        <RealtimeSyncProvider>
+          <I18nProvider>
+            <ProfileDataProvider>
+              <KitchMemoApp />
+            </ProfileDataProvider>
+          </I18nProvider>
+        </RealtimeSyncProvider>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
 
@@ -550,6 +624,7 @@ function KitchenLoading() {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1, backgroundColor: '#F5F4EE' },
   content: { flex: 1, overflow: 'hidden' },
   screenStage: { flex: 1, overflow: 'hidden' },
