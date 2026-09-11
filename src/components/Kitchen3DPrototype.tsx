@@ -510,6 +510,7 @@ function KitchenCameraControls({
   onExplore,
   onFocusComplete,
   reduceMotion,
+  sceneActive,
 }: {
   activeInteraction: KitchenInteraction;
   cameraResetRequest: number;
@@ -521,6 +522,7 @@ function KitchenCameraControls({
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
   reduceMotion: boolean;
+  sceneActive: boolean;
 }) {
   const { scene } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -529,6 +531,13 @@ function KitchenCameraControls({
   const invalidate = useThree((state) => state.invalidate);
   const canvasWidth = useThree((state) => state.size.width);
   const canvasHeight = useThree((state) => state.size.height);
+  // Arthur: NarIyirm
+  // 中文：焦点完成回调经 ref 读取，避免父组件因切 tab 换引用时重跑镜头 effect、再次导航到冰箱。
+  // EN: Read focus callbacks via refs so parent tab-switch identity changes do not restart the camera effect and re-navigate to fridge.
+  const onEffectCueRef = useRef(onEffectCue);
+  const onFocusCompleteRef = useRef(onFocusComplete);
+  onEffectCueRef.current = onEffectCue;
+  onFocusCompleteRef.current = onFocusComplete;
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
@@ -543,6 +552,21 @@ function KitchenCameraControls({
     invalidate();
   }, [camera, canvasHeight, canvasWidth, invalidate]);
 
+  useLayoutEffect(() => {
+    if (sceneActive) return;
+
+    // Arthur: NarIyirm
+    // 中文：切离首页时立刻复位镜头；隐藏态下 demand 帧循环可能不跑完动画复位。
+    // EN: Snap the camera as soon as home deactivates; a paused demand loop may never finish an animated reset.
+    cameraMotionRef.current = null;
+    camera.position.set(...INITIAL_CAMERA_POSITION);
+    camera.up.set(0, 1, 0);
+    controlsRef.current?.target.set(...CAMERA_TARGET);
+    controlsRef.current?.update();
+    camera.lookAt(...CAMERA_TARGET);
+    camera.updateMatrixWorld();
+  }, [camera, sceneActive]);
+
   useEffect(() => {
     if (!activeInteraction) {
       cameraMotionRef.current = null;
@@ -550,16 +574,16 @@ function KitchenCameraControls({
     }
 
     if (reduceMotion) {
-      onEffectCue(activeInteraction);
-      const timer = setTimeout(() => onFocusComplete(activeInteraction), REDUCED_MOTION_DELAY);
+      onEffectCueRef.current(activeInteraction);
+      const timer = setTimeout(() => onFocusCompleteRef.current(activeInteraction), REDUCED_MOTION_DELAY);
       return () => clearTimeout(timer);
     }
 
     const focus = CAMERA_FOCUS[activeInteraction];
     const anchor = focus.anchorName ? scene.getObjectByName(focus.anchorName) : undefined;
     if (!anchor && !focus.worldPosition) {
-      onEffectCue(activeInteraction);
-      onFocusComplete(activeInteraction);
+      onEffectCueRef.current(activeInteraction);
+      onFocusCompleteRef.current(activeInteraction);
       return;
     }
 
@@ -593,7 +617,7 @@ function KitchenCameraControls({
       thetaDelta,
     };
     invalidate();
-  }, [activeInteraction, camera, invalidate, onEffectCue, onFocusComplete, reduceMotion, scene]);
+  }, [activeInteraction, camera, invalidate, reduceMotion, scene]);
 
   useEffect(() => {
     if (cameraResetRequest === 0 || activeInteraction) return;
@@ -638,7 +662,7 @@ function KitchenCameraControls({
 
     if (motion.feature && !motion.hasCuedEffect && progress >= EFFECT_CUE_PROGRESS) {
       motion.hasCuedEffect = true;
-      onEffectCue(motion.feature);
+      onEffectCueRef.current(motion.feature);
     }
 
     motion.currentTarget.lerpVectors(motion.startTarget, motion.endTarget, moveProgress);
@@ -658,9 +682,9 @@ function KitchenCameraControls({
       return;
     }
 
-    if (motion.feature && !motion.hasCuedEffect) onEffectCue(motion.feature);
+    if (motion.feature && !motion.hasCuedEffect) onEffectCueRef.current(motion.feature);
     cameraMotionRef.current = null;
-    if (motion.feature) onFocusComplete(motion.feature);
+    if (motion.feature) onFocusCompleteRef.current(motion.feature);
     else {
       controlsRef.current?.update();
       onCameraResetComplete();
@@ -725,6 +749,7 @@ function KitchenScene({ active, activeInteraction, activitySignal, batches, came
           onExplore={onExplore}
           onFocusComplete={onFocusComplete}
           reduceMotion={reduceMotion}
+          sceneActive={active}
         />
         <SpoonieWorldCharacter
           activitySignal={activitySignal}
@@ -770,6 +795,22 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
   useEffect(() => () => {
     if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (active) return;
+
+    // Arthur: NarIyirm
+    // 中文：首页 Canvas 切走后仍挂载；必须清掉冰箱等焦点锁，否则父层切 tab 时旧交互会再次触发导航。
+    // EN: The home Canvas stays mounted off-tab; clear fridge focus locks so stale interactions cannot re-fire navigation on later tab changes.
+    if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
+    interactionRef.current = null;
+    setActiveInteraction(null);
+    setEffectInteraction(null);
+    setPressedFeature(null);
+    setIsRecipeBookOpen(false);
+    setIsCameraModified(false);
+    setIsResettingCamera(false);
+  }, [active]);
 
   const registerCameraActivity = useCallback(() => {
     setCameraActivityVersion((version) => version + 1);
@@ -836,6 +877,12 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
 
   const handleFocusComplete = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current !== feature) return;
+    // Arthur: NarIyirm
+    // 中文：导航发出后立刻释放交互锁，避免 keep-alive 场景在切页后重复完成焦点并跳回冰箱。
+    // EN: Release the interaction lock as soon as navigation fires so a kept-alive scene cannot complete focus again and bounce back to fridge.
+    interactionRef.current = null;
+    setActiveInteraction(null);
+    setPressedFeature(null);
     onNavigate(feature === 'fridge' ? 'fridge' : feature === 'shopping' ? 'shopping' : 'notifications');
   }, [onNavigate]);
 
