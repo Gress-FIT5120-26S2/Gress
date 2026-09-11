@@ -20,22 +20,27 @@ import {
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
 import { useI18n } from '../i18n';
+import type { InventoryBatch } from '../services/inventoryApi';
 import type { AppTab } from './FloatingTabBar';
 import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
 import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
 import { KitchenShoppingCart, SHOPPING_CART_POSITION } from './KitchenShoppingCart';
+import { SpoonieWorldCharacter } from './SpoonieWorldCharacter';
 import {
   KitchenTimeEnvironment,
   type KitchenLightingState,
 } from './KitchenTimeLighting';
 
 type Kitchen3DPrototypeProps = {
+  active?: boolean;
+  batches?: InventoryBatch[];
   expiringCount?: number;
   inventoryFillRatio?: number;
   lighting: KitchenLightingState;
   onExplore?: () => void;
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
+  onOpenAssistant: () => void;
   onReady?: () => void;
   unreadNotificationCount?: number;
   weather?: KitchenWeather;
@@ -76,7 +81,10 @@ type CameraMotion = {
   thetaDelta: number;
 };
 type KitchenSceneProps = {
+  active: boolean;
   activeInteraction: KitchenInteraction;
+  activitySignal: number;
+  batches: InventoryBatch[];
   cameraResetRequest: number;
   effectInteraction: KitchenInteraction;
   expiringCount: number;
@@ -90,13 +98,16 @@ type KitchenSceneProps = {
   onCameraResetComplete: () => void;
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
+  onOpenAssistant: () => void;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
+  onSpeechChange: (message: string | null) => void;
   pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
   isResettingCamera: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
+  language: 'en' | 'zh';
 };
 
 const CAMERA_TARGET: [number, number, number] = [0, 1.3, 0];
@@ -303,6 +314,7 @@ function KitchenModel({
   onSelectFeature,
   pressedFeature,
   reduceMotion,
+  sceneVisible,
   unreadNotificationCount,
   weather,
 }: {
@@ -317,6 +329,7 @@ function KitchenModel({
   onSelectFeature: (feature: KitchenFeature) => void;
   pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
+  sceneVisible: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
 }) {
@@ -351,7 +364,7 @@ function KitchenModel({
   }, [invalidate, scene]);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || !sceneVisible) {
       invalidate();
       return;
     }
@@ -361,7 +374,7 @@ function KitchenModel({
     // EN: One low-frequency invalidation loop drives rain, steam, flame, and pulse cues instead of giving every detail its own render loop.
     const interval = setInterval(invalidate, 90);
     return () => clearInterval(interval);
-  }, [invalidate, reduceMotion]);
+  }, [invalidate, reduceMotion, sceneVisible]);
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
@@ -679,7 +692,7 @@ function KitchenCameraControls({
   );
 }
 
-function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isResettingCamera, isStoveLit, lighting, onCameraActivity, onCameraChanged, onCameraResetComplete, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, pressedFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
+function KitchenScene({ active, activeInteraction, activitySignal, batches, cameraResetRequest, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isResettingCamera, isStoveLit, language, lighting, onCameraActivity, onCameraChanged, onCameraResetComplete, onEffectCue, onExplore, onFocusComplete, onOpenAssistant, onReady, onSelectFeature, onSpeechChange, pressedFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
   return (
     <>
       <KitchenTimeEnvironment lighting={lighting} weather={weather} />
@@ -697,6 +710,7 @@ function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction
           onSelectFeature={onSelectFeature}
           pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
+          sceneVisible={active}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
@@ -712,13 +726,22 @@ function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction
           onFocusComplete={onFocusComplete}
           reduceMotion={reduceMotion}
         />
+        <SpoonieWorldCharacter
+          activitySignal={activitySignal}
+          batches={batches}
+          language={language}
+          onOpenAssistant={onOpenAssistant}
+          onSpeechChange={onSpeechChange}
+          reduceMotion={reduceMotion}
+          sceneBusy={!active || activeInteraction !== null || isResettingCamera}
+        />
       </Suspense>
     </>
   );
 }
 
-export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
-  const { t } = useI18n();
+export function Kitchen3DPrototype({ active = true, batches = [], expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onOpenAssistant, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
+  const { language, t } = useI18n();
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
@@ -729,6 +752,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   const [isResettingCamera, setIsResettingCamera] = useState(false);
   const [isStoveLit, setIsStoveLit] = useState(false);
   const [pressedFeature, setPressedFeature] = useState<KitchenFeature | null>(null);
+  const [spoonieSpeech, setSpoonieSpeech] = useState<string | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const interactionRef = useRef<KitchenInteraction>(null);
   const markerFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -826,7 +850,10 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
         gl={{ antialias: false, alpha: false }}
       >
         <KitchenScene
+          active={active}
           activeInteraction={activeInteraction}
+          activitySignal={cameraActivityVersion}
+          batches={batches}
           cameraResetRequest={cameraResetRequest}
           effectInteraction={effectInteraction}
           expiringCount={expiringCount}
@@ -834,6 +861,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
           isRecipeBookOpen={isRecipeBookOpen}
           isResettingCamera={isResettingCamera}
           isStoveLit={isStoveLit}
+          language={language}
           lighting={lighting}
           onCameraActivity={registerCameraActivity}
           onCameraChanged={handleCameraChanged}
@@ -841,14 +869,33 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
           onEffectCue={handleEffectCue}
           onExplore={onExplore}
           onFocusComplete={handleFocusComplete}
+          onOpenAssistant={onOpenAssistant}
           onReady={onReady}
           onSelectFeature={handleSelectFeature}
+          onSpeechChange={setSpoonieSpeech}
           pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
       </Canvas>
+      {spoonieSpeech && !activeInteraction ? (
+        <Pressable
+          accessibilityLabel={`${t.fridge.assistant.assistantName}: ${spoonieSpeech}`}
+          accessibilityRole="button"
+          onPress={onOpenAssistant}
+          style={({ pressed }) => [
+            styles.spoonieSpeech,
+            lighting.phase === 'night' ? styles.spoonieSpeechNight : styles.spoonieSpeechDay,
+            pressed && styles.spoonieSpeechPressed,
+          ]}
+        >
+          <Text style={[styles.spoonieSpeechName, lighting.phase === 'night' && styles.spoonieSpeechNameNight]}>
+            {t.fridge.assistant.assistantName}
+          </Text>
+          <Text style={[styles.spoonieSpeechText, lighting.phase === 'night' && styles.spoonieSpeechTextNight]}>{spoonieSpeech}</Text>
+        </Pressable>
+      ) : null}
       {isCameraModified && !activeInteraction && !isResettingCamera ? (
         <Pressable
           accessibilityHint={t.kitchen.resetCameraHint}
@@ -887,6 +934,18 @@ function KitchenLoading({ label, backgroundColor }: { label: string; backgroundC
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  spoonieSpeech: {
+    position: 'absolute', right: 36, bottom: '25%', maxWidth: 246, minHeight: 74, justifyContent: 'center',
+    paddingHorizontal: 18, paddingVertical: 13, borderRadius: 22, borderWidth: 1,
+    shadowColor: '#173D31', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+  },
+  spoonieSpeechDay: { borderColor: 'rgba(72,117,96,0.16)', backgroundColor: 'rgba(255,253,247,0.94)' },
+  spoonieSpeechNight: { borderColor: 'rgba(214,235,226,0.2)', backgroundColor: 'rgba(31,57,51,0.94)' },
+  spoonieSpeechPressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
+  spoonieSpeechName: { marginBottom: 3, color: '#D66E16', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  spoonieSpeechNameNight: { color: '#FFB564' },
+  spoonieSpeechText: { color: '#294A3F', fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  spoonieSpeechTextNight: { color: '#F1F6F2' },
   resetCameraButton: { position: 'absolute', top: 136, right: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderWidth: 1 },
   resetCameraButtonDay: { borderColor: 'rgba(255,255,255,0.76)', backgroundColor: 'rgba(241,248,246,0.82)' },
   resetCameraButtonNight: { borderColor: 'rgba(226,237,247,0.24)', backgroundColor: 'rgba(47,68,87,0.82)' },
