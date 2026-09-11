@@ -107,6 +107,8 @@ const zh = {
     emptyDescription: '换一个分类、状态或关键词看看。',
     assistant: {
       buttonA11y: '打开厨房小助手',
+      petA11y: '打开勺勺助手，拖动可调整停靠位置',
+      petGreeting: '嗨，要我帮你看看冰箱吗？',
       title: '勺勺',
       back: '返回',
       assistantName: '勺勺',
@@ -899,6 +901,8 @@ const en: Translation = {
     emptyDescription: 'Try another category, status, or search term.',
     assistant: {
       buttonA11y: 'Open kitchen assistant',
+      petA11y: 'Open Spoonie assistant. Drag to change the dock position.',
+      petGreeting: 'Hi! Want me to check the fridge with you?',
       title: 'Spoonie',
       back: 'Back',
       assistantName: 'Spoonie',

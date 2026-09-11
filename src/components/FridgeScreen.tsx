@@ -24,7 +24,6 @@ import { CreateCategoryModal } from './fridge/CreateCategoryModal';
 import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
 import { FridgeAssistantButton } from './fridge/FridgeAssistantButton';
-import { FridgeAssistantScreen } from './fridge/FridgeAssistantScreen';
 import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
 import {
   InventoryEntryFlow,
@@ -162,14 +161,25 @@ function isExpiredAt(expiresAt: string | null) {
 // 中文：主页面继续集中管理数据、筛选状态和整体布局，只把重复且视觉独立的组件放到 fridge 子目录。
 // EN: The screen keeps data, filter state, and page layout together; only repeated visual components live in the fridge subfolder.
 type FridgeScreenProps = {
+  assistantAddRequestToken?: number;
+  assistantBatchRequestUid?: string | null;
   blurTarget?: RefObject<View | null>;
   initialFilter?: FridgeFilter | null;
+  onAssistantBatchRequestHandled?: () => void;
+  onOpenAssistant: () => void;
 };
 
 // Arthur: NarIyirm
 // 中文：冰箱功能的页面编排入口；上游由 App.tsx 的 fridge Tab 挂载，下游通过 inventoryApi、sharingApi 和同步订阅读写权威数据。
 // EN: This orchestrates the fridge feature; App.tsx mounts it for the fridge tab and it reaches authoritative data through inventoryApi, sharingApi, and sync subscriptions.
-export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenProps) {
+export function FridgeScreen({
+  assistantAddRequestToken = 0,
+  assistantBatchRequestUid = null,
+  blurTarget,
+  initialFilter = null,
+  onAssistantBatchRequestHandled,
+  onOpenAssistant,
+}: FridgeScreenProps) {
   const { t } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(initialFilter);
@@ -195,10 +205,10 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
   const [isSharingContextLoading, setIsSharingContextLoading] = useState(false);
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
-  const [isAssistantVisible, setIsAssistantVisible] = useState(false);
   const [saveConfirmationVisible, setSaveConfirmationVisible] = useState(false);
   const [showFilterSwipeHint, setShowFilterSwipeHint] = useState(false);
   const filterSwipeHintDismissedRef = useRef(false);
+  const handledAssistantAddRequestRef = useRef(0);
 
   useEffect(() => {
     let mounted = true;
@@ -397,13 +407,24 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
 
   const openAddSheet = useCallback(() => setIsAddSheetVisible(true), []);
   const closeAddSheet = useCallback(() => setIsAddSheetVisible(false), []);
-  // Arthur: NarIyirm
-  // 中文：助手确认写操作后只触发既有库存对账与共享同步；原有入库入口和提交流程保持独立不变。
-  // EN: After an assistant action is confirmed, reuse inventory reconciliation and shared sync while leaving the existing intake flow independent and unchanged.
-  const handleAssistantDataChanged = useCallback(() => {
-    requestImmediateSyncProbe();
-    void loadInventory('background').catch(() => undefined);
-  }, [loadInventory]);
+
+  useEffect(() => {
+    if (!assistantBatchRequestUid) return;
+    // Arthur: NarIyirm
+    // 中文：其他页面的全局助手关闭后把批次 UID 交给冰箱页，再由现有详情弹窗完成鉴权读取。
+    // EN: After the global assistant closes on another tab, it hands the batch UID to the fridge so the existing authenticated detail sheet can load it.
+    setSelectedBatchUid(assistantBatchRequestUid);
+    onAssistantBatchRequestHandled?.();
+  }, [assistantBatchRequestUid, onAssistantBatchRequestHandled]);
+
+  useEffect(() => {
+    if (assistantAddRequestToken <= handledAssistantAddRequestRef.current) return;
+    // Arthur: NarIyirm
+    // 中文：递增令牌让全局助手跨 Tab 只触发一次既有入库选择窗，页面重渲染不会重复打开。
+    // EN: An increasing token lets the global assistant open the existing intake chooser once across tabs without repeating on re-render.
+    handledAssistantAddRequestRef.current = assistantAddRequestToken;
+    openAddSheet();
+  }, [assistantAddRequestToken, openAddSheet]);
   const selectAddMethod = useCallback((method: AddItemMethod) => {
     // Arthur: NarIyirm
     // 中文：这个回调只会在选择窗完全卸载后触发，因此不会与手动录入的原生 Modal 重叠。
@@ -633,7 +654,7 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
               </Pressable>
             ) : null}
           </View>
-          <FridgeAssistantButton onPress={() => setIsAssistantVisible(true)} />
+          <FridgeAssistantButton onPress={onOpenAssistant} />
         </View>
 
         <View style={styles.filterBar}>
@@ -863,15 +884,6 @@ export function FridgeScreen({ blurTarget, initialFilter = null }: FridgeScreenP
         onClose={() => setSharingFlow(null)}
         onContextChanged={handleSharingContextChanged}
         visible={sharingFlow !== null}
-      />
-      <FridgeAssistantScreen
-        batches={snapshot?.batches ?? []}
-        fridgeUid={snapshot?.fridge.uid ?? null}
-        onAddItem={openAddSheet}
-        onClose={() => setIsAssistantVisible(false)}
-        onDataChanged={handleAssistantDataChanged}
-        onOpenItem={setSelectedBatchUid}
-        visible={isAssistantVisible}
       />
     </View>
   );
