@@ -61,6 +61,13 @@ server/.env.production
 /branding/
 
 # Arthur: NarIyirm
+# 中文：厨房主页依赖此 GLB；仅跟踪这一项，确保新电脑和 CI 能正常打包，同时继续忽略其他本地模型。
+# EN: The kitchen home requires this GLB; track only this asset so fresh machines and CI can bundle while other local models stay ignored.
+!/models/
+/models/*
+!/models/Kitchen-Home-rebuilt-lighting.glb
+
+# Arthur: NarIyirm
 # 中文：docs 中保留可审阅的文本资料，忽略不适合版本控制的二进制办公文档。
 # EN: Keep reviewable text documentation in docs while excluding binary office artifacts.
 /docs/**/*.ppt
