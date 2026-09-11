@@ -66,6 +66,8 @@ server/.env.production
 !/models/
 /models/*
 !/models/Kitchen-Home-rebuilt-lighting.glb
+!/models/Spoonie-Character-v2.glb
+!/models/Spoonie-Character-v2.blend
 
 # Arthur: NarIyirm
 # 中文：docs 中保留可审阅的文本资料，忽略不适合版本控制的二进制办公文档。

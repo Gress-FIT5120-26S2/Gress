@@ -8,6 +8,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
+import { SPOONIE_MODEL_ASSET } from './src/assets/spoonieModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
@@ -80,6 +81,7 @@ function KitchMemoApp() {
   const [assistantSnapshot, setAssistantSnapshot] = useState<InventorySnapshot | null>(null);
   const [assistantBatchRequestUid, setAssistantBatchRequestUid] = useState<string | null>(null);
   const [assistantAddRequestToken, setAssistantAddRequestToken] = useState(0);
+  const [assistantActivitySignal, setAssistantActivitySignal] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [notificationReturnTab, setNotificationReturnTab] = useState<'home' | 'profile'>('home');
   const [notificationTargetId, setNotificationTargetId] = useState<string | null>(null);
@@ -156,7 +158,7 @@ function KitchMemoApp() {
     // Arthur: NarIyirm
     // 中文：开场动画播放时先把 GLB 放入本地缓存，稍后创建 Canvas 时可直接进入解析阶段。
     // EN: Cache the GLB while the opener plays so Canvas can proceed directly to parsing when it mounts.
-    void Asset.loadAsync(KITCHEN_MODEL_ASSET).catch(() => undefined);
+    void Asset.loadAsync([KITCHEN_MODEL_ASSET, SPOONIE_MODEL_ASSET]).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -445,84 +447,110 @@ function KitchMemoApp() {
     setActiveTab('fridge');
   }, []);
 
+  // Arthur: NarIyirm
+  // 中文：根视图把任意触摸转换成轻量计数信号，边缘助手据此取消表演并重新开始无操作计时。
+  // EN: The root view turns any touch into a lightweight counter signal so the edge assistant cancels its performance and restarts the inactivity timer.
+  const markAssistantPageActivity = useCallback(() => {
+    setAssistantActivitySignal((current) => current + 1);
+  }, []);
+
   return (
-    <View style={styles.container}>
+    <View onTouchStart={markAssistantPageActivity} style={styles.container}>
       {/* Arthur: NarIyirm
           中文：内容层是导航栏的模糊目标；导航栏在它之后渲染才能获得真实毛玻璃效果。
           EN: This content layer is the blur target; it renders before the bar for a real glass effect. */}
       <BlurTargetView ref={blurTargetRef} style={styles.content}>
         <Animated.View
-          style={[
-            styles.screenStage,
-            activeTab === 'home'
-              ? styles.homeContent
-              : activeTab === 'fridge'
-                ? styles.fridgeContent
-                : activeTab === 'profile' || activeTab === 'notifications'
-                  ? styles.profileContent
-                  : styles.standardContent,
-            { opacity: screenOpacity, transform: [{ scale: screenScale }] },
-          ]}
+          style={[styles.screenStage, { opacity: screenOpacity, transform: [{ scale: screenScale }] }]}
         >
-          {activeTab === 'home' && canMountKitchen ? (
-            <Suspense fallback={<KitchenLoading />}>
-              <Kitchen3DPrototype
-                expiringCount={expiringCount}
-                inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
-                lighting={kitchenLighting}
-                onExplore={dismissHomeInteractionHint}
-                onInteractionStart={beginCinematicFocus}
-                onNavigate={handleCinematicNavigate}
-                onReady={markKitchenReady}
-                unreadNotificationCount={unreadNotificationCount}
-                weather={HOME_PREVIEW_WEATHER}
-              />
-            </Suspense>
-          ) : activeTab === 'home' && !isOpening ? (
-            <KitchenLoading />
-          ) : activeTab === 'fridge' ? (
-            <FridgeScreen
-              assistantAddRequestToken={assistantAddRequestToken}
-              assistantBatchRequestUid={assistantBatchRequestUid}
-              blurTarget={blurTargetRef}
-              initialFilter={fridgeFocusFilter}
-              key={fridgeFocusFilter ?? 'unfiltered'}
-              onAssistantBatchRequestHandled={clearAssistantBatchRequest}
-              onOpenAssistant={openAssistant}
-            />
-          ) : activeTab === 'shopping' ? (       
-            <ShoppingScreen />                    
-          ) : activeTab === 'notifications' ? (
-            <NotificationInbox
-              initialNotificationId={notificationTargetId}
-              onBack={() => setActiveTab(notificationReturnTab)}
-              onCountsChange={handleNotificationCountsChange}
-            />
-          ) : activeTab === 'profile' ? (
-            <ProfileScreen
-              onOpenNotifications={() => {
-                setNotificationReturnTab('profile');
-                setNotificationTargetId(null);
-                setActiveTab('notifications');
-              }}
-              onReplayOnboarding={() => {
-                // Arthur: NarIyirm
-                // 中文：个人页重播只切换当前会话的引导状态，不清除首次完成标记或任何业务数据。
-                // EN: Profile replay changes only the current session's journey state without clearing completion or business data.
-                setFirstUseJourneyState('pending');
-              }}
-            />
-          ) : activeTab !== 'home' ? (
-            <>
-              <View style={styles.glow} />
-              <Text style={styles.greeting}>KITCHMEMO</Text>
-              <View style={styles.screenCopy}>
-                <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
-                <Text style={styles.title}>{screen.title}</Text>
-                <Text style={styles.description}>{screen.description}</Text>
-                <Text style={styles.connection}>{status}</Text>
-              </View>
-            </>
+          {/* Arthur: NarIyirm
+              中文：首页 GL Canvas 在首次创建后保持挂载；切走时只暂停并隐藏，返回时复用已经绘制的纹理和 GL 上下文，消除重新建场景产生的白帧。
+              EN: Keep the Home GL canvas mounted after its first creation; hide and pause it off-tab so returning reuses the rendered texture and GL context without a reconstruction flash. */}
+          <View
+            pointerEvents={activeTab === 'home' ? 'auto' : 'none'}
+            style={[
+              styles.homeSceneLayer,
+              { backgroundColor: kitchenLighting.background },
+              activeTab !== 'home' && styles.homeSceneLayerHidden,
+            ]}
+          >
+            {canMountKitchen ? (
+              <Suspense fallback={<KitchenLoading />}>
+                <Kitchen3DPrototype
+                  active={activeTab === 'home'}
+                  batches={assistantSnapshot?.batches ?? []}
+                  expiringCount={expiringCount}
+                  inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
+                  lighting={kitchenLighting}
+                  onExplore={dismissHomeInteractionHint}
+                  onInteractionStart={beginCinematicFocus}
+                  onNavigate={handleCinematicNavigate}
+                  onOpenAssistant={openAssistant}
+                  onReady={markKitchenReady}
+                  unreadNotificationCount={unreadNotificationCount}
+                  weather={HOME_PREVIEW_WEATHER}
+                />
+              </Suspense>
+            ) : !isOpening ? <KitchenLoading /> : null}
+          </View>
+
+          {activeTab !== 'home' ? (
+            <View
+              style={[
+                styles.activeScreen,
+                activeTab === 'fridge'
+                  ? styles.fridgeContent
+                  : activeTab === 'profile' || activeTab === 'notifications'
+                    ? styles.profileContent
+                    : styles.standardContent,
+                { backgroundColor: transitionTones[activeTab] },
+              ]}
+            >
+              {activeTab === 'fridge' ? (
+                <FridgeScreen
+                  assistantAddRequestToken={assistantAddRequestToken}
+                  assistantBatchRequestUid={assistantBatchRequestUid}
+                  blurTarget={blurTargetRef}
+                  initialFilter={fridgeFocusFilter}
+                  key={fridgeFocusFilter ?? 'unfiltered'}
+                  onAssistantBatchRequestHandled={clearAssistantBatchRequest}
+                  onOpenAssistant={openAssistant}
+                />
+              ) : activeTab === 'shopping' ? (
+                <ShoppingScreen />
+              ) : activeTab === 'notifications' ? (
+                <NotificationInbox
+                  initialNotificationId={notificationTargetId}
+                  onBack={() => setActiveTab(notificationReturnTab)}
+                  onCountsChange={handleNotificationCountsChange}
+                />
+              ) : activeTab === 'profile' ? (
+                <ProfileScreen
+                  onOpenNotifications={() => {
+                    setNotificationReturnTab('profile');
+                    setNotificationTargetId(null);
+                    setActiveTab('notifications');
+                  }}
+                  onReplayOnboarding={() => {
+                    // Arthur: NarIyirm
+                    // 中文：个人页重播只切换当前会话的引导状态，不清除首次完成标记或任何业务数据。
+                    // EN: Profile replay changes only the current session's journey state without clearing completion or business data.
+                    setFirstUseJourneyState('pending');
+                  }}
+                />
+              ) : (
+                <>
+                  <View style={styles.glow} />
+                  <Text style={styles.greeting}>KITCHMEMO</Text>
+                  <View style={styles.screenCopy}>
+                    <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
+                    <Text style={styles.title}>{screen.title}</Text>
+                    <Text style={styles.description}>{screen.description}</Text>
+                    <Text style={styles.connection}>{status}</Text>
+                  </View>
+                </>
+              )}
+            </View>
           ) : null}
         </Animated.View>
       </BlurTargetView>
@@ -544,6 +572,7 @@ function KitchMemoApp() {
             />
           ) : null}
           <SpooniePetEntry
+            activitySignal={assistantActivitySignal}
             onOpen={openAssistant}
             visible={!assistantVisible && (activeTab === 'shopping' || activeTab === 'achievements' || activeTab === 'profile')}
           />
@@ -625,7 +654,9 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: '#F5F4EE' },
   content: { flex: 1, overflow: 'hidden' },
   screenStage: { flex: 1, overflow: 'hidden' },
-  homeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  homeSceneLayer: { ...StyleSheet.absoluteFill },
+  homeSceneLayerHidden: { opacity: 0 },
+  activeScreen: { flex: 1 },
   fridgeContent: { paddingHorizontal: 0, paddingTop: 0 },
   profileContent: { paddingHorizontal: 0, paddingTop: 0 },
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
