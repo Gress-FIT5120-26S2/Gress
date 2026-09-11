@@ -1,48 +1,49 @@
 import { Image } from 'expo-image';
-import { useEffect } from 'react';
-import { Pressable, StyleSheet } from 'react-native';
-import Animated, { cancelAnimation, Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import { useEffect, useRef, useState } from 'react';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet } from 'react-native';
 import { useI18n } from '../../i18n';
 
 type FridgeAssistantButtonProps = {
   onPress: () => void;
 };
 
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
-
 // Arthur: NarIyirm
-// 中文：冰箱页保持原固定入口，只加入低频两像素呼吸动作；提醒状态和主动吸引注意仍与入口分离。
-// EN: The fridge keeps its fixed entry with only a low-frequency two-pixel breath; reminders and attention-seeking motion remain separate.
+// 中文：冰箱页入口使用 RN 内置原生驱动，保留低频两像素呼吸动作，同时避免启动时加载 Worklets。
+// EN: The fridge entry uses RN's built-in native driver to keep its subtle two-pixel breath without loading Worklets at startup.
 export function FridgeAssistantButton({ onPress }: FridgeAssistantButtonProps) {
   const { t } = useI18n();
-  const reducedMotion = useReducedMotion();
-  const idleY = useSharedValue(0);
-  const pressScale = useSharedValue(1);
+  const [reducedMotion, setReducedMotion] = useState(false);
+  const idleY = useRef(new Animated.Value(0)).current;
+  const pressScale = useRef(new Animated.Value(1)).current;
 
   useEffect(() => {
-    cancelAnimation(idleY);
-    idleY.set(0);
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
+    return () => subscription.remove();
+  }, []);
+
+  useEffect(() => {
+    idleY.stopAnimation();
+    idleY.setValue(0);
     if (reducedMotion) return;
-    idleY.set(withRepeat(withSequence(
-      withDelay(5200, withTiming(-2, { duration: 480, easing: EASE_OUT })),
-      withTiming(0, { duration: 560, easing: EASE_OUT }),
-    ), -1, false));
-    return () => cancelAnimation(idleY);
+    const animation = Animated.loop(Animated.sequence([
+      Animated.delay(5200),
+      Animated.timing(idleY, { toValue: -2, duration: 480, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(idleY, { toValue: 0, duration: 560, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]));
+    animation.start();
+    return () => animation.stop();
   }, [idleY, reducedMotion]);
 
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: idleY.get() }, { scale: pressScale.get() }],
-  }));
-
   return (
-    <Animated.View style={[styles.mascotButton, animatedStyle]}>
+    <Animated.View style={[styles.mascotButton, { transform: [{ translateY: idleY }, { scale: pressScale }] }]}>
       <Pressable
         accessibilityLabel={t.fridge.assistant.buttonA11y}
         accessibilityRole="button"
         hitSlop={6}
         onPress={onPress}
-        onPressIn={() => pressScale.set(withTiming(0.97, { duration: 100, easing: EASE_OUT }))}
-        onPressOut={() => pressScale.set(withTiming(1, { duration: 120, easing: EASE_OUT }))}
+        onPressIn={() => Animated.timing(pressScale, { toValue: 0.97, duration: 100, useNativeDriver: true }).start()}
+        onPressOut={() => Animated.timing(pressScale, { toValue: 1, duration: 120, useNativeDriver: true }).start()}
         pressRetentionOffset={12}
         style={styles.mascotPressable}
       >

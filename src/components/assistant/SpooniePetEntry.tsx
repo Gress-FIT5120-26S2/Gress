@@ -2,22 +2,8 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { StyleSheet, Text, useWindowDimensions, View } from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  cancelAnimation,
-  Easing,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withDelay,
-  withRepeat,
-  withSequence,
-  withSpring,
-  withTiming,
-} from 'react-native-reanimated';
+import { AccessibilityInfo, Animated, Easing, PanResponder, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { scheduleOnRN } from 'react-native-worklets';
 import { useI18n } from '../../i18n';
 
 type PetSide = 'left' | 'right';
@@ -36,10 +22,8 @@ const POSITION_KEY = 'kitchmemo.spoonie.pet-position.v1';
 const PET_SIZE = 78;
 const EDGE_PEEK = 13;
 const BUBBLE_WIDTH = 214;
-const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 function clamp(value: number, minimum: number, maximum: number) {
-  'worklet';
   return Math.min(Math.max(value, minimum), maximum);
 }
 
@@ -48,24 +32,24 @@ function playDockHaptic() {
 }
 
 // Arthur: NarIyirm
-// 中文：Cart、成就和“我的”共用一个设备本地停靠位置；拖动全程留在 UI 线程，结束后才持久化比例坐标。
-// EN: Cart, Achievements, and Profile share one device-local dock position; dragging stays on the UI thread and persists a ratio only after release.
+// 中文：为避开部分 Expo Go 在初始化 Worklets 时的原生闪退，宠物改用 RN 内置动画；拖动坐标仅在松手后持久化。
+// EN: To avoid native Worklets startup crashes seen in some Expo Go builds, the pet uses built-in RN animation and persists coordinates only on release.
 export function SpooniePetEntry({ onOpen, visible }: SpooniePetEntryProps) {
   const { t } = useI18n();
   const { height, width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const reducedMotion = useReducedMotion();
   const [side, setSide] = useState<PetSide>('right');
   const [showGreeting, setShowGreeting] = useState(false);
+  const [reducedMotion, setReducedMotion] = useState(false);
   const openingRef = useRef(false);
   const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const x = useSharedValue(width - PET_SIZE + EDGE_PEEK);
-  const y = useSharedValue(Math.max(insets.top + 88, height * 0.43));
-  const dragStartX = useSharedValue(0);
-  const dragStartY = useSharedValue(0);
-  const bob = useSharedValue(0);
-  const tilt = useSharedValue(0);
-  const scale = useSharedValue(1);
+  const idleAnimationRef = useRef<Animated.CompositeAnimation | null>(null);
+  const position = useRef(new Animated.ValueXY({ x: width - PET_SIZE + EDGE_PEEK, y: height * 0.43 })).current;
+  const currentPositionRef = useRef({ x: width - PET_SIZE + EDGE_PEEK, y: height * 0.43 });
+  const dragStartRef = useRef(currentPositionRef.current);
+  const bob = useRef(new Animated.Value(0)).current;
+  const tilt = useRef(new Animated.Value(0)).current;
+  const scale = useRef(new Animated.Value(1)).current;
 
   const minY = insets.top + 70;
   const maxY = Math.max(minY, height - insets.bottom - 116 - PET_SIZE);
@@ -83,12 +67,12 @@ export function SpooniePetEntry({ onOpen, visible }: SpooniePetEntryProps) {
     if (openingRef.current) return;
     openingRef.current = true;
     setShowGreeting(true);
-    tilt.set(withSequence(
-      withTiming(side === 'right' ? -7 : 7, { duration: 130, easing: EASE_OUT }),
-      withTiming(side === 'right' ? 5 : -5, { duration: 150, easing: EASE_OUT }),
-      withTiming(0, { duration: 150, easing: EASE_OUT }),
-    ));
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light).catch(() => undefined);
+    Animated.sequence([
+      Animated.timing(tilt, { toValue: side === 'right' ? -7 : 7, duration: 130, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(tilt, { toValue: side === 'right' ? 5 : -5, duration: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(tilt, { toValue: 0, duration: 150, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]).start();
+    playDockHaptic();
     openTimerRef.current = setTimeout(() => {
       setShowGreeting(false);
       openingRef.current = false;
@@ -96,6 +80,21 @@ export function SpooniePetEntry({ onOpen, visible }: SpooniePetEntryProps) {
       onOpen();
     }, reducedMotion ? 180 : 620);
   }, [onOpen, reducedMotion, side, tilt]);
+
+  useEffect(() => {
+    const xListener = position.x.addListener(({ value }) => { currentPositionRef.current.x = value; });
+    const yListener = position.y.addListener(({ value }) => { currentPositionRef.current.y = value; });
+    return () => {
+      position.x.removeListener(xListener);
+      position.y.removeListener(yListener);
+    };
+  }, [position]);
+
+  useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReducedMotion);
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReducedMotion);
+    return () => subscription.remove();
+  }, []);
 
   useEffect(() => {
     if (visible) return;
@@ -107,6 +106,7 @@ export function SpooniePetEntry({ onOpen, visible }: SpooniePetEntryProps) {
 
   useEffect(() => () => {
     if (openTimerRef.current) clearTimeout(openTimerRef.current);
+    idleAnimationRef.current?.stop();
   }, []);
 
   useEffect(() => {
@@ -116,107 +116,117 @@ export function SpooniePetEntry({ onOpen, visible }: SpooniePetEntryProps) {
       const parsed = JSON.parse(raw) as Partial<StoredPetPosition>;
       if ((parsed.side !== 'left' && parsed.side !== 'right') || typeof parsed.yRatio !== 'number') return;
       const restoredY = minY + clamp(parsed.yRatio, 0, 1) * (maxY - minY);
+      const restored = { x: parsed.side === 'left' ? leftX : rightX, y: restoredY };
       setSide(parsed.side);
-      x.set(parsed.side === 'left' ? leftX : rightX);
-      y.set(restoredY);
+      currentPositionRef.current = restored;
+      position.setValue(restored);
     }).catch(() => undefined);
     return () => { mounted = false; };
-  }, [leftX, maxY, minY, rightX, x, y]);
+  }, [leftX, maxY, minY, position, rightX]);
 
   useEffect(() => {
-    x.set(withTiming(side === 'left' ? leftX : rightX, { duration: 180, easing: EASE_OUT }));
-    y.set(clamp(y.get(), minY, maxY));
-  }, [leftX, maxY, minY, rightX, side, width, x, y]);
+    const bounded = {
+      x: side === 'left' ? leftX : rightX,
+      y: clamp(currentPositionRef.current.y, minY, maxY),
+    };
+    currentPositionRef.current = bounded;
+    position.setValue(bounded);
+  }, [leftX, maxY, minY, position, rightX, side]);
 
   useEffect(() => {
-    cancelAnimation(bob);
-    bob.set(0);
+    idleAnimationRef.current?.stop();
+    bob.setValue(0);
     if (!visible || reducedMotion) return;
-    bob.set(withRepeat(withSequence(
-      withDelay(3600, withTiming(-3, { duration: 650, easing: EASE_OUT })),
-      withTiming(0, { duration: 750, easing: EASE_OUT }),
-    ), -1, false));
-    return () => cancelAnimation(bob);
+    const animation = Animated.loop(Animated.sequence([
+      Animated.delay(3600),
+      Animated.timing(bob, { toValue: -3, duration: 650, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+      Animated.timing(bob, { toValue: 0, duration: 750, easing: Easing.out(Easing.cubic), useNativeDriver: true }),
+    ]));
+    idleAnimationRef.current = animation;
+    animation.start();
+    return () => animation.stop();
   }, [bob, reducedMotion, visible]);
 
-  const panGesture = useMemo(() => Gesture.Pan()
-    .minDistance(8)
-    .onStart(() => {
-      dragStartX.set(x.get());
-      dragStartY.set(y.get());
-      scale.set(withTiming(1.04, { duration: 120, easing: EASE_OUT }));
-    })
-    .onUpdate((event) => {
-      x.set(clamp(dragStartX.get() + event.translationX, leftX, rightX));
-      y.set(clamp(dragStartY.get() + event.translationY, minY, maxY));
-      tilt.set(clamp(event.translationX / 18, -8, 8));
-    })
-    .onEnd((event) => {
-      const nextSide: PetSide = x.get() + PET_SIZE / 2 < width / 2 ? 'left' : 'right';
-      const targetX = nextSide === 'left' ? leftX : rightX;
-      const targetY = clamp(y.get(), minY, maxY);
-      x.set(withSpring(targetX, { dampingRatio: 0.8, duration: 400, velocity: event.velocityX }));
-      y.set(withSpring(targetY, { dampingRatio: 0.8, duration: 400, velocity: event.velocityY }));
-      tilt.set(withTiming(0, { duration: 160, easing: EASE_OUT }));
-      scale.set(withTiming(1, { duration: 140, easing: EASE_OUT }));
-      scheduleOnRN(persistPosition, nextSide, targetY);
-      scheduleOnRN(playDockHaptic);
-    })
-    .onFinalize(() => {
-      scale.set(withTiming(1, { duration: 140, easing: EASE_OUT }));
-      tilt.set(withTiming(0, { duration: 160, easing: EASE_OUT }));
-    }), [dragStartX, dragStartY, leftX, maxY, minY, persistPosition, rightX, scale, tilt, width, x, y]);
+  const panResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_event, gestureState) => Math.abs(gestureState.dx) > 3 || Math.abs(gestureState.dy) > 3,
+    onPanResponderGrant: () => {
+      position.stopAnimation();
+      dragStartRef.current = { ...currentPositionRef.current };
+      Animated.timing(scale, { toValue: 1.04, duration: 120, useNativeDriver: true }).start();
+    },
+    onPanResponderMove: (_event, gestureState) => {
+      position.setValue({
+        x: clamp(dragStartRef.current.x + gestureState.dx, leftX, rightX),
+        y: clamp(dragStartRef.current.y + gestureState.dy, minY, maxY),
+      });
+      tilt.setValue(clamp(gestureState.dx / 18, -8, 8));
+    },
+    onPanResponderRelease: (_event, gestureState) => {
+      const moved = Math.hypot(gestureState.dx, gestureState.dy) > 8;
+      if (!moved) {
+        Animated.timing(scale, { toValue: 1, duration: 120, useNativeDriver: true }).start();
+        openAfterGreeting();
+        return;
+      }
+      const releasedX = clamp(dragStartRef.current.x + gestureState.dx, leftX, rightX);
+      const targetY = clamp(dragStartRef.current.y + gestureState.dy, minY, maxY);
+      const nextSide: PetSide = releasedX + PET_SIZE / 2 < width / 2 ? 'left' : 'right';
+      const target = { x: nextSide === 'left' ? leftX : rightX, y: targetY };
+      Animated.parallel([
+        Animated.spring(position, { toValue: target, damping: 18, stiffness: 180, mass: 1, useNativeDriver: true }),
+        Animated.timing(tilt, { toValue: 0, duration: 160, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 140, useNativeDriver: true }),
+      ]).start();
+      persistPosition(nextSide, targetY);
+      playDockHaptic();
+    },
+    onPanResponderTerminate: () => {
+      Animated.parallel([
+        Animated.timing(tilt, { toValue: 0, duration: 160, useNativeDriver: true }),
+        Animated.timing(scale, { toValue: 1, duration: 140, useNativeDriver: true }),
+      ]).start();
+    },
+    onPanResponderTerminationRequest: () => true,
+  }), [leftX, maxY, minY, openAfterGreeting, persistPosition, position, rightX, scale, tilt, width]);
 
-  const tapGesture = useMemo(() => Gesture.Tap()
-    .maxDistance(8)
-    .onBegin(() => scale.set(withTiming(0.97, { duration: 100, easing: EASE_OUT })))
-    .onFinalize(() => scale.set(withTiming(1, { duration: 120, easing: EASE_OUT })))
-    .onEnd((_event, success) => {
-      if (success) scheduleOnRN(openAfterGreeting);
-    }), [openAfterGreeting, scale]);
-
-  const gesture = useMemo(() => Gesture.Race(panGesture, tapGesture), [panGesture, tapGesture]);
-  const petStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: x.get() },
-      { translateY: y.get() + bob.get() },
-      { rotate: `${tilt.get()}deg` },
-      { scale: scale.get() },
-    ],
-  }));
-  const bubbleStyle = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: x.get() + (side === 'right' ? -BUBBLE_WIDTH + 18 : PET_SIZE - 18) },
-      { translateY: y.get() + 7 },
-    ],
-  }));
-
+  const rotate = tilt.interpolate({ inputRange: [-8, 8], outputRange: ['-8deg', '8deg'] });
   if (!visible) return null;
 
   return (
     <View pointerEvents="box-none" style={styles.layer}>
       {showGreeting ? (
-        <Animated.View accessibilityLiveRegion="polite" pointerEvents="none" style={[styles.greetingBubble, bubbleStyle]}>
+        <Animated.View
+          accessibilityLiveRegion="polite"
+          pointerEvents="none"
+          style={[
+            styles.greetingBubble,
+            { left: side === 'right' ? -BUBBLE_WIDTH + 18 : PET_SIZE - 18 },
+            { transform: [{ translateX: position.x }, { translateY: position.y }] },
+          ]}
+        >
           <Text style={styles.greetingText}>{t.fridge.assistant.petGreeting}</Text>
         </Animated.View>
       ) : null}
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          accessibilityActions={[{ name: 'activate' }]}
-          accessibilityLabel={t.fridge.assistant.petA11y}
-          accessibilityRole="button"
-          accessible
-          onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'activate') openAfterGreeting(); }}
-          style={[styles.pet, petStyle]}
-        >
-          <Image
-            cachePolicy="memory-disk"
-            contentFit="contain"
-            source={require('../../../assets/kitchmemo-assistant.png')}
-            style={[styles.image, side === 'left' && styles.imageLeft]}
-          />
-        </Animated.View>
-      </GestureDetector>
+      <Animated.View
+        {...panResponder.panHandlers}
+        accessibilityActions={[{ name: 'activate' }]}
+        accessibilityLabel={t.fridge.assistant.petA11y}
+        accessibilityRole="button"
+        accessible
+        onAccessibilityAction={(event) => { if (event.nativeEvent.actionName === 'activate') openAfterGreeting(); }}
+        style={[
+          styles.pet,
+          { transform: [{ translateX: position.x }, { translateY: Animated.add(position.y, bob) }, { rotate }, { scale }] },
+        ]}
+      >
+        <Image
+          cachePolicy="memory-disk"
+          contentFit="contain"
+          source={require('../../../assets/kitchmemo-assistant.png')}
+          style={[styles.image, side === 'left' && styles.imageLeft]}
+        />
+      </Animated.View>
     </View>
   );
 }
@@ -227,7 +237,7 @@ const styles = StyleSheet.create({
   image: { width: PET_SIZE, height: PET_SIZE },
   imageLeft: { transform: [{ scaleX: -1 }] },
   greetingBubble: {
-    position: 'absolute', top: 0, left: 0, width: BUBBLE_WIDTH, minHeight: 58, justifyContent: 'center', paddingHorizontal: 16,
+    position: 'absolute', top: 7, width: BUBBLE_WIDTH, minHeight: 58, justifyContent: 'center', paddingHorizontal: 16,
     borderWidth: 1, borderColor: 'rgba(90, 126, 103, 0.16)', borderRadius: 20, backgroundColor: '#FFFDF8',
     shadowColor: '#29473D', shadowOpacity: 0.13, shadowRadius: 14, shadowOffset: { width: 0, height: 7 }, elevation: 7,
   },
