@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-10（Australia/Sydney）。
+- 最后核对日期：2026-09-11（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 31 份 migration。CLI 当前链接 `Gress-development`；2026-09-11 已将 `20260911010000_confirm_assistant_pending_actions.sql`、`20260911020000_harden_assistant_action_confirmation.sql` 与 `20260911030000_link_assistant_actions_to_messages.sql` 应用到开发库。开发库迁移历史与本地一致；生产库没有应用本轮助手 migration。
+- 本地 schema 历史共有 32 份 migration。CLI 当前链接 `Gress-development`；截至 2026-09-11，开发库与生产库的 migration 历史均与本地一致，并已应用 `20260909010000` 至 `20260911040000` 的助手与结构修复 migration。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。两库远程 lint 均无 schema error；CLI 完成后已恢复链接开发库。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -14,7 +14,7 @@
 - Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
 - 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出和设备恢复；这些功能依赖的 migration 当前已在开发与生产项目同步应用。成就和分类管理接口尚未实现。
-- 已在开发库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。这些 migration、知识内容与 API 仍须完成整套端到端回归后才能应用生产库。
+- 已在开发库和生产库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。数据库契约已经进入生产，但生产知识内容摄取、OpenAI 环境变量、Express API 部署和端到端验收仍需单独完成。
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
 
@@ -302,7 +302,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `version` | `integer` | 默认 1，用于共享编辑乐观锁 |
 | `created_at` / `updated_at` | `timestamptz` | 审计时间 |
 
-开发库中的助手日期契约（由 `20260909010000` 实现；生产库尚未应用）：
+开发库与生产库中的助手日期契约（由 `20260909010000` 实现）：
 
 - `use_by_at`：包装或可靠识别得到的硬性安全截止时间；超过后必须丢弃，不能推荐食用。
 - `estimated_quality_until`：系统根据食材、入库时间、储存方式、本地澳洲季节和版本化品质档案自动计算；用户不能直接编辑，不是安全保证。
