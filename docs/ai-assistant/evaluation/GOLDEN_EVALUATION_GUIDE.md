@@ -126,7 +126,7 @@ Do not use an LLM judge as the sole authority for inventory facts, access contro
 
 ## Known implementation gaps exposed by the baseline
 
-1. The date contract is locked in `FRESHNESS_DATE_CONTRACT.md`. Development now has separate `use_by_at` and system-owned `estimated_quality_until` fields through `20260909010000`; production still has only the legacy contract until the verified migrations are promoted. Historical `expires_at` values are never treated as verified safety deadlines.
+1. The date contract is locked in `FRESHNESS_DATE_CONTRACT.md`. Development and production now have separate `use_by_at` and system-owned `estimated_quality_until` fields through `20260909010000`. Historical `expires_at` values are never treated as verified safety deadlines.
 2. The current inventory client response does not expose safe creator or owner labels. A new read-only assistant tool must map internal IDs to safe display labels inside Express without sending device IDs to Luna.
 3. Historical analysis needs bounded aggregation over `inventory_events`, with explicit `personal` and `shared` scopes. Raw actor IDs must not be returned to the model.
 4. History currently records stock, consumption, adjustment, waste, and transfer semantics, but prediction quality depends on sufficient, clean event coverage.

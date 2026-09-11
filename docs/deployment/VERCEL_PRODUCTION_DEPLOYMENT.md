@@ -1,6 +1,6 @@
 # KitchMemo Vercel 生产部署手册
 
-> 状态：已记录，尚未执行生产部署。最后核对日期：2026-09-02。
+> 状态：助手数据库 migration 已于 2026-09-11 部署并通过生产 lint；Vercel API、生产 OpenAI 配置、RAG 内容摄取和 App 发布尚未执行。
 >
 > 本文用于后续把 `server/` 中的 Express API 部署到 Vercel。执行前必须再次确认 Vercel、Gemini、Cloudflare 和 Supabase 的当前限制与价格。
 
