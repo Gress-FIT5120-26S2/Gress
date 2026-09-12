@@ -87,7 +87,7 @@ try {
     });
   });
   await api(0, '/inventory/batches', {
-    body: JSON.stringify({ categoryCode: 'other', expiresAt: null, initialQuantity: 1, name: `Live ${runId}`, purchasePrice: null, restockRule: null, storageZone: 'pantry', unit: 'item' }),
+    body: JSON.stringify({ categoryCode: 'other', deadlineType: 'best_before', expiresAt: null, initialQuantity: 1, name: `Live ${runId}`, priceSource: 'user', purchasePrice: 0, restockRule: null, storageZone: 'pantry', unit: 'item' }),
     method: 'POST',
   });
   const broadcastPayload = await Promise.race([

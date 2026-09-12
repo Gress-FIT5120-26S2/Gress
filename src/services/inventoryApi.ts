@@ -1,6 +1,11 @@
 import { requestApi } from './apiClient';
 
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
+export type InventoryDeadlineType = 'use_by' | 'best_before';
+export type InventoryPriceSource = 'user' | 'barcode' | 'recognition' | 'legacy';
+export type InventoryPriceStatus = 'recorded' | 'free' | 'legacy_unknown';
+export type InventoryOutcome = 'consume' | 'discard' | 'correction';
+export type InventoryOutcomeReason = 'used' | 'spoiled' | 'overbought' | 'forgotten' | 'unwanted' | 'quality_rejected' | 'other' | 'confirmed_use_by_expiry' | 'data_correction';
 export type InventoryCategoryCode =
   | 'meat'
   | 'vegetables'
@@ -11,9 +16,12 @@ export type InventoryCategoryCode =
   | 'other';
 
 export type InventoryBatch = {
+  bestBeforeAt: string | null;
   categoryCode: InventoryCategoryCode;
   categoryId?: string;
   currency: string;
+  deadlineType: InventoryDeadlineType | null;
+  estimatedQualityUntil: string | null;
   expiresAt: string | null;
   expiryWarningDays: number | null;
   id: string;
@@ -23,10 +31,13 @@ export type InventoryBatch = {
   needsRestock: boolean;
   presetUid?: string | null;
   purchasePrice: number | null;
+  priceSource: InventoryPriceSource;
+  priceStatus: InventoryPriceStatus;
   remainingQuantity: number;
   stockedAt: string;
   storageZone: InventoryStorageZone;
   unit: string;
+  useByAt: string | null;
 };
 
 export type InventoryLifecycleState = 'active' | 'consumed' | 'discarded' | 'archived';
@@ -68,12 +79,14 @@ export type InventoryCategory = InventorySnapshot['categories'][number];
 
 export type CreateInventoryBatchInput = {
   categoryCode: InventoryCategoryCode;
+  deadlineType: InventoryDeadlineType;
   expiresAt: string | null;
   expiryWarningDays: number | null;
   initialQuantity: number;
   name: string;
   presetUid: string | null;
-  purchasePrice: number | null;
+  purchasePrice: number;
+  priceSource: Exclude<InventoryPriceSource, 'legacy'>;
   restockRule: {
     enabled: true;
     minimumQuantity: number;
@@ -85,11 +98,13 @@ export type CreateInventoryBatchInput = {
 
 export type UpdateInventoryBatchInput = {
   categoryCode: InventoryCategoryCode;
+  deadlineType: InventoryDeadlineType;
   expectedVersion: number;
   expiresAt: string | null;
   expiryWarningDays: number | null;
   name: string;
-  purchasePrice: number | null;
+  purchasePrice: number;
+  priceSource: Exclude<InventoryPriceSource, 'legacy'>;
   remainingQuantity: number;
   storageZone: InventoryStorageZone;
   unit: string;
@@ -210,6 +225,21 @@ export function setInventoryRestockRule(
   return requestApi<{ restockRule: InventoryRestockRule | null }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/restock-rule`, {
     body: JSON.stringify(rule ? { ...rule, unit } : { enabled: false, unit }),
     method: 'PUT',
+  });
+}
+
+// Arthur: NarIyirm
+// 中文：移出库存不再等同删除；调用方明确提交“已使用、已丢弃或数据纠错”，服务端原子保留可审计流水。
+// EN: Removing stock is no longer deletion; callers submit consumed, discarded, or correction so the server preserves one auditable event atomically.
+export function resolveInventoryBatch(
+  batchUid: string,
+  expectedVersion: number,
+  outcome: InventoryOutcome,
+  reasonCode: InventoryOutcomeReason,
+): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }> {
+  return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/resolve`, {
+    body: JSON.stringify({ expectedVersion, outcome, reasonCode }),
+    method: 'POST',
   });
 }
 

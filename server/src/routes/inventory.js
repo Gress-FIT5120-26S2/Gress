@@ -16,6 +16,10 @@ const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
 const STORAGE_ZONES = new Set(['chilled', 'frozen', 'pantry']);
 const INVENTORY_UNITS = new Set(['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box']);
+const INVENTORY_DEADLINE_TYPES = new Set(['use_by', 'best_before']);
+const INVENTORY_OUTCOMES = new Set(['consume', 'discard', 'correction']);
+const INVENTORY_OUTCOME_REASONS = new Set(['used', 'spoiled', 'overbought', 'forgotten', 'unwanted', 'quality_rejected', 'other', 'confirmed_use_by_expiry', 'data_correction']);
+const INVENTORY_PRICE_SOURCES = new Set(['user', 'barcode', 'recognition']);
 const MAX_INVENTORY_NAME_LENGTH = 120;
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const PRESET_ICON_BUCKET = 'food-preset-icons';
@@ -37,6 +41,14 @@ function normaliseName(value) {
 function asNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+// Arthur: NarIyirm
+// 中文：必填金额必须先排除 null、undefined 与空字符串；Number(null) 会得到 0，不能把缺失价格误记成免费。
+// EN: Required money fields reject null, undefined, and blanks before conversion because Number(null) is 0 and must not turn missing prices into free items.
+function asRequiredNumber(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
+  return asNumber(value);
 }
 
 // Arthur: NarIyirm
@@ -140,7 +152,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
     supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
     supabase.from('food_categories').select('category_uid, name, system_code, colour, icon, icon_path, is_default').eq('fridge_uid', fridgeUid).order('created_at'),
-    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
+    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
     supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, target_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
   ]);
 
@@ -187,6 +199,9 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
         categoryId: batch.category_uid,
         categoryName: categoryByUid.get(batch.category_uid)?.name ?? 'Other',
         currency: batch.currency,
+        deadlineType: batch.use_by_at ? 'use_by' : batch.best_before_at ? 'best_before' : null,
+        bestBeforeAt: batch.best_before_at,
+        estimatedQualityUntil: batch.estimated_quality_until,
         expiresAt: batch.expires_at,
         expiryWarningDays: batch.expiry_warning_days,
         id: batch.batch_uid,
@@ -199,6 +214,8 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
         openedAt: batch.opened_at,
         presetUid: batch.preset_uid,
         purchasePrice: batch.purchase_price === null ? null : Number(batch.purchase_price),
+        priceSource: batch.price_source,
+        priceStatus: batch.price_status,
         remainingQuantity: Number(batch.remaining_quantity),
         restockRule: rule ? {
           enabled: Boolean(rule.is_enabled),
@@ -208,6 +225,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
         stockedAt: batch.stocked_at,
         storageZone: batch.storage_zone,
         unit: batch.unit,
+        useByAt: batch.use_by_at,
         version: batch.version,
       };
     }),
@@ -224,7 +242,7 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
   const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
   const batchResult = await supabase
     .from('inventory_batches')
-    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, currency, stocked_at, expires_at, expiry_warning_days, opened_at, lifecycle_state, version')
+    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version')
     .eq('fridge_uid', fridgeUid)
     .eq('batch_uid', batchUid)
     .eq('lifecycle_state', 'active')
@@ -265,6 +283,9 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
     categoryCode: categoryResult.data?.system_code ?? 'other',
     categoryName: categoryResult.data?.name ?? 'Other',
     currency: batch.currency,
+    deadlineType: batch.use_by_at ? 'use_by' : batch.best_before_at ? 'best_before' : null,
+    bestBeforeAt: batch.best_before_at,
+    estimatedQualityUntil: batch.estimated_quality_until,
     expiresAt: batch.expires_at,
     expiryWarningDays: batch.expiry_warning_days,
     id: batch.batch_uid,
@@ -275,6 +296,8 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
     name: batch.name,
     openedAt: batch.opened_at,
     purchasePrice: batch.purchase_price === null ? null : Number(batch.purchase_price),
+    priceSource: batch.price_source,
+    priceStatus: batch.price_status,
     presetUid: batch.preset_uid,
     remainingQuantity: Number(batch.remaining_quantity),
     restockRule: rule ? {
@@ -285,6 +308,7 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
     stockedAt: batch.stocked_at,
     storageZone: batch.storage_zone,
     unit: batch.unit,
+    useByAt: batch.use_by_at,
     version: batch.version,
   };
 }
@@ -297,6 +321,9 @@ function sendInventoryMutationError(response, error) {
   if (error.message.includes('not found')) return response.status(404).json({ message: error.message });
   if (error.message.includes('version conflict')) {
     return response.status(409).json({ message: 'This item changed on another device. Reload it and try again.' });
+  }
+  if (error.message.includes('inventory_use_by_expired')) {
+    return response.status(409).json({ error: 'inventory_use_by_expired', message: 'This item is past its use-by time and cannot be recorded as consumed.' });
   }
   console.error('Inventory mutation failed:', error.message);
   return response.status(503).json({ message: 'The inventory change could not be saved.' });
@@ -436,7 +463,9 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   const body = request.body ?? {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const remainingQuantity = asNumber(body.remainingQuantity);
-  const purchasePrice = body.purchasePrice === null || body.purchasePrice === undefined ? null : asNumber(body.purchasePrice);
+  const purchasePrice = asRequiredNumber(body.purchasePrice);
+  const priceSource = body.priceSource ?? 'user';
+  const deadlineType = body.deadlineType ?? 'best_before';
   const expectedVersion = asNumber(body.expectedVersion);
   const expiryWarningDays = getExpiryWarningDays(body);
   if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
@@ -447,7 +476,9 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   if (remainingQuantity === null || remainingQuantity < 0 || !INVENTORY_UNITS.has(body.unit) || remainingQuantity >= getMaxInventoryQuantity(body.unit)) {
     return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
   }
-  if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
+  if (purchasePrice === null || purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price is required and cannot be negative.');
+  if (!INVENTORY_PRICE_SOURCES.has(priceSource)) return sendInvalidRequest(response, 'A valid price source is required.');
+  if (body.expiresAt != null && !INVENTORY_DEADLINE_TYPES.has(deadlineType)) return sendInvalidRequest(response, 'A valid deadline type is required.');
   if (!Number.isInteger(expectedVersion)) return sendInvalidRequest(response, 'A batch version is required.');
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
     return sendInvalidRequest(response, 'Expiry time is invalid.');
@@ -457,15 +488,17 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   }
 
   try {
-    const { error } = await supabase.rpc('update_inventory_batch_details', {
+    const { error } = await supabase.rpc('update_inventory_batch_details_v2', {
       p_batch_uid: batchUid,
       p_category_code: body.categoryCode,
       p_device_id: deviceId,
       p_expected_version: expectedVersion,
-      p_expires_at: body.expiresAt ?? null,
+      p_deadline_at: body.expiresAt ?? null,
+      p_deadline_type: body.expiresAt == null ? 'none' : deadlineType,
       p_expiry_warning_days: expiryWarningDays,
       p_name: name,
       p_purchase_price: purchasePrice,
+      p_price_source: priceSource,
       p_remaining_quantity: remainingQuantity,
       p_storage_zone: body.storageZone,
       p_unit: body.unit.trim(),
@@ -475,6 +508,45 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
     const batch = await getInventoryBatchDetail(deviceId, batchUid, request.fridgeUid);
     await notifySharedInventory(deviceId, batchUid, 'updated');
     return response.json({ batch });
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：详情页只提交结果与原因；数据库函数在同一锁中决定 consume、discard 或 correction 流水并清零活跃库存。
+// EN: The detail screen submits only outcome and reason; the database function records consume, discard, or correction and clears active stock under one lock.
+inventoryRouter.post('/inventory/batches/:batchUid/resolve', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const expectedVersion = asNumber(request.body?.expectedVersion);
+  const outcome = request.body?.outcome;
+  const reasonCode = request.body?.reasonCode;
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (!Number.isInteger(expectedVersion) || !INVENTORY_OUTCOMES.has(outcome) || !INVENTORY_OUTCOME_REASONS.has(reasonCode)) {
+    return sendInvalidRequest(response, 'A batch version, outcome, and reason are required.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('resolve_inventory_batch', {
+      p_batch_uid: batchUid,
+      p_device_id: deviceId,
+      p_expected_version: expectedVersion,
+      p_outcome: outcome,
+      p_reason_code: reasonCode,
+    });
+    if (error) throw error;
+    const updated = Array.isArray(data) ? data[0] : data;
+    await notifySharedInventory(deviceId, batchUid, 'removed');
+    return response.json({
+      batch: {
+        id: updated.batch_uid,
+        lifecycleState: updated.lifecycle_state,
+        remainingQuantity: Number(updated.remaining_quantity),
+        version: updated.version,
+      },
+    });
   } catch (error) {
     return sendInventoryMutationError(response, error);
   }
@@ -645,7 +717,9 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   const body = request.body ?? {};
   const name = typeof body.name === 'string' ? body.name.trim() : '';
   const quantity = asNumber(body.initialQuantity);
-  const purchasePrice = body.purchasePrice === null || body.purchasePrice === undefined ? null : asNumber(body.purchasePrice);
+  const purchasePrice = asRequiredNumber(body.purchasePrice);
+  const priceSource = body.priceSource ?? 'user';
+  const deadlineType = body.deadlineType ?? 'best_before';
   const restock = body.restockRule;
   const hasRestock = restock?.enabled === true;
   const restockMinimum = hasRestock ? asNumber(restock.minimumQuantity) : null;
@@ -659,7 +733,9 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   if (quantity === null || quantity <= 0 || !INVENTORY_UNITS.has(body.unit) || quantity >= getMaxInventoryQuantity(body.unit)) {
     return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
   }
-  if (purchasePrice !== null && purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price cannot be negative.');
+  if (purchasePrice === null || purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price is required and cannot be negative.');
+  if (!INVENTORY_PRICE_SOURCES.has(priceSource)) return sendInvalidRequest(response, 'A valid price source is required.');
+  if (body.expiresAt != null && !INVENTORY_DEADLINE_TYPES.has(deadlineType)) return sendInvalidRequest(response, 'A valid deadline type is required.');
   if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
     return sendInvalidRequest(response, 'Expiry time is invalid.');
   }
@@ -674,15 +750,16 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   }
 
   try {
-    const { data, error } = await supabase.rpc('create_inventory_batch', {
+    const { data, error } = await supabase.rpc('create_inventory_batch_v2', {
       p_category_code: body.categoryCode,
-      p_currency: 'AUD',
       p_device_id: deviceId,
-      p_expires_at: body.expiresAt ?? null,
+      p_deadline_at: body.expiresAt ?? null,
+      p_deadline_type: body.expiresAt == null ? 'none' : deadlineType,
       p_expiry_warning_days: expiryWarningDays,
       p_initial_quantity: quantity,
       p_name: name,
       p_purchase_price: purchasePrice,
+      p_price_source: priceSource,
       p_preset_uid: presetUid,
       p_restock_enabled: hasRestock,
       p_restock_minimum_quantity: restockMinimum,

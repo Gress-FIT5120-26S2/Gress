@@ -89,7 +89,7 @@ async function embedQuery(text) {
 async function getInventorySnapshot(args, context) {
   let query = context.supabase
     .from('inventory_batches')
-    .select('batch_uid,name,storage_zone,remaining_quantity,unit,stocked_at,use_by_at,estimated_quality_until,quality_estimate_basis,owner_device_id,version')
+    .select('batch_uid,name,storage_zone,remaining_quantity,unit,stocked_at,use_by_at,best_before_at,estimated_quality_until,quality_estimate_basis,owner_device_id,version')
     .eq('fridge_uid', context.fridgeUid)
     .eq('lifecycle_state', 'active')
     .limit(MAX_INVENTORY_ROWS);
@@ -100,6 +100,7 @@ async function getInventorySnapshot(args, context) {
   const now = Date.now();
   return (data ?? []).map((batch) => {
     const useByAt = asIso(batch.use_by_at);
+    const bestBeforeAt = asIso(batch.best_before_at);
     const estimatedQualityUntil = asIso(batch.estimated_quality_until);
     const hardExpired = Boolean(useByAt && Date.parse(useByAt) < now);
     const qualityOverdue = Boolean(estimatedQualityUntil && Date.parse(estimatedQualityUntil) < now);
@@ -111,11 +112,15 @@ async function getInventorySnapshot(args, context) {
       unit: batch.unit,
       stockedAt: asIso(batch.stocked_at),
       useByAt,
+      bestBeforeAt,
       estimatedQualityUntil,
       qualityEstimateBasis: batch.quality_estimate_basis,
       hardExpired,
       qualityOverdue,
-      consumptionEligible: !hardExpired && !qualityOverdue,
+      // Arthur: NarIyirm
+      // 中文：只有 use-by 是硬性食用阻断；best-before 与系统品质估计只提示检查，不能被助手当作安全期限。
+      // EN: Only use-by blocks consumption; best-before and estimated quality prompt inspection and must not be treated as safety deadlines.
+      consumptionEligible: !hardExpired,
       ownership: batch.owner_device_id === context.deviceId ? 'personal' : 'shared',
       version: batch.version,
     };

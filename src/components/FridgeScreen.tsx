@@ -570,12 +570,14 @@ export function FridgeScreen({
     // EN: Manual and recognition entry share this submission contract; the server chooses the target fridge from Device-ID.
     await createInventoryBatch({
       categoryCode: submission.batch.categoryCode,
+      deadlineType: submission.batch.deadlineType,
       expiresAt: submission.batch.expiresAt,
       expiryWarningDays: submission.expiryWarningDays,
       initialQuantity: submission.batch.initialQuantity,
       name: submission.batch.name,
       presetUid: submission.batch.matchedPresetUid,
       purchasePrice: submission.batch.purchasePrice,
+      priceSource: submission.batch.priceSource === 'manual' ? 'user' : submission.batch.priceSource,
       restockRule: submission.restockRule
         ? {
           enabled: true,
@@ -595,11 +597,13 @@ export function FridgeScreen({
   const saveEditedInventoryEntry = useCallback(async (editingBatch: InventoryBatchDetail, submission: InventoryEntrySubmission) => {
     const updated = await updateInventoryBatch(editingBatch.id, {
       categoryCode: submission.batch.categoryCode,
+      deadlineType: submission.batch.deadlineType,
       expectedVersion: editingBatch.version,
       expiresAt: submission.batch.expiresAt,
       expiryWarningDays: submission.expiryWarningDays,
       name: submission.batch.name,
       purchasePrice: submission.batch.purchasePrice,
+      priceSource: 'user',
       remainingQuantity: submission.batch.remainingQuantity,
       storageZone: submission.batch.storageZone,
       unit: submission.batch.unit,

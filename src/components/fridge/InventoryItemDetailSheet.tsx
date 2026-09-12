@@ -20,12 +20,13 @@ import {
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import {
-  archiveInventoryBatch,
   getInventoryBatchDetail,
+  resolveInventoryBatch,
   setInventoryRestockRule,
   updateInventoryBatchQuantity,
   type InventoryBatchDetail,
   type InventoryCategoryCode,
+  type InventoryOutcomeReason,
 } from '../../services/inventoryApi';
 import {
   InventoryEntryFlow,
@@ -128,6 +129,7 @@ export function InventoryItemDetailSheet({
   const [showRemoveConfirm, setShowRemoveConfirm] = useState(false);
   const [isRemoving, setIsRemoving] = useState(false);
   const [removeError, setRemoveError] = useState<string | null>(null);
+  const [discardReason, setDiscardReason] = useState<InventoryOutcomeReason | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const contentOpacity = useRef(new Animated.Value(1)).current;
 
@@ -175,6 +177,7 @@ export function InventoryItemDetailSheet({
     setQuantityError(null);
     setRestockError(null);
     setRemoveError(null);
+    setDiscardReason(null);
     setShowRemoveConfirm(false);
     setIsClosing(false);
     setShowQuantityConfirmation(false);
@@ -453,14 +456,29 @@ export function InventoryItemDetailSheet({
   }, [batch, copy.restock.error, isSavingRestock, minimumQuantity, onChanged, restockEnabled, targetQuantity]);
 
   // Arthur: NarIyirm
-  // 中文：确认移除后调用 archiveInventoryBatch；后端软归档并保留历史，成功后再通知父页面刷新。
-  // EN: Confirmed removal calls archiveInventoryBatch; the backend soft-archives history and the parent refreshes after success.
+  // 中文：移出动作按 use-by 与临期窗口自动归类；正常库存仅询问丢弃原因，避免让用户理解数据库事件类型。
+  // EN: Removal is classified from use-by and the warning window; normal stock asks only for a discard reason so users never manage database event types.
   const removeBatch = useCallback(async () => {
     if (!batch || isRemoving) return;
     setIsRemoving(true);
     setRemoveError(null);
     try {
-      await archiveInventoryBatch(batch.id, batch.version);
+      const now = Date.now();
+      const useByTime = batch.useByAt ? new Date(batch.useByAt).getTime() : Number.NaN;
+      const deadlineTime = batch.expiresAt ? new Date(batch.expiresAt).getTime() : Number.NaN;
+      const warningStart = Number.isNaN(deadlineTime) ? Number.NaN : deadlineTime - (batch.expiryWarningDays ?? 3) * 86_400_000;
+      const hardExpired = !Number.isNaN(useByTime) && useByTime <= now;
+      const nearExpiry = !hardExpired && !Number.isNaN(warningStart) && now >= warningStart && now <= deadlineTime;
+      if (!hardExpired && !nearExpiry && !discardReason) {
+        setIsRemoving(false);
+        return;
+      }
+      await resolveInventoryBatch(
+        batch.id,
+        batch.version,
+        nearExpiry ? 'consume' : 'discard',
+        hardExpired ? 'confirmed_use_by_expiry' : nearExpiry ? 'used' : discardReason ?? 'other',
+      );
       await onChanged();
       setShowRemoveConfirm(false);
       await animateClosed();
@@ -470,7 +488,7 @@ export function InventoryItemDetailSheet({
     } finally {
       setIsRemoving(false);
     }
-  }, [animateClosed, batch, copy.removeError, finishClose, isRemoving, onChanged]);
+  }, [animateClosed, batch, copy.removeError, discardReason, finishClose, isRemoving, onChanged]);
 
   const openEditor = useCallback(() => {
     if (!batch) return;
@@ -486,6 +504,7 @@ export function InventoryItemDetailSheet({
     const expiry = batch.expiresAt ? new Date(batch.expiresAt) : null;
     return {
       categoryCode: batch.categoryCode,
+      deadlineType: batch.deadlineType ?? 'best_before',
       expiryDate: expiry ? formatEntryDate(expiry) : undefined,
       expiryEnabled: Boolean(expiry),
       expiryTime: expiry ? formatEntryTime(expiry) : undefined,
@@ -532,6 +551,14 @@ export function InventoryItemDetailSheet({
     const days = Math.ceil(milliseconds / 86_400_000);
     return days === 0 ? t.fridge.freshness.today : t.fridge.freshness.daysLeft(days);
   })() : null;
+  const removalMode = batch ? (() => {
+    const now = Date.now();
+    const useByTime = batch.useByAt ? new Date(batch.useByAt).getTime() : Number.NaN;
+    const deadlineTime = batch.expiresAt ? new Date(batch.expiresAt).getTime() : Number.NaN;
+    if (!Number.isNaN(useByTime) && useByTime <= now) return 'expired' as const;
+    const warningStart = Number.isNaN(deadlineTime) ? Number.NaN : deadlineTime - (batch.expiryWarningDays ?? 3) * 86_400_000;
+    return !Number.isNaN(warningStart) && now >= warningStart && now <= deadlineTime ? 'near' as const : 'normal' as const;
+  })() : 'normal';
 
   return (
     <Modal
@@ -746,8 +773,8 @@ export function InventoryItemDetailSheet({
               <View style={styles.confirmHeader}>
                 <View style={styles.dangerIcon}><Ionicons name="trash" size={25} color="#FF3047" /></View>
                 <View style={styles.confirmTitleWrap}>
-                  <Text style={styles.confirmTitle}>{copy.removeTitle}</Text>
-                  <Text style={styles.confirmDescription}>{copy.removeDescription}</Text>
+                  <Text style={styles.confirmTitle}>{copy.removeModes[removalMode].title}</Text>
+                  <Text style={styles.confirmDescription}>{copy.removeModes[removalMode].description}</Text>
                 </View>
                 <Pressable accessibilityRole="button" onPress={() => setShowRemoveConfirm(false)} style={styles.confirmClose}><Ionicons name="close" size={23} color="#75807D" /></Pressable>
               </View>
@@ -758,13 +785,28 @@ export function InventoryItemDetailSheet({
                   <Text style={styles.confirmItemQuantity}>{formatQuantity(batch.remainingQuantity)} {unitLabel}</Text>
                 </View>
               </View>
-              <View style={styles.warningBox}><Ionicons name="alert-circle" size={18} color="#F2384A" /><Text style={styles.warningText}>{copy.removeWarning}</Text></View>
+              {removalMode === 'normal' ? (
+                <View style={styles.reasonList}>
+                  {(['spoiled', 'overbought', 'forgotten', 'unwanted', 'quality_rejected', 'other'] as const).map((reason) => (
+                    <Pressable
+                      accessibilityRole="radio"
+                      accessibilityState={{ checked: discardReason === reason }}
+                      key={reason}
+                      onPress={() => setDiscardReason(reason)}
+                      style={[styles.reasonChip, discardReason === reason && styles.reasonChipSelected]}
+                    >
+                      <Text style={[styles.reasonChipText, discardReason === reason && styles.reasonChipTextSelected]}>{copy.discardReasons[reason]}</Text>
+                    </Pressable>
+                  ))}
+                </View>
+              ) : null}
+              <View style={styles.warningBox}><Ionicons name="alert-circle" size={18} color="#F2384A" /><Text style={styles.warningText}>{copy.removeModes[removalMode].warning}</Text></View>
               {removeError ? <Text style={styles.errorText}>{removeError}</Text> : null}
               <View style={styles.confirmActions}>
                 <Pressable accessibilityRole="button" disabled={isRemoving} onPress={() => setShowRemoveConfirm(false)} style={styles.keepButton}><Text style={styles.keepText}>{copy.keep}</Text></Pressable>
-                <Pressable accessibilityRole="button" disabled={isRemoving} onPress={() => void removeBatch()} style={[styles.confirmRemoveButton, isRemoving && styles.disabled]}>
+                <Pressable accessibilityRole="button" disabled={isRemoving || (removalMode === 'normal' && !discardReason)} onPress={() => void removeBatch()} style={[styles.confirmRemoveButton, (isRemoving || (removalMode === 'normal' && !discardReason)) && styles.disabled]}>
                   <Ionicons name="trash" size={19} color="#FFFFFF" />
-                  <Text style={styles.confirmRemoveText}>{isRemoving ? copy.removing : copy.confirmRemove}</Text>
+                  <Text style={styles.confirmRemoveText}>{isRemoving ? copy.removing : copy.removeModes[removalMode].confirm}</Text>
                 </Pressable>
               </View>
             </View>
@@ -887,6 +929,11 @@ const styles = StyleSheet.create({
   quantityConfirmValueText: { color: '#B85F13', fontSize: 27, fontWeight: '900' },
   warningBox: { flexDirection: 'row', alignItems: 'center', gap: 9, padding: 13, borderRadius: 14, backgroundColor: '#FFF0F2' },
   warningText: { flex: 1, color: '#9C5A61', fontSize: 12.5, lineHeight: 18 },
+  reasonList: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 14 },
+  reasonChip: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 12, borderRadius: 12, backgroundColor: '#F1F4F2' },
+  reasonChipSelected: { borderWidth: 1, borderColor: '#F2384A', backgroundColor: '#FFE9EC' },
+  reasonChipText: { color: '#4F625A', fontSize: 12, fontWeight: '700' },
+  reasonChipTextSelected: { color: '#C82F42' },
   confirmActions: { flexDirection: 'row', gap: 10 },
   keepButton: { flex: 1, minHeight: 55, alignItems: 'center', justifyContent: 'center', borderRadius: 18, backgroundColor: '#F0F1F3' },
   keepText: { color: '#6F7477', fontSize: 15, fontWeight: '800' },

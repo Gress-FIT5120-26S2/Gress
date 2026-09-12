@@ -22,12 +22,14 @@ import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggesti
 import { getMaxInventoryQuantity, MAX_INVENTORY_NAME_LENGTH, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
 export type InventoryEntrySource = 'manual' | 'recognition' | 'barcode';
+export type InventoryDeadlineType = 'use_by' | 'best_before';
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
 export type InventoryCategoryCode = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
 export type InventoryUnit = 'item' | 'g' | 'kg' | 'ml' | 'L' | 'bag' | 'bottle' | 'box';
 
 export type InventoryEntryInitialValues = Partial<{
   categoryCode: InventoryCategoryCode;
+  deadlineType: InventoryDeadlineType;
   expiryEnabled: boolean;
   expiryDate: string;
   expiryTime: string;
@@ -46,11 +48,13 @@ export type InventoryEntrySubmission = {
   batch: {
     categoryCode: InventoryCategoryCode;
     currency: 'AUD';
+    deadlineType: InventoryDeadlineType;
     expiresAt: string | null;
     initialQuantity: number;
     matchedPresetUid: string | null;
     name: string;
-    purchasePrice: number | null;
+    purchasePrice: number;
+    priceSource: InventoryEntrySource;
     remainingQuantity: number;
     stockedAt: string;
     storageZone: InventoryStorageZone;
@@ -123,6 +127,7 @@ export function InventoryEntryFlow({
   const [quantity, setQuantity] = useState('');
   const [unit, setUnit] = useState<InventoryUnit>('item');
   const [price, setPrice] = useState('');
+  const [deadlineType, setDeadlineType] = useState<InventoryDeadlineType>('best_before');
   const [storageZone, setStorageZone] = useState<InventoryStorageZone>('chilled');
   const [categoryCode, setCategoryCode] = useState<InventoryCategoryCode>('other');
   const [suggestion, setSuggestion] = useState<StorageSuggestion | null>(null);
@@ -163,6 +168,7 @@ export function InventoryEntryFlow({
     setQuantity(initialValues?.quantity ?? '');
     setUnit(initialValues?.unit ?? 'item');
     setPrice(initialValues?.price ?? '');
+    setDeadlineType(initialValues?.deadlineType ?? 'best_before');
     setStorageZone(initialValues?.storageZone ?? 'chilled');
     setCategoryCode(initialValues?.categoryCode ?? 'other');
     setSuggestion(null);
@@ -318,7 +324,7 @@ export function InventoryEntryFlow({
       : parsedQuantity >= getMaxInventoryQuantity(unit)
         ? copy.validation.quantityLimit(getMaxInventoryQuantity(unit), unitLabel)
         : null;
-    const nextPriceError = parsedPrice === null || (Number.isFinite(parsedPrice) && parsedPrice >= 0) ? null : copy.validation.price;
+    const nextPriceError = parsedPrice !== null && Number.isFinite(parsedPrice) && parsedPrice >= 0 ? null : copy.validation.price;
     setNameError(nextNameError);
     setQuantityError(nextQuantityError);
     setPriceError(nextPriceError);
@@ -363,17 +369,19 @@ export function InventoryEntryFlow({
     if (nextExpiryError || nextRestockError || !validateBasics()) return;
 
     const numericQuantity = Number(quantity);
-    const numericPrice = price.trim().length > 0 ? Number(price) : null;
+    const numericPrice = Number(price);
     const submission: InventoryEntrySubmission = {
       source,
       batch: {
         categoryCode,
         currency: 'AUD',
+        deadlineType,
         expiresAt: expiry?.toISOString() ?? null,
         initialQuantity: numericQuantity,
         matchedPresetUid: suggestion?.presetUid ?? null,
         name: name.trim(),
         purchasePrice: numericPrice,
+        priceSource: source,
         remainingQuantity: numericQuantity,
         stockedAt: new Date().toISOString(),
         storageZone,
@@ -406,7 +414,7 @@ export function InventoryEntryFlow({
     }
 
     await submitInventory(submission);
-  }, [categoryCode, copy.confirmation, copy.validation, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays]);
+  }, [categoryCode, copy.confirmation, copy.validation, deadlineType, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays]);
 
   const confirmSubmission = useCallback(() => {
     if (!pendingSubmission) return;
@@ -524,6 +532,14 @@ export function InventoryEntryFlow({
               </View>
               <Text style={styles.helperText}>{copy.price.helper}</Text>
               {priceError ? <Text style={styles.errorText}>{priceError}</Text> : null}
+
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="calendar-outline" label={copy.expiry.typeLabel} tone="#D87519" tint="#FFF2E3" />
+              <View style={styles.twoColumnRow}>
+                <ChoiceChip fill label={copy.expiry.bestBefore} onPress={() => setDeadlineType('best_before')} selected={deadlineType === 'best_before'} tone="orange" />
+                <ChoiceChip fill label={copy.expiry.useBy} onPress={() => setDeadlineType('use_by')} selected={deadlineType === 'use_by'} tone="orange" />
+              </View>
+              <Text style={styles.helperText}>{deadlineType === 'use_by' ? copy.expiry.useByHelper : copy.expiry.bestBeforeHelper}</Text>
             </View>
 
             <ReminderSettingsSection
@@ -685,6 +701,7 @@ const styles = StyleSheet.create({
   subLabel: { marginTop: 14, marginBottom: 9, color: '#5E7068', fontSize: 12.5, fontWeight: '700' },
   chipRow: { gap: 8, paddingRight: 8 },
   threeColumnRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  twoColumnRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
   choiceChip: { minHeight: 43, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 15, borderRadius: 14, borderCurve: 'continuous' },
   choiceChipFill: { flex: 1, paddingHorizontal: 8 },
   choiceChipText: { fontSize: 13, fontWeight: '800' },
