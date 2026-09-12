@@ -8,6 +8,12 @@ import type { AchievementCode, AchievementDashboard } from '../services/achievem
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
 import { AchievementMountainHero } from './achievement/AchievementMountainHero';
+import {
+  formatBadgeProgressLabel,
+  getBadgeProgressRatio,
+  isAchievementBadgeVisible,
+  resolveVisibleBadgeStatus,
+} from './achievement/badgePresentation';
 
 const ACHIEVEMENT_ICONS: Record<AchievementCode, keyof typeof Ionicons.glyphMap> = {
   first_item: 'basket-outline',
@@ -101,19 +107,25 @@ export function AchievementsScreen() {
         <View style={styles.card}>
           <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text></View>
           <View style={styles.badgeRow}>
-            {dashboard.achievements.filter((achievement) => achievement.status !== 'unavailable').map((achievement) => {
-              const unlocked = achievement.status === 'unlocked' || achievement.unlocked;
-              const stateLabel = unlocked && achievement.unlockedAt
-                ? copy.badges.unlockedOn(formatUnlockDate(achievement.unlockedAt))
-                : unlocked
-                  ? copy.badges.unlocked
-                  : achievement.status === 'in_progress' && achievement.progressTarget
-                    ? copy.badges.progressOf(Number(achievement.progressCurrent ?? 0), Number(achievement.progressTarget))
-                    : copy.badges.reward(achievement.xpReward);
+            {dashboard.achievements.filter(isAchievementBadgeVisible).map((achievement) => {
+              // Arthur: NarIyirm
+              // 中文：四态只读服务端 status + 进度分母；unavailable 已过滤，locked 展示条件而非 0 进度失败感。
+              // EN: Four states read server status plus progress denominators; unavailable is hidden and locked shows the requirement instead of failed zero progress.
+              const status = resolveVisibleBadgeStatus(achievement);
+              const progressRatio = getBadgeProgressRatio(achievement);
+              const progressLabel = formatBadgeProgressLabel(achievement, copy.badges);
+              const stateLabel = status === 'unlocked'
+                ? (achievement.unlockedAt
+                  ? copy.badges.unlockedOn(formatUnlockDate(achievement.unlockedAt))
+                  : copy.badges.unlocked)
+                : status === 'in_progress'
+                  ? progressLabel
+                  : copy.badges.descriptions[achievement.code];
+              const iconColor = status === 'unlocked' ? '#C6661C' : status === 'in_progress' ? '#A8895C' : '#8A9A93';
               return (
                 <Pressable
                   accessibilityHint={copy.badges.holdHint}
-                  accessibilityLabel={`${copy.badges.items[achievement.code]}. ${stateLabel}. ${copy.badges.descriptions[achievement.code]}`}
+                  accessibilityLabel={`${copy.badges.items[achievement.code]}. ${status === 'locked' ? copy.badges.locked : status === 'in_progress' ? copy.badges.inProgress : copy.badges.unlocked}. ${stateLabel}. ${copy.badges.descriptions[achievement.code]}`}
                   accessibilityRole="button"
                   delayLongPress={BADGE_LONG_PRESS_MS}
                   key={achievement.code}
@@ -125,15 +137,28 @@ export function AchievementsScreen() {
                   }}
                   style={({ pressed }) => [
                     styles.badgeCard,
-                    !unlocked && styles.badgeCardLocked,
+                    status === 'unlocked' && styles.badgeCardUnlocked,
+                    status === 'in_progress' && styles.badgeCardInProgress,
+                    status === 'locked' && styles.badgeCardLocked,
                     (pressed || heldAchievement?.code === achievement.code) && styles.badgeCardPressed,
                   ]}
                 >
-                  <View style={[styles.badgeIcon, !unlocked && styles.badgeIconLocked]}>
-                    <Ionicons color={unlocked ? '#C6661C' : '#8A9A93'} name={ACHIEVEMENT_ICONS[achievement.code]} size={22} />
+                  <View style={[
+                    styles.badgeIcon,
+                    status === 'unlocked' && styles.badgeIconUnlocked,
+                    status === 'in_progress' && styles.badgeIconInProgress,
+                    status === 'locked' && styles.badgeIconLocked,
+                  ]}>
+                    <Ionicons color={iconColor} name={ACHIEVEMENT_ICONS[achievement.code]} size={22} />
                   </View>
-                  <Text numberOfLines={2} style={[styles.badgeName, !unlocked && styles.badgeNameLocked]}>{copy.badges.items[achievement.code]}</Text>
-                  <Text numberOfLines={2} style={styles.badgeState}>{stateLabel}</Text>
+                  <Text numberOfLines={2} style={[styles.badgeName, status !== 'unlocked' && styles.badgeNameMuted]}>{copy.badges.items[achievement.code]}</Text>
+                  <Text numberOfLines={2} style={[styles.badgeState, status === 'unlocked' && styles.badgeStateUnlocked, status === 'in_progress' && styles.badgeStateInProgress]}>{stateLabel}</Text>
+                  {status === 'in_progress' ? (
+                    <View style={styles.badgeProgressTrack}>
+                      <View style={[styles.badgeProgressFill, { width: `${Math.round(progressRatio * 100)}%` }]} />
+                    </View>
+                  ) : null}
+                  {status === 'locked' ? <Text style={styles.badgeReward}>{copy.badges.reward(achievement.xpReward)}</Text> : null}
                 </Pressable>
               );
             })}
@@ -215,14 +240,23 @@ const styles = StyleSheet.create({
   coverageNote: { marginTop: 12, padding: 10, borderRadius: 11, backgroundColor: '#FFF6E9', color: '#8B632E', fontSize: 11.5, fontWeight: '700', lineHeight: 17 },
   emptyText: { color: '#70827A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCard: { width: '47%', minHeight: 126, flexGrow: 1, alignItems: 'center', paddingHorizontal: 8, paddingTop: 14, paddingBottom: 12, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FFF8EF' },
+  badgeCard: { width: '47%', minHeight: 126, flexGrow: 1, alignItems: 'center', paddingHorizontal: 8, paddingTop: 14, paddingBottom: 12, borderRadius: 16, borderCurve: 'continuous' },
+  badgeCardUnlocked: { backgroundColor: '#FFF8EF' },
+  badgeCardInProgress: { backgroundColor: '#F7F4EE' },
   badgeCardLocked: { backgroundColor: '#F3F6F5' },
   badgeCardPressed: { transform: [{ scale: 0.97 }], opacity: 0.92 },
-  badgeIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: '#FFE8C8' },
+  badgeIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
+  badgeIconUnlocked: { backgroundColor: '#FFE8C8' },
+  badgeIconInProgress: { backgroundColor: '#EFE6D8' },
   badgeIconLocked: { backgroundColor: '#E4EBE8' },
   badgeName: { marginTop: 10, color: '#173D31', fontSize: 12, fontWeight: '800', textAlign: 'center', lineHeight: 16 },
-  badgeNameLocked: { color: '#6F817A' },
+  badgeNameMuted: { color: '#6F817A' },
   badgeState: { marginTop: 6, color: '#8A9A93', fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
+  badgeStateUnlocked: { color: '#2A8A61' },
+  badgeStateInProgress: { color: '#8B6B3A' },
+  badgeProgressTrack: { alignSelf: 'stretch', marginTop: 8, height: 6, borderRadius: 999, backgroundColor: '#E7E0D4', overflow: 'hidden' },
+  badgeProgressFill: { height: '100%', borderRadius: 999, backgroundColor: '#C6661C' },
+  badgeReward: { marginTop: 6, color: '#A0AFA8', fontSize: 10, fontWeight: '700' },
   xpRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DCE8E3' },
   xpIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#EAF8EF' },
   xpReason: { color: '#173D31', fontSize: 13, fontWeight: '800' },

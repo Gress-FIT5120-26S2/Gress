@@ -816,7 +816,12 @@ const zh = {
       reward: (xp: number) => `+${xp} XP`,
       holdHint: '点击或长按查看详情',
       releaseHint: '点击空白处关闭',
+      // Arthur: NarIyirm
+      // 中文：progressLabelKey 映射到固定分母文案；卡片进行中态必须显示确切 current/target。
+      // EN: progressLabelKey maps to fixed-denominator copy; in-progress cards must show exact current/target.
       progressOf: (current: number, total: number) => `已完成 ${current}/${total}`,
+      membersOf: (current: number, total: number) => `有效成员 ${current}/${total}`,
+      xpOf: (current: number, total: number) => `${current}/${total} XP`,
       items: {
         first_item: '首次记录',
         first_rescue: '初次挽救',
@@ -1721,7 +1726,12 @@ const en: Translation = {
       reward: (xp: number) => `+${xp} XP`,
       holdHint: 'Tap or press and hold for details',
       releaseHint: 'Tap outside to close',
+      // Arthur: NarIyirm
+      // 中文：progressLabelKey 映射到固定分母文案；卡片进行中态必须显示确切 current/target。
+      // EN: progressLabelKey maps to fixed-denominator copy; in-progress cards must show exact current/target.
       progressOf: (current: number, total: number) => `${current} of ${total}`,
+      membersOf: (current: number, total: number) => `Active members ${current} of ${total}`,
+      xpOf: (current: number, total: number) => `${current} of ${total} XP`,
       items: {
         first_item: 'First Item',
         first_rescue: 'First Rescue',
