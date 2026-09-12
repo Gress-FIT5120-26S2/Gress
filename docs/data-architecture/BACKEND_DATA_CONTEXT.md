@@ -4,16 +4,16 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-11（Australia/Sydney）。
+- 最后核对日期：2026-09-12（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 33 份 migration。CLI 当前链接 `Gress-development`；截至 2026-09-11，开发库与生产库已同步应用到 `20260911040000`。本地新增的 `20260912010000_inventory_outcome_accounting.sql` 尚未应用到远程环境，必须先在开发/测试库验证，再发布依赖它的 Express 与 App。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。
+- 本地 schema 历史共有 34 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20260912020000_achievement_dashboard.sql`，第二阶段 `verify:inventory-outcomes` 与第三阶段 `verify:achievements` 均通过。生产库仍只确认同步到 `20260911040000`，必须按顺序应用 `20260912010000` 和 `20260912020000` 后才能发布依赖新契约的 Express 与 App。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
-- 应用最新本地 migration 后共有 20 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC，以及冰箱领域同步版本。
-- Seed 现在包含 16 条常见食材建议和 4 条成就定义；新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
+- 应用最新本地 migration 后共有 22 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC、冰箱领域同步版本，以及成就等级和 XP 流水。
+- Seed 现在包含 16 条常见食材建议和 4 条旧成就定义；`20260912020000_achievement_dashboard.sql` 会幂等扩充并统一为 8 条已确认成就定义。新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
-- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出和设备恢复；这些功能依赖的 migration 当前已在开发与生产项目同步应用。成就和分类管理接口尚未实现。
+- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。分类管理接口尚未实现；生产发布仍须先应用 `20260912010000` 和 `20260912020000`。
 - 已在开发库和生产库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。数据库契约已经进入生产，但生产知识内容摄取、OpenAI 环境变量、Express API 部署和端到端验收仍需单独完成。
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
@@ -184,6 +184,8 @@ erDiagram
 | `created_by_device_id` | `text` | 外键 → `devices.device_id` |
 | `status` | `fridge_status` | 默认 `active` |
 | `merged_into_fridge_uid` | `uuid` | 自外键；合并后指向目标冰箱 |
+| `time_zone` | `text` | 成就周期统一使用的 IANA 时区，默认 `Australia/Sydney` |
+| `achievement_peak_xp` | `integer` | 历史最高有效 XP，不得为负，保证等级不回退 |
 | `created_at` | `timestamptz` | 创建时间 |
 | `updated_at` | `timestamptz` | 由触发器更新 |
 
@@ -416,6 +418,11 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `description_key` | `text` | i18n 描述键 |
 | `rule_type` | `text` | 计算规则类型 |
 | `threshold` | `numeric` | 可空且不得为负 |
+| `rule_config` | `jsonb` | 复合规则配置对象 |
+| `xp_reward` | `integer` | 解锁奖励，不得为负 |
+| `sort_order` | `integer` | 页面稳定排序 |
+| `badge_asset_key` | `text` | 可空的视觉素材键 |
+| `rule_version` | `integer` | 正整数规则版本 |
 | `is_enabled` | `boolean` | 是否启用 |
 | `created_at` / `updated_at` | `timestamptz` | 审计时间 |
 
@@ -431,6 +438,34 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `metric_value` | `numeric` | 解锁时指标，可空 |
 
 不保存 `device_id`，因为成就属于整个冰箱。
+
+### 7.13.1 `achievement_levels`
+
+全局五级山峰定义。`minimum_xp`、稳定代码、山峰素材键和主题键均由 migration 管理，客户端不得写死阈值。
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `level` | `smallint` | 正整数主键 |
+| `code` | `text` | 唯一稳定等级代码 |
+| `title_key` | `text` | i18n 标题键 |
+| `minimum_xp` | `integer` | 唯一且不得为负 |
+| `mountain_key` / `theme_key` | `text` | 山峰素材和视觉主题选择键 |
+| `is_enabled` | `boolean` | 是否参与等级计算 |
+
+### 7.13.2 `fridge_xp_events`
+
+共享冰箱追加式 XP 账本。库存来源通过 `(fridge_uid, source_event_uid, reason_code)` 幂等，周奖励、共享和成就奖励通过 `(fridge_uid, source_key)` 幂等。允许未来以负流水记录可审计纠错，但 `fridges.achievement_peak_xp` 保证已达到的等级不回退。
+
+| 字段 | 类型 | 规则 |
+| --- | --- | --- |
+| `xp_event_uid` | `uuid` | 主键 |
+| `fridge_uid` | `uuid` | XP 所属共享冰箱 |
+| `source_event_uid` | `uuid` | 可空库存流水来源 |
+| `source_key` | `text` | 可空非库存幂等来源；与 `source_event_uid` 必须且只能有一个 |
+| `reason_code` | `text` | 稳定积分原因 |
+| `points` | `integer` | 非零账本分值 |
+| `occurred_at` | `timestamptz` | 业务发生时间 |
+| `metadata` | `jsonb` | 规则版本与计算快照 |
 
 ### 7.14 `shopping_cart_items`
 
@@ -626,6 +661,7 @@ POST /api/notification-delivery/register
 GET /api/cart
 POST /api/cart
 GET /api/restock
+GET /api/achievements
 POST /api/assistant/messages
 GET  /api/assistant/conversations
 GET  /api/assistant/conversations/:conversationUid
@@ -656,12 +692,12 @@ POST /api/assistant/actions/:actionUid/cancel
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
 - 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会在返回 mutation 成功前写入带操作者昵称和批次详情的 `shared` 站内通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统 Push 只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员；Vercel 通过 `waitUntil` 在响应后完成该投递和审计，本地长驻 Express 在后台执行，投递失败不回滚库存 mutation。
 - 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请，以及不含真实 `device_id` 的昵称、头像令牌与成员顺序。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
+- 成就聚合：`GET /api/achievements` 读取当前已鉴权共享冰箱，并通过 `get_achievement_dashboard` 以唯一来源键对账 XP 和解锁记录，再一次返回等级、进度、AUD 使用/挽救/丢弃价值、价格覆盖率、8 项成就和最近 XP；Express 同时从 `achievement_levels` 返回按等级排序的 `levelCatalog`（含 `minimumXp`、山峰键和主题键），供 Expo 浏览未解锁等级并显示权威升级差值。Expo 只负责本地化与格式化，不因预览修改真实等级。根节点常驻的 `AchievementDataProvider` 会在 App 开场期间预取该快照、跨 Tab 保存在内存中，并在 `inventory`、`fridge`、`members` 同步事件后后台静默替换；成就页重新挂载不再发起请求或显示重复加载态。该能力已在开发库通过端到端验证。
 - 邀请失败状态：加入 RPC 会先读取邀请码真实状态，再分别返回 `invite_not_found`、`invite_expired`、`invite_used`、`invite_revoked`；Express 保留这些稳定错误码，Expo 负责显示对应中英文提示。只有格式错误或确实不存在的码显示无效/未找到。
 - 前台静默同步：`GET /api/sync/state` 返回当前冰箱模式、四个领域版本，以及共享模式下的 Realtime endpoint、publishable key 和高熵频道能力值。数据库 Broadcast 变化后只通知当前已挂载页面静默重拉相关接口；连接正常时每 30 秒对账，未配置或断线时共享模式回退每 6 秒探测，个人模式保持 30 秒。App 回前台会重建频道并立即对账，网络错误最长 60 秒退避。该方案不依赖 Vercel Function 实例内存，也不需要 Redis。
 
 尚未实现：
 
-- 成就聚合读取接口与 XP/等级计算（库存结果数据契约已具备）
 - 库存数量硬上限按单位执行：`g`/`ml` 小于 1,000,000，`item`/`bag`/`bottle`/`box`/`kg`/`L` 小于 1,000；前端、Express 与数据库约束保持一致。
 
 ## 14. 建议的接口开发顺序
@@ -748,7 +784,7 @@ DELETE /api/inventory/batches/:batchUid
 
 `20260904020000_inventory_expiry_warning_days.sql` 新增批次级 `expiry_warning_days`，并为创建与完整编辑 RPC 增加原子保存该字段的安全重载；Express 的列表与详情响应统一返回 `expiryWarningDays`。
 
-`20260912010000_inventory_outcome_accounting.sql` 是尚待开发/测试库应用的第二阶段契约：新增明确的 best-before、价格状态/来源和事件统计快照；`create_inventory_batch_v2`、`update_inventory_batch_details_v2` 强制新写入价格；`resolve_inventory_batch` 原子记录 consumed、discarded 或 correction，并在 use-by 过期后拒绝 consume。旧 DELETE 仅保留旧客户端兼容，新 App 使用 resolve endpoint。
+`20260912010000_inventory_outcome_accounting.sql` 已在开发库应用并通过 `npm --prefix server run verify:inventory-outcomes`：新增明确的 best-before、价格状态/来源和事件统计快照；`create_inventory_batch_v2`、`update_inventory_batch_details_v2` 强制新写入价格；`resolve_inventory_batch` 原子记录 consumed、discarded 或 correction，并在 use-by 过期后拒绝 consume。旧 DELETE 仅保留旧客户端兼容，新 App 使用 resolve endpoint。生产库仍需先应用同一 migration 才能发布依赖它的 App。
 
 ### 已完成并在开发库验证：共享冰箱与设备恢复
 
@@ -781,11 +817,13 @@ Expo 冰箱页左上角是共享功能唯一主入口：个人模式提供创建
 
 Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页临期件数。首页件数订阅 `inventory` 与 `home`，与冰箱快过期筛选同源。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取；页面业务列表只在挂载时订阅对应领域，个人资料 Provider 是例外，它常驻订阅轻量 `fridge` 摘要以保证个人页进入即显示最新资料。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
 
-### 阶段五：成就
+### 本地已实现、待开发库迁移验证：成就
 
 ```text
 GET /api/achievements
 ```
+
+`20260912020000_achievement_dashboard.sql` 新增冰箱统一时区、历史最高 XP、五级山峰定义、扩展成就规则和追加式幂等 XP 账本。读取 RPC 会对账完整使用、临期挽救、共享、完整周奖励和成就解锁，再返回稳定聚合快照。验证脚本 `server/scripts/verify-achievements.js` 已在开发库覆盖并通过初始等级、XP 防重复、100 XP 升级、临期挽救金额和丢弃零基础 XP。
 
 ## 15. Migration 工作流
 

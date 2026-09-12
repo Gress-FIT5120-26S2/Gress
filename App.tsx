@@ -19,6 +19,7 @@ import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { ProfileScreen } from './src/components/ProfileScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
+import { AchievementDataProvider } from './src/components/AchievementDataProvider';
 import { AchievementsScreen } from './src/components/AchievementsScreen';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
@@ -614,7 +615,7 @@ function KitchMemoApp() {
         onOpenItem={handleAssistantOpenItem}
         visible={assistantVisible}
       />
-      <StatusBar style={!isFirstUseJourneyVisible && activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
+      <StatusBar style={!isFirstUseJourneyVisible && ((activeTab === 'home' && kitchenLighting.phase === 'night') || activeTab === 'achievements') ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
           canReveal={canRevealKitchen}
@@ -631,11 +632,13 @@ export default function App() {
   return (
     <SafeAreaProvider style={styles.root}>
       <RealtimeSyncProvider>
-        <I18nProvider>
-          <ProfileDataProvider>
-            <KitchMemoApp />
-          </ProfileDataProvider>
-        </I18nProvider>
+        <AchievementDataProvider>
+          <I18nProvider>
+            <ProfileDataProvider>
+              <KitchMemoApp />
+            </ProfileDataProvider>
+          </I18nProvider>
+        </AchievementDataProvider>
       </RealtimeSyncProvider>
     </SafeAreaProvider>
   );
