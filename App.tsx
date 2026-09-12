@@ -19,6 +19,7 @@ import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { ProfileScreen } from './src/components/ProfileScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
+import { AchievementsScreen } from './src/components/AchievementsScreen';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
 import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
@@ -500,7 +501,7 @@ function KitchMemoApp() {
                 styles.activeScreen,
                 activeTab === 'fridge'
                   ? styles.fridgeContent
-                  : activeTab === 'profile' || activeTab === 'notifications'
+                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements'
                     ? styles.profileContent
                     : styles.standardContent,
                 { backgroundColor: transitionTones[activeTab] },
@@ -538,6 +539,8 @@ function KitchMemoApp() {
                     setFirstUseJourneyState('pending');
                   }}
                 />
+              ) : activeTab === 'achievements' ? (
+                <AchievementsScreen />
               ) : (
                 <>
                   <View style={styles.glow} />
