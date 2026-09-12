@@ -11,6 +11,7 @@
     "verify:notification-preferences": "node scripts/verify-notification-preferences.js",
     "verify:expiry-warning-days": "node scripts/verify-expiry-warning-days.js",
     "verify:inventory-outcomes": "node scripts/verify-inventory-outcomes.js",
+    "verify:achievements": "node scripts/verify-achievements.js",
     "verify:api-security": "node scripts/verify-api-security.js",
     "verify:api-security:live": "node scripts/verify-api-security.js --live",
     "verify:assistant-rag": "node scripts/verify-assistant-rag.js",
