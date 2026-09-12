@@ -3,12 +3,15 @@ import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { AchievementDashboard, AchievementLevelCode } from '../../services/achievementApi';
 
 type Language = 'zh' | 'en';
 
 type HeroCopy = {
+  title: string;
+  subtitle: string;
   levels: Record<AchievementLevelCode, string>;
   level: {
     progress: (remaining: number) => string;
@@ -59,6 +62,7 @@ const CLOUD_FRONT = require('../../assets/achievements/cloud-front.png');
 // 中文：山峰、路线和数据文案分层渲染；本地预览只切换服务端目录中的视觉定义，不改变权威等级或重新计算规则。
 // EN: Mountain art, route, and data copy render as separate layers; local preview only swaps visual definitions from the server catalog without changing the authoritative level or recalculating rules.
 export function AchievementMountainHero({ copy, dashboard, language, onTailColorChange, rescuedValue }: AchievementMountainHeroProps) {
+  const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const reducedMotion = usePrefersReducedMotion();
   const { backCloudProgress, frontCloudProgress } = useCloudMotion(reducedMotion);
@@ -181,11 +185,16 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
       <LinearGradient colors={levelVisual.colors} end={{ x: 0.5, y: 1 }} locations={[0, 0.58, 1]} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
 
       <Animated.View
-        accessibilityLabel={copy.hero.accessibilitySummary(viewedLevel, dashboard.level.current, levelName, dashboard.level.totalXp, dashboard.metrics.rescuedBatchCount, rescuedValue)}
+        accessibilityLabel={`${copy.title}. ${copy.subtitle}. ${copy.hero.accessibilitySummary(viewedLevel, dashboard.level.current, levelName, dashboard.level.totalXp, dashboard.metrics.rescuedBatchCount, rescuedValue)}`}
         accessible
         pointerEvents="none"
-        style={[styles.heading, contentStyle]}
+        style={[styles.heading, contentStyle, { top: Math.max(insets.top, 12) + 6 }]}
       >
+        {/* Arthur: NarIyirm
+            中文：补充规范要求页面展示 Kitchen Wins 标题与副标题；等级文案紧随其后，共用同一安全区顶部。
+            EN: The supplement requires Kitchen Wins title and subtitle on the page; level copy follows in the same safe-area top band. */}
+        <Text style={styles.pageTitle}>{copy.title}</Text>
+        <Text style={styles.pageSubtitle}>{copy.subtitle}</Text>
         <Text adjustsFontSizeToFit numberOfLines={1} style={styles.levelTitle}>Lv.{viewedLevel} {levelName}</Text>
         <Text numberOfLines={1} style={styles.levelSubtitle}>{levelStatus}</Text>
         <View accessibilityElementsHidden importantForAccessibility="no-hide-descendants" style={styles.levelPager}>
@@ -344,7 +353,9 @@ function HeroMetric({ label, value }: { label: string; value: string }) {
 
 const styles = StyleSheet.create({
   heroFrame: { alignSelf: 'center', width: '100%', maxWidth: HERO_MAX_WIDTH, overflow: 'hidden', backgroundColor: '#2798E7' },
-  heading: { position: 'absolute', zIndex: 5, top: 52, right: 22, left: 22, alignItems: 'center' },
+  heading: { position: 'absolute', zIndex: 5, right: 22, left: 22, alignItems: 'center' },
+  pageTitle: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center', textTransform: 'uppercase' },
+  pageSubtitle: { marginTop: 3, marginBottom: 10, color: 'rgba(255,255,255,0.82)', fontSize: 12, fontWeight: '600', textAlign: 'center' },
   levelTitle: { maxWidth: '100%', color: '#FFFFFF', fontSize: 26, fontWeight: '800', letterSpacing: -0.35, textAlign: 'center', textShadowColor: 'rgba(20,76,130,0.18)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 4 },
   levelSubtitle: { marginTop: 6, color: 'rgba(255,255,255,0.78)', fontSize: 12.5, fontWeight: '600', textAlign: 'center' },
   levelPager: { height: 10, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 9 },
