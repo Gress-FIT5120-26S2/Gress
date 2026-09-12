@@ -42,6 +42,14 @@ export type AchievementDashboard = {
     descriptionKey: string;
     xpReward: number;
     badgeAssetKey: string | null;
+    ruleVersion: number;
+    // Arthur: NarIyirm
+    // 中文：status 与进度分母由 GET /api/achievements 权威返回；unlocked 仅作兼容布尔快捷字段。
+    // EN: status and progress denominators come from GET /api/achievements; unlocked remains a compatibility boolean shortcut.
+    status: 'locked' | 'in_progress' | 'unlocked' | 'unavailable';
+    progressCurrent: number;
+    progressTarget: number;
+    progressLabelKey: string;
     unlocked: boolean;
     unlockedAt: string | null;
     metricValue: number | null;

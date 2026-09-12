@@ -692,7 +692,7 @@ POST /api/assistant/actions/:actionUid/cancel
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
 - 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会在返回 mutation 成功前写入带操作者昵称和批次详情的 `shared` 站内通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统 Push 只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员；Vercel 通过 `waitUntil` 在响应后完成该投递和审计，本地长驻 Express 在后台执行，投递失败不回滚库存 mutation。
 - 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请，以及不含真实 `device_id` 的昵称、头像令牌与成员顺序。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
-- 成就聚合：`GET /api/achievements` 读取当前已鉴权共享冰箱，并通过 `get_achievement_dashboard` 以唯一来源键对账 XP 和解锁记录，再一次返回等级、进度、AUD 使用/挽救/丢弃价值、价格覆盖率、8 项成就和最近 XP；Express 同时从 `achievement_levels` 返回按等级排序的 `levelCatalog`（含 `minimumXp`、山峰键和主题键），供 Expo 浏览未解锁等级并显示权威升级差值。Expo 只负责本地化与格式化，不因预览修改真实等级。根节点常驻的 `AchievementDataProvider` 会在 App 开场期间预取该快照、跨 Tab 保存在内存中，并在 `inventory`、`fridge`、`members` 同步事件后后台静默替换；成就页重新挂载不再发起请求或显示重复加载态。该能力已在开发库通过端到端验证。
+- 成就聚合：`GET /api/achievements` 读取当前已鉴权共享冰箱，并通过 `get_achievement_dashboard` 以唯一来源键对账 XP 和解锁记录，再一次返回等级、进度、AUD 使用/挽救/丢弃价值、价格覆盖率、8 项成就和最近 XP。每个成就对象包含权威 `status`、`progressCurrent` / `progressTarget`、`progressLabelKey` 与 `ruleVersion`；Express 同时从 `achievement_levels` 返回按等级排序的 `levelCatalog`（含 `minimumXp`、山峰键和主题键），供 Expo 浏览未解锁等级并显示权威升级差值。Expo 只负责本地化与格式化，不因预览修改真实等级，也不在客户端判定徽章解锁。根节点常驻的 `AchievementDataProvider` 会在 App 开场期间预取该快照、跨 Tab 保存在内存中，并在 `inventory`、`fridge`、`members` 同步事件后后台静默替换；成就页重新挂载不再发起请求或显示重复加载态。该能力已在开发库通过端到端验证。
 - 邀请失败状态：加入 RPC 会先读取邀请码真实状态，再分别返回 `invite_not_found`、`invite_expired`、`invite_used`、`invite_revoked`；Express 保留这些稳定错误码，Expo 负责显示对应中英文提示。只有格式错误或确实不存在的码显示无效/未找到。
 - 前台静默同步：`GET /api/sync/state` 返回当前冰箱模式、四个领域版本，以及共享模式下的 Realtime endpoint、publishable key 和高熵频道能力值。数据库 Broadcast 变化后只通知当前已挂载页面静默重拉相关接口；连接正常时每 30 秒对账，未配置或断线时共享模式回退每 6 秒探测，个人模式保持 30 秒。App 回前台会重建频道并立即对账，网络错误最长 60 秒退避。该方案不依赖 Vercel Function 实例内存，也不需要 Redis。
 
@@ -817,13 +817,15 @@ Expo 冰箱页左上角是共享功能唯一主入口：个人模式提供创建
 
 Expo 的全局 `RealtimeSyncProvider` 只在 App 前台维护一个共享冰箱 Broadcast 频道；系统进入后台会断开，恢复时重建频道并主动刷新库存、购物车、补货、通知、共享上下文和首页临期件数。首页件数订阅 `inventory` 与 `home`，与冰箱快过期筛选同源。180ms 合并窗口避免一笔业务事务的多个事件造成重复读取；页面业务列表只在挂载时订阅对应领域，个人资料 Provider 是例外，它常驻订阅轻量 `fridge` 摘要以保证个人页进入即显示最新资料。冰箱、购物车、补货列表支持手动下拉刷新，通知列表提供显式刷新按钮。
 
-### 本地已实现、待开发库迁移验证：成就
+### 已完成并在开发库验证：成就
 
 ```text
 GET /api/achievements
 ```
 
-`20260912020000_achievement_dashboard.sql` 新增冰箱统一时区、历史最高 XP、五级山峰定义、扩展成就规则和追加式幂等 XP 账本。读取 RPC 会对账完整使用、临期挽救、共享、完整周奖励和成就解锁，再返回稳定聚合快照。验证脚本 `server/scripts/verify-achievements.js` 已在开发库覆盖并通过初始等级、XP 防重复、100 XP 升级、临期挽救金额和丢弃零基础 XP。
+`20260912020000_achievement_dashboard.sql` 新增冰箱统一时区、历史最高 XP、五级山峰定义、扩展成就规则和追加式幂等 XP 账本。读取 RPC 会对账完整使用、临期挽救、共享、完整周奖励和成就解锁，再返回稳定聚合快照。
+
+`20260913010000_achievement_badge_progress.sql` 扩展同一 RPC 的成就数组：每个徽章权威返回 `status`（`locked` / `in_progress` / `unlocked`；`unavailable` 预留给缺依赖功能的未来成就）、`progressCurrent`、`progressTarget`、`progressLabelKey` 与 `ruleVersion`；保留 `unlocked` 布尔字段兼容旧客户端。Express 仍只透传 `get_achievement_dashboard` 结果并附加 `levelCatalog`，不在 Node 侧重算状态。验证脚本 `server/scripts/verify-achievements.js` 覆盖初始等级、XP 防重复、徽章状态流转（locked → in_progress → unlocked）与进度分母。
 
 ## 15. Migration 工作流
 

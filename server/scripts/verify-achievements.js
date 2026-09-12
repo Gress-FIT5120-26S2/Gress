@@ -82,6 +82,11 @@ async function run() {
     const afterFirstItem = await request('/api/achievements');
     assert(afterFirstItem.body?.level?.totalXp === 30, 'First inventory and first-item rewards did not total 30 XP');
     assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'first_item')?.unlocked === true, 'First-item achievement was not unlocked');
+    assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'first_item')?.status === 'unlocked', 'First-item status was not unlocked');
+    assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'first_item')?.progressCurrent === 1, 'First-item progress current was not 1');
+    assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'first_item')?.progressTarget === 1, 'First-item progress target was not 1');
+    assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'rescue_ten')?.status === 'locked', 'Rescue-ten should stay locked before rescues');
+    assert(afterFirstItem.body?.achievements?.find((item) => item.code === 'rescue_ten')?.progressTarget === 10, 'Rescue-ten target was not 10');
 
     const firstDetail = await request(`/api/inventory/batches/${firstCreated.body.batchUid}`);
     const firstConsumed = await request(`/api/inventory/batches/${firstCreated.body.batchUid}/resolve`, {
@@ -94,6 +99,9 @@ async function run() {
     assert(afterFirstRescue.body?.level?.totalXp === 70, 'First rescue did not add 8 + 12 + 20 XP');
     assert(afterFirstRescue.body?.metrics?.rescuedBatchCount === 1, 'First rescue was not counted');
     assert(Number(afterFirstRescue.body?.metrics?.rescuedValue) === 12, 'First rescue value was not A$12');
+    assert(afterFirstRescue.body?.achievements?.find((item) => item.code === 'rescue_ten')?.status === 'in_progress', 'Rescue-ten did not enter in_progress after first rescue');
+    assert(afterFirstRescue.body?.achievements?.find((item) => item.code === 'rescue_ten')?.progressCurrent === 1, 'Rescue-ten progress current was not 1');
+    assert(afterFirstRescue.body?.achievements?.find((item) => item.code === 'first_rescue')?.status === 'unlocked', 'First-rescue status was not unlocked');
 
     await createAndResolve('consume');
     await createAndResolve('consume');
