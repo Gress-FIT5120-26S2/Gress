@@ -69,10 +69,12 @@ export function ShoppingCheckoutReview({
         initialQuantity: submission.batch.initialQuantity,
         unit: submission.batch.unit,
         categoryCode: submission.batch.categoryCode,
+        deadlineType: submission.batch.deadlineType,
         storageZone: submission.batch.storageZone,
         expiresAt: submission.batch.expiresAt,
         expiryWarningDays: submission.expiryWarningDays,
         purchasePrice: submission.batch.purchasePrice,
+        priceSource: submission.batch.priceSource === 'manual' ? 'user' : submission.batch.priceSource,
         presetUid: submission.batch.matchedPresetUid ?? item.preset_uid,
         restockRule: submission.restockRule,
       });

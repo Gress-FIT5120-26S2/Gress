@@ -32,12 +32,14 @@ async function run() {
     const created = await request('/api/inventory/batches', {
       body: JSON.stringify({
         categoryCode: 'vegetables',
+        deadlineType: 'best_before',
         expiresAt: expiry,
         expiryWarningDays: 5,
         initialQuantity: 2,
         name: 'Expiry warning verification item',
         presetUid: null,
-        purchasePrice: null,
+        purchasePrice: 0,
+        priceSource: 'user',
         restockRule: null,
         storageZone: 'chilled',
         unit: 'item',
@@ -55,11 +57,13 @@ async function run() {
     const updated = await request(`/api/inventory/batches/${batchUid}`, {
       body: JSON.stringify({
         categoryCode: firstDetail.body.batch.categoryCode,
+        deadlineType: firstDetail.body.batch.deadlineType,
         expectedVersion: firstDetail.body.batch.version,
         expiresAt: expiry,
         expiryWarningDays: 3,
         name: firstDetail.body.batch.name,
         purchasePrice: firstDetail.body.batch.purchasePrice,
+        priceSource: 'user',
         remainingQuantity: firstDetail.body.batch.remainingQuantity,
         storageZone: firstDetail.body.batch.storageZone,
         unit: firstDetail.body.batch.unit,

@@ -6,7 +6,7 @@
 
 - 最后核对日期：2026-09-11（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 32 份 migration。CLI 当前链接 `Gress-development`；截至 2026-09-11，开发库与生产库的 migration 历史均与本地一致，并已应用 `20260909010000` 至 `20260911040000` 的助手与结构修复 migration。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。两库远程 lint 均无 schema error；CLI 完成后已恢复链接开发库。
+- 本地 schema 历史共有 33 份 migration。CLI 当前链接 `Gress-development`；截至 2026-09-11，开发库与生产库已同步应用到 `20260911040000`。本地新增的 `20260912010000_inventory_outcome_accounting.sql` 尚未应用到远程环境，必须先在开发/测试库验证，再发布依赖它的 Express 与 App。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -292,10 +292,15 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `initial_quantity` | `numeric(12,3)` | 必须大于 0 |
 | `remaining_quantity` | `numeric(12,3)` | 0 到初始数量之间 |
 | `unit` | `text` | 例如 `item`、`g`、`ml` |
-| `purchase_price` | `numeric(12,2)` | 可空且不得为负 |
+| `purchase_price` | `numeric(12,2)` | 历史记录可空；v2 新建与编辑必须提交且不得为负，免费物品写 0 |
+| `price_status` | `text` | `recorded`、`free` 或 `legacy_unknown`；未知价格不得参与金额指标 |
+| `price_source` | `text` | `user`、`barcode`、`recognition` 或历史兼容的 `legacy` |
 | `currency` | `char(3)` | 默认 `AUD`，三位大写代码 |
 | `stocked_at` | `timestamptz` | 入库时间 |
 | `expires_at` | `timestamptz` | 可空，不得早于入库时间 |
+| `use_by_at` | `timestamptz` | 包装安全期限；超过后禁止记录为已使用 |
+| `best_before_at` | `timestamptz` | 包装品质期限；超过后不会自动判定不可食用 |
+| `estimated_quality_until` | `timestamptz` | 系统品质估计，不是安全期限 |
 | `expiry_warning_days` | `smallint` | 无到期时间时为空；否则为 1–7 天，用于批次级本地临期提醒 |
 | `opened_at` | `timestamptz` | 可空，不得早于入库时间 |
 | `lifecycle_state` | `inventory_lifecycle` | 默认 `active` |
@@ -321,7 +326,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 - App 对低于硬上限但明显偏大的数量，以及没有命中食材参考库的名称进行二次确认；用户确认可继续保存，但不能绕过硬上限。
 - 数量降到 0 时批次转为 `consumed`；从 0 增加时可恢复为 `active`。
 - 修改请求携带 `expectedVersion`；版本不一致时 Express 返回 `409`，避免共享冰箱中的并发覆盖。
-- 普通删除是软删除：批次转为 `archived`、剩余数量归零并保留流水，不物理删除历史记录。
+- 新版“移出冰箱”不做物理删除：临期窗口内默认结算为 `consumed`，普通库存选择丢弃原因后结算为 `discarded`，超过 `use_by_at` 只能结算为 `discarded`；纯数据错误使用 `archived`/`adjust` 纠错语义。
 
 ### 7.8 `inventory_events`
 
@@ -338,6 +343,11 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 | `value_change` | `numeric(12,2)` | 默认 0，带符号价值影响 |
 | `occurred_at` | `timestamptz` | 事件时间 |
 | `note` | `text` | 可选原因或备注 |
+| `reason_code` | `text` | 结构化使用、丢弃或纠错原因 |
+| `was_in_warning_window` | `boolean` | 事件发生时是否位于该批次临期窗口 |
+| `date_type_snapshot` / `deadline_snapshot` | `text` / `timestamptz` | 事件发生时采用的期限类型与时间快照 |
+| `purchase_price_snapshot` / `currency_snapshot` | `numeric(12,2)` / `char(3)` | 事件发生时的价格与币种快照 |
+| `initial_quantity_snapshot` | `numeric(12,3)` | 事件发生时的初始数量，用于按比例复算金额 |
 
 建议约定：
 
@@ -601,6 +611,7 @@ POST /api/food-presets/generate
 POST /api/photo-recognition
 GET /api/barcode-products/:barcode
 POST /api/inventory/batches
+POST /api/inventory/batches/:batchUid/resolve
 POST /api/inventory/categories
 GET /api/inventory/batches/:batchUid
 PATCH /api/inventory/batches/:batchUid/quantity
@@ -637,7 +648,7 @@ POST /api/assistant/actions/:actionUid/cancel
 - 储藏建议：精确匹配 `food_presets.canonical_name` 或 `aliases`，返回建议储存方式、分类和保质期天数。
 - AI 预设兜底：用户明确点击生成，或条码扫描命中商品但需要补全图标、分类、储存方式和参考保质期时，`POST /api/food-presets/generate` 才调用 Gemini；服务端在调用 FLUX 前再次匹配标准名与别名。确实未命中时，Cloudflare FLUX.1-schnell 生成固定底色图标，Sharp 仅移除与边缘相连的底色，再统一为 256×256 透明 PNG。图片写入公开只读的 `food-preset-icons` bucket，路径和生成审计写入全局 preset。
 - 冰箱助手服务端：`POST /api/assistant/messages` 使用 GPT-5.6 Luna 的 Responses API。Luna 在单次用户交互中最多选择 3 个只读工具；若使用工具，服务端执行后再发起一次结构化回答调用。工具只能读取当前已鉴权冰箱的库存、个人或共享历史、补货/购物清单状态和审核 RAG。服务端复核批次 ID、引用 URL、use-by 安全措辞与动作语义，并以 `store: false` 调用模型。写请求先生成 10 分钟有效的 `assistant_pending_actions`；只有同一创建设备向 confirm endpoint 明确提交 `confirm: true`，数据库才在单一事务中复核状态、期限和批次版本并执行。重复确认幂等返回、过期返回 `410`、取消或版本冲突返回 `409`。会话列表与详情接口只返回当前设备在当前冰箱创建且仍处于 30 天保留期内的记录；详情恢复结构化回答、反馈与服务端动作状态。`POST /api/assistant/messages/:messageUid/feedback` 只允许评价当前设备私有会话中的助手消息。
-- 新增库存：表单会提交命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`；新版 `create_inventory_batch` RPC 验证预设启用状态后写入 `inventory_batches.preset_uid`，并在同一事务保存批次级临期提前天数。历史无法可靠匹配的批次继续保留 null preset；已有有效期批次回填为 3 天。
+- 新增库存：表单必须提交购买价格，免费物品明确写 0；同时提交 `deadlineType`（`use_by` 或 `best_before`）、命中的 `presetUid` 和 1–7 天的 `expiryWarningDays`。`create_inventory_batch_v2` 在同一事务写入批次、stock 流水、期限类型、价格来源和可选补货规则。历史 null 价格保留为 `legacy_unknown`，不会伪造为 0。
 - 拍照识别：校验当前设备的冰箱成员关系后，在内存中把单张 JPEG、PNG 或 WebP 图片转发给视觉模型；限制 10 MB、模型超时 25 秒，图片不写磁盘、不进入 Supabase，也不记录图片内容。
 - 条码识别：Expo Camera 读取 EAN-13、EAN-8、UPC-A 或 UPC-E 后，通过已鉴权的 `GET /api/barcode-products/:barcode` 查询 Express。服务端验证 GTIN 校验位，以自定义 User-Agent 请求 Open Food Facts v3.6，只返回清洗后的名称、品牌、包装规格、分类映射、储存建议和 HTTPS 产品图；进程内缓存命中与未命中结果 24 小时，并使用数据库设备级限流保护上游。查询结果只进入可编辑核对页，再复用 `InventoryEntryFlow` 保存；第三方 `expiration_date` 不作为当前实物有效期，价格和包装日期继续由用户确认。
 - 自定义分类：`food_categories` 的非默认记录属于当前冰箱；`POST /api/inventory/categories` 限制每个冰箱最多 12 个自定义分类，并复用 Cloudflare 图标生成与透明 PNG 标准化流程。图标路径持久化在分类记录中，`GET /api/inventory` 与库存快照一次返回分类及公开 URL，进入冰箱页不会触发或等待 AI。
@@ -650,7 +661,7 @@ POST /api/assistant/actions/:actionUid/cancel
 
 尚未实现：
 
-- 明确的丢弃（`discard`）入口
+- 成就聚合读取接口与 XP/等级计算（库存结果数据契约已具备）
 - 库存数量硬上限按单位执行：`g`/`ml` 小于 1,000,000，`item`/`bag`/`bottle`/`box`/`kg`/`L` 小于 1,000；前端、Express 与数据库约束保持一致。
 
 ## 14. 建议的接口开发顺序
@@ -725,6 +736,7 @@ GET    /api/inventory/batches/:batchUid
 PATCH  /api/inventory/batches/:batchUid/quantity
 PATCH  /api/inventory/batches/:batchUid
 PUT    /api/inventory/batches/:batchUid/restock-rule
+POST   /api/inventory/batches/:batchUid/resolve
 DELETE /api/inventory/batches/:batchUid
 ```
 
@@ -735,6 +747,8 @@ DELETE /api/inventory/batches/:batchUid
 `20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
 `20260904020000_inventory_expiry_warning_days.sql` 新增批次级 `expiry_warning_days`，并为创建与完整编辑 RPC 增加原子保存该字段的安全重载；Express 的列表与详情响应统一返回 `expiryWarningDays`。
+
+`20260912010000_inventory_outcome_accounting.sql` 是尚待开发/测试库应用的第二阶段契约：新增明确的 best-before、价格状态/来源和事件统计快照；`create_inventory_batch_v2`、`update_inventory_batch_details_v2` 强制新写入价格；`resolve_inventory_batch` 原子记录 consumed、discarded 或 correction，并在 use-by 过期后拒绝 consume。旧 DELETE 仅保留旧客户端兼容，新 App 使用 resolve endpoint。
 
 ### 已完成并在开发库验证：共享冰箱与设备恢复
 
