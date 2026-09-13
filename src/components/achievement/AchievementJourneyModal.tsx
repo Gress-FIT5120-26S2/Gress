@@ -3,7 +3,7 @@ import { Image } from 'expo-image';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { AchievementCode, AchievementDashboard } from '../../services/achievementApi';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
@@ -30,7 +30,8 @@ type Props = { visible: boolean; initialTab: 'journey'|'medals'; onClose: () => 
 // 中文：成长路径与奖牌馆共用同一全屏层级，保持山路叙事但用留白和克制色彩维持成熟会员中心的清晰度。
 // EN: The journey and medal collection share one full-screen layer, retaining the mountain-path story with restrained colour and member-centre clarity.
 export function AchievementJourneyModal({ visible, initialTab, onClose, dashboard, language, badgeCopy }: Props) {
-  const [tab,setTab]=useState<'journey'|'medals'>('journey');
+  const insets=useSafeAreaInsets();
+  const [tab,setTab]=useState<'journey'|'medals'>(initialTab);
   const [filter,setFilter]=useState<'all'|'earned'|'locked'>('all');
   const [focused,setFocused]=useState<AchievementDashboard['achievements'][number]|null>(null);
   const scrollRef=useRef<ScrollView>(null);
@@ -49,7 +50,7 @@ export function AchievementJourneyModal({ visible, initialTab, onClose, dashboar
     requestAnimationFrame(() => scrollRef.current?.scrollTo({ y: Math.max(0, index*TRAIL_STEP_HEIGHT+70), animated: false }));
   };
   return <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-    <EdgeSwipeBackView onBack={onClose}><SafeAreaView edges={['top','bottom']} style={styles.root}><StatusBar style="dark" /><View style={styles.nav}><Pressable accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.navButton}><Ionicons color="#294A40" name="chevron-back" size={23}/></Pressable><Text style={styles.navTitle}>{zh?'环保里程碑':'Eco milestones'}</Text><View style={styles.navButton}/></View>
+    <EdgeSwipeBackView onBack={onClose}><View style={[styles.root,{paddingTop:Math.max(insets.top,12),paddingBottom:insets.bottom}]}><StatusBar style="dark" /><View style={styles.nav}><Pressable accessibilityRole="button" hitSlop={12} onPress={onClose} style={styles.navButton}><Ionicons color="#294A40" name="chevron-back" size={23}/></Pressable><Text style={styles.navTitle}>{zh?'环保里程碑':'Eco milestones'}</Text><View style={styles.navButton}/></View>
     <View style={styles.tabs}><Pressable onPress={()=>setTab('journey')} style={[styles.tab,tab==='journey'&&styles.tabActive]}><Text style={[styles.tabText,tab==='journey'&&styles.tabTextActive]}>{zh?'成长路径':'Journey'}</Text></Pressable><Pressable onPress={()=>setTab('medals')} style={[styles.tab,tab==='medals'&&styles.tabActive]}><Text style={[styles.tabText,tab==='medals'&&styles.tabTextActive]}>{zh?'奖牌馆':'Medals'}</Text></Pressable></View>
     {tab==='journey'?<ScrollView ref={scrollRef} contentContainerStyle={journeyStyles.journey} showsVerticalScrollIndicator={false}>
       <View style={journeyStyles.ascentSummary}>
@@ -113,7 +114,7 @@ export function AchievementJourneyModal({ visible, initialTab, onClose, dashboar
         })}
       </View>
     </ScrollView>:<ScrollView contentContainerStyle={styles.medalPage} showsVerticalScrollIndicator={false}><View style={styles.filters}>{(['all','earned','locked'] as const).map((item)=><Pressable key={item} onPress={()=>setFilter(item)} style={[styles.filter,filter===item&&styles.filterActive]}><Text style={[styles.filterText,filter===item&&styles.filterTextActive]}>{item==='all'?(zh?'全部':'All'):item==='earned'?(zh?'已获得':'Earned'):(zh?'未获得':'Locked')}</Text></Pressable>)}</View><View style={styles.medalGrid}>{achievements.map((item)=><Pressable key={item.code} onPress={()=>setFocused(item)} style={({pressed})=>[styles.medalCell,pressed&&styles.pressed]}><Medal code={item.code} earned={item.status==='unlocked'}/><Text numberOfLines={2} style={[styles.medalName,item.status!=='unlocked'&&styles.muted]}>{badgeCopy.items[item.code]}</Text><Text style={styles.medalState}>{item.status==='unlocked'?badgeCopy.unlocked:item.status==='in_progress'?`${Math.floor(item.progressCurrent)}/${Math.floor(item.progressTarget)}`:badgeCopy.locked}</Text></Pressable>)}</View></ScrollView>}
-    {focused?<View style={styles.detailScrim}><Pressable onPress={()=>setFocused(null)} style={StyleSheet.absoluteFill}/><View style={styles.detail}><Medal code={focused.code} earned={focused.status==='unlocked'} large/><Text style={styles.detailTitle}>{badgeCopy.items[focused.code]}</Text><Text style={styles.detailBody}>{badgeCopy.descriptions[focused.code]}</Text><Text style={styles.detailReward}>{badgeCopy.reward(focused.xpReward)}</Text><Pressable onPress={()=>setFocused(null)} style={styles.done}><Text style={styles.doneText}>{zh?'收起':'Done'}</Text></Pressable></View></View>:null}</SafeAreaView></EdgeSwipeBackView>
+    {focused?<View style={styles.detailScrim}><Pressable onPress={()=>setFocused(null)} style={StyleSheet.absoluteFill}/><View style={styles.detail}><Medal code={focused.code} earned={focused.status==='unlocked'} large/><Text style={styles.detailTitle}>{badgeCopy.items[focused.code]}</Text><Text style={styles.detailBody}>{badgeCopy.descriptions[focused.code]}</Text><Text style={styles.detailReward}>{badgeCopy.reward(focused.xpReward)}</Text><Pressable onPress={()=>setFocused(null)} style={styles.done}><Text style={styles.doneText}>{zh?'收起':'Done'}</Text></Pressable></View></View>:null}</View></EdgeSwipeBackView>
   </Modal>;
 }
 
