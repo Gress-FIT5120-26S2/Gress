@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-12（Australia/Sydney）。
+- 最后核对日期：2026-09-13（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 34 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20260912020000_achievement_dashboard.sql`，第二阶段 `verify:inventory-outcomes` 与第三阶段 `verify:achievements` 均通过。生产库仍只确认同步到 `20260911040000`，必须按顺序应用 `20260912010000` 和 `20260912020000` 后才能发布依赖新契约的 Express 与 App。生产部署时发现 `20260907010000`、`20260908010000`、`20260908020000` 的部分结构已存在但历史缺失；经明确授权修复历史后，由 `20260911040000_reconcile_pre_assistant_schema.sql` 幂等补齐并统一最终约束与字段。
+- 本地 schema 历史共有 35 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20260913010000_achievement_badge_progress.sql`，第三阶段成就验证通过。`20260913160000_fridge_daily_weekly_quests.sql` 新增每日/每周挑战定义与分配；须先在开发库 `db push` 并跑 `verify:quests` 后再考虑生产。生产库仍须按顺序补齐未应用的成就相关 migration 后才能发布依赖新契约的 Express 与 App。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -692,7 +692,8 @@ POST /api/assistant/actions/:actionUid/cancel
 - 手动入库：数据库函数在一个事务中创建库存批次、`stock` 流水和可选补货规则。
 - 通知：打开列表时按当前库存同步临期、过期、补货提醒；共享冰箱的新增、修改与移除库存会在返回 mutation 成功前写入带操作者昵称和批次详情的 `shared` 站内通知，并排除操作者本人。已读写入 `notification_reads`，按设备独立。列表按当前设备的类别开关过滤，响应分别返回真实 `unreadCount` 和考虑总开关、首页角标、免打扰时段后的 `badgeCount`。系统 Push 只面向已授权、已注册 Token、开启共享与系统投递且不处于免打扰时段的其他成员；Vercel 通过 `waitUntil` 在响应后完成该投递和审计，本地长驻 Express 在后台执行，投递失败不回滚库存 mutation。
 - 共享与恢复：命名并开启共享、邀请码轮换、改名、加入、退出和设备恢复通过数据库原子函数完成；上下文返回当前有效邀请，以及不含真实 `device_id` 的昵称、头像令牌与成员顺序。加入只接受单成员个人冰箱，退出带走当前设备所有的有效批次。
-- 成就聚合：`GET /api/achievements` 读取当前已鉴权共享冰箱，并通过 `get_achievement_dashboard` 以唯一来源键对账 XP 和解锁记录，再一次返回等级、进度、AUD 使用/挽救/丢弃价值、价格覆盖率、8 项成就和最近 XP。每个成就对象包含权威 `status`、`progressCurrent` / `progressTarget`、`progressLabelKey` 与 `ruleVersion`；Express 同时从 `achievement_levels` 返回按等级排序的 `levelCatalog`（含 `minimumXp`、山峰键和主题键），供 Expo 浏览未解锁等级并显示权威升级差值。Expo 只负责本地化与格式化，不因预览修改真实等级，也不在客户端判定徽章解锁。根节点常驻的 `AchievementDataProvider` 会在 App 开场期间预取该快照、跨 Tab 保存在内存中，并在 `inventory`、`fridge`、`members` 同步事件后后台静默替换；成就页重新挂载不再发起请求或显示重复加载态。该能力已在开发库通过端到端验证。
+- 成就聚合：`GET /api/achievements` 读取当前已鉴权共享冰箱，并通过 `get_achievement_dashboard` 以唯一来源键对账 XP 和解锁记录，再一次返回等级、进度、AUD 使用/挽救/丢弃价值、价格覆盖率、8 项成就和最近 XP。每个成就对象包含权威 `status`、`progressCurrent` / `progressTarget`、`progressLabelKey` 与 `ruleVersion`；Express 同时从 `achievement_levels` 返回按等级排序的 `levelCatalog`，并并行调用 `get_fridge_quests` 附带当日/当周挑战卡（冻结目标、进度、奖励、周期边界与每周剩余更换次数）。Expo 只负责本地化与格式化，不因预览修改真实等级，也不在客户端判定徽章解锁或挑战完成。根节点常驻的 `AchievementDataProvider` 会在 App 开场期间预取该快照、跨 Tab 保存在内存中，并在 `inventory`、`fridge`、`members` 同步事件后后台静默替换；成就页重新挂载不再发起请求或显示重复加载态。该能力已在开发库通过端到端验证。
+- 每周挑战更换：`POST /api/achievements/quests/reroll` 由 `reroll_weekly_quest` 校验本周是否已更换、当前挑战是否仍为 `assigned`，并在可完成性过滤后分配同奖励档替代挑战；无替代时恢复原分配并返回稳定错误码。
 - 邀请失败状态：加入 RPC 会先读取邀请码真实状态，再分别返回 `invite_not_found`、`invite_expired`、`invite_used`、`invite_revoked`；Express 保留这些稳定错误码，Expo 负责显示对应中英文提示。只有格式错误或确实不存在的码显示无效/未找到。
 - 前台静默同步：`GET /api/sync/state` 返回当前冰箱模式、四个领域版本，以及共享模式下的 Realtime endpoint、publishable key 和高熵频道能力值。数据库 Broadcast 变化后只通知当前已挂载页面静默重拉相关接口；连接正常时每 30 秒对账，未配置或断线时共享模式回退每 6 秒探测，个人模式保持 30 秒。App 回前台会重建频道并立即对账，网络错误最长 60 秒退避。该方案不依赖 Vercel Function 实例内存，也不需要 Redis。
 
@@ -826,6 +827,8 @@ GET /api/achievements
 `20260912020000_achievement_dashboard.sql` 新增冰箱统一时区、历史最高 XP、五级山峰定义、扩展成就规则和追加式幂等 XP 账本。读取 RPC 会对账完整使用、临期挽救、共享、完整周奖励和成就解锁，再返回稳定聚合快照。
 
 `20260913010000_achievement_badge_progress.sql` 扩展同一 RPC 的成就数组：每个徽章权威返回 `status`（`locked` / `in_progress` / `unlocked`；`unavailable` 预留给缺依赖功能的未来成就）、`progressCurrent`、`progressTarget`、`progressLabelKey` 与 `ruleVersion`；保留 `unlocked` 布尔字段兼容旧客户端。Express 仍只透传 `get_achievement_dashboard` 结果并附加 `levelCatalog`，不在 Node 侧重算状态。验证脚本 `server/scripts/verify-achievements.js` 覆盖初始等级、XP 防重复、徽章状态流转（locked → in_progress → unlocked）与进度分母。
+
+`20260913160000_fridge_daily_weekly_quests.sql` 新增 `quest_definitions` 与 `fridge_quest_assignments`，以及 `get_fridge_quests` / `reroll_weekly_quest`。读取 `GET /api/achievements` 时 Express 并行调用 `get_fridge_quests`，把 `quests.daily` / `quests.weekly` / `quests.weeklyRerollsRemaining` 并入同一快照；完成与 XP（`reason_code = quest_completed`，`source_key = quest:{assignmentUid}`）只在数据库结算。购物/检查类挑战定义已入库但 `is_enabled = false`，待支撑事件落地后再打开。`POST /api/achievements/quests/reroll` 每周允许更换一次。验证脚本：`npm run verify:quests`。
 
 ## 15. Migration 工作流
 

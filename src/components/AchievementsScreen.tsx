@@ -4,10 +4,13 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../i18n';
+import { getApiErrorCode } from '../services/apiClient';
 import type { AchievementCode, AchievementDashboard } from '../services/achievementApi';
+import { rerollWeeklyQuest } from '../services/achievementApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
 import { AchievementMountainHero } from './achievement/AchievementMountainHero';
+import { AchievementQuestSection } from './achievement/AchievementQuestSection';
 import {
   formatBadgeProgressLabel,
   getBadgeProgressRatio,
@@ -38,6 +41,8 @@ export function AchievementsScreen() {
   const [heroTailColor, setHeroTailColor] = useState('#60C7F5');
   const [heldAchievement, setHeldAchievement] = useState<AchievementDashboard['achievements'][number] | null>(null);
   const [badgeScrollEnabled, setBadgeScrollEnabled] = useState(true);
+  const [rerollingWeekly, setRerollingWeekly] = useState(false);
+  const [rerollError, setRerollError] = useState<string | null>(null);
 
   // Arthur: NarIyirm
   // 中文：点击或长按打开 Modal；按下时暂停 ScrollView，避免滚动抢手势。松手不关，点遮罩才关。
@@ -50,6 +55,28 @@ export function AchievementsScreen() {
   const dismissHeldAchievement = () => {
     setHeldAchievement(null);
     setBadgeScrollEnabled(true);
+  };
+
+  const handleRerollWeekly = async () => {
+    if (rerollingWeekly) return;
+    setRerollingWeekly(true);
+    setRerollError(null);
+    try {
+      await rerollWeeklyQuest();
+      await refresh(true);
+      void Haptics.selectionAsync().catch(() => undefined);
+    } catch (error) {
+      const code = getApiErrorCode(error);
+      setRerollError(
+        code === 'weekly_quest_reroll_exhausted'
+          ? copy.quests.rerollUsed
+          : code === 'weekly_quest_not_rerollable'
+            ? copy.quests.rerollUnavailable
+            : copy.quests.rerollFailed,
+      );
+    } finally {
+      setRerollingWeekly(false);
+    }
   };
 
   if (loading && !dashboard) {
@@ -103,6 +130,17 @@ export function AchievementsScreen() {
             </>
           ) : <Text style={styles.emptyText}>{copy.impact.empty}</Text>}
         </View>
+
+        <AchievementQuestSection
+          copy={copy.quests}
+          daily={dashboard.quests?.daily ?? null}
+          formatEndsAt={(iso) => new Intl.DateTimeFormat(numberLocale, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))}
+          onRerollWeekly={() => { void handleRerollWeekly(); }}
+          rerolling={rerollingWeekly}
+          weekly={dashboard.quests?.weekly ?? null}
+          weeklyRerollsRemaining={dashboard.quests?.weeklyRerollsRemaining ?? 0}
+        />
+        {rerollError ? <Text style={styles.rerollError}>{rerollError}</Text> : null}
 
         <View style={styles.card}>
           <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text></View>
@@ -239,6 +277,7 @@ const styles = StyleSheet.create({
   impactValue: { marginTop: 3, color: '#173D31', fontSize: 16, fontWeight: '800' },
   coverageNote: { marginTop: 12, padding: 10, borderRadius: 11, backgroundColor: '#FFF6E9', color: '#8B632E', fontSize: 11.5, fontWeight: '700', lineHeight: 17 },
   emptyText: { color: '#70827A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  rerollError: { marginTop: 8, marginHorizontal: 18, color: '#B42318', fontSize: 12, fontWeight: '700' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   badgeCard: { width: '47%', minHeight: 126, flexGrow: 1, alignItems: 'center', paddingHorizontal: 8, paddingTop: 14, paddingBottom: 12, borderRadius: 16, borderCurve: 'continuous' },
   badgeCardUnlocked: { backgroundColor: '#FFF8EF' },
