@@ -1,9 +1,9 @@
 // src/components/shopping/ShoppingCheckoutReview.tsx
 // US5.4 checkout review + US5.5 add purchases to inventory (B1 draft flow).
-// Receives ONLY the confirmed (checked) cart items. Lists them, highlights
-// duplicate warnings, and turns them into inventory one at a time via the
-// shared InventoryEntryFlow.
-// US5.5.3: leaving while any confirmed item is still not stocked prompts first.
+// Receives the WHOLE cart (the checkbox "confirm" gate was removed -- every
+// cart item is checkout-eligible). Lists them, highlights duplicate warnings,
+// and turns them into inventory one at a time via the shared InventoryEntryFlow.
+// US5.5.3: leaving while any item is still not stocked prompts first.
 import React, { useMemo, useState } from 'react';
 import {
   Modal,
@@ -16,14 +16,34 @@ import {
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import { InventoryEntryFlow, type InventoryEntrySubmission, type InventoryUnit } from '../inventory-entry/InventoryEntryFlow';
-import { createInventoryBatch } from '../../services/inventoryApi';
+import {
+  createInventoryBatch,
+  getFoodPresetSuggestion,
+  generateFoodPreset,
+  type FoodPresetSuggestion,
+} from '../../services/inventoryApi';
 import type { CartItem } from '../../services/cartApi';
+
+const DEFAULT_SHELF_LIFE_DAYS = 7;
+
+// 中文：一键入库时用同一个预设/AI 补全服务猜品类、储存方式和保质期，跟条码/拍照识别走的是同一条路。
+// EN: One-tap stocking reuses the same preset/AI enrichment service as barcode/photo recognition to guess category, storage, and shelf life.
+async function suggestFor(name: string): Promise<FoodPresetSuggestion | null> {
+  try {
+    const presetResult = await getFoodPresetSuggestion(name);
+    if (presetResult.suggestion) return presetResult.suggestion;
+    const generatedResult = await generateFoodPreset(name);
+    return generatedResult.suggestion;
+  } catch {
+    return null;
+  }
+}
 
 type DraftStatus = 'pending' | 'done';
 
 type ShoppingCheckoutReviewProps = {
   visible: boolean;
-  items: CartItem[]; // already filtered to confirmed (checked) items
+  items: CartItem[]; // the whole cart -- there is no separate "confirmed" subset anymore
   inventoryNames: Set<string>;
   onClose: () => void;
   onAllStocked: (stockedItemUids: string[]) => void | Promise<void>;
@@ -85,6 +105,44 @@ export function ShoppingCheckoutReview({
     }
   };
 
+  // 中文：一键把所有未入库的确认项自动写入库存——分类/储存位置来自预设建议，
+  //       保质期缺省 7 天，价格留空；用户之后仍可在冰箱页里逐条编辑修正。
+  // EN: Stock every not-yet-done confirmed item in one tap -- category/storage
+  //     come from the preset suggestion, shelf life defaults to 7 days, price
+  //     is left blank; users can still edit each batch from the fridge screen after.
+  const handleAutoStockAll = async () => {
+    setBusy(true);
+    try {
+      for (const item of remaining) {
+        try {
+          const suggestion = await suggestFor(item.name);
+          const shelfLifeDays = suggestion?.shelfLifeDays ?? DEFAULT_SHELF_LIFE_DAYS;
+          const expiresAt = new Date(Date.now() + shelfLifeDays * 86_400_000);
+          expiresAt.setHours(23, 59, 0, 0);
+          await createInventoryBatch({
+            name: item.name,
+            initialQuantity: item.quantity ?? 1,
+            unit: item.unit ?? 'item',
+            categoryCode: suggestion?.categoryCode ?? 'other',
+            deadlineType: 'best_before',
+            storageZone: suggestion?.storageZone ?? 'chilled',
+            expiresAt: expiresAt.toISOString(),
+            expiryWarningDays: 3,
+            purchasePrice: 0,
+            priceSource: 'recognition',
+            presetUid: suggestion?.presetUid ?? item.preset_uid,
+            restockRule: null,
+          });
+          setStatus((prev) => ({ ...prev, [item.item_uid]: 'done' }));
+        } catch {
+          // one item failing (e.g. name conflict) shouldn't stop the rest of the batch
+        }
+      }
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const doClose = async () => {
     await onAllStocked(stockedUids);
     setStatus({});
@@ -113,6 +171,13 @@ export function ShoppingCheckoutReview({
         </View>
 
         {busy ? <ActivityIndicator style={{ marginTop: 8 }} /> : null}
+
+        {/* one-tap auto stock: skip the per-item form, fill category/storage/expiry from presets */}
+        {remaining.length > 0 ? (
+          <Pressable style={styles.autoStockBtn} disabled={busy} onPress={() => void handleAutoStockAll()}>
+            <Text style={styles.autoStockText}>{copy.autoStockAll(remaining.length)}</Text>
+          </Pressable>
+        ) : null}
 
         <FlatList
           data={items}
@@ -207,6 +272,16 @@ const styles = StyleSheet.create({
   },
   headerBtn: { color: '#2e7d32', fontSize: 15, fontWeight: '700', width: 44 },
   headerTitle: { fontSize: 18, fontWeight: '800', color: '#173D31' },
+  autoStockBtn: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    height: 46,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#2e7d32',
+  },
+  autoStockText: { color: '#fff', fontSize: 14, fontWeight: '800' },
   list: { paddingHorizontal: 16, paddingBottom: 20 },
   row: {
     flexDirection: 'row',

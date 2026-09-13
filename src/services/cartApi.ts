@@ -54,6 +54,14 @@ export const updateCartQuantity = (id: string, quantity: number) =>
   });
 
 // Arthur: NarIyirm
+// 中文：点开购物车某一行时复用加入购物车的表单来编辑；这里一次性提交名称/数量/单位里改动过的字段。
+// EN: Tapping a cart row reopens the add-to-cart form to edit it; this submits whichever of name/quantity/unit changed, in one call.
+export const updateCartItem = (
+  id: string,
+  patch: Partial<{ name: string; quantity: number; unit: string }>,
+) => requestApi<CartItem>(`/api/cart/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+
+// Arthur: NarIyirm
 // 中文：勾选状态属于整个冰箱并同步给所有成员；后端同时记录操作者和完成时间。
 // EN: Checked state belongs to the fridge and syncs to every member; the backend also records the actor and completion time.
 export const toggleCartItem = (id: string, is_checked: boolean) =>
