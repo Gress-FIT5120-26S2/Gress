@@ -525,6 +525,7 @@ function KitchMemoApp() {
                   initialNotificationId={notificationTargetId}
                   onBack={() => setActiveTab(notificationReturnTab)}
                   onCountsChange={handleNotificationCountsChange}
+                  onGoToRestock={() => setActiveTab('shopping')}
                 />
               ) : activeTab === 'profile' ? (
                 <ProfileScreen
