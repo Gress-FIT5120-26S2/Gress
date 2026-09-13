@@ -46,8 +46,7 @@ export function AchievementsScreen() {
   const [badgeScrollEnabled, setBadgeScrollEnabled] = useState(true);
   const [rerollingAssignmentUid, setRerollingAssignmentUid] = useState<string | null>(null);
   const [rerollError, setRerollError] = useState<string | null>(null);
-  const [journeyVisible, setJourneyVisible] = useState(false);
-  const [journeyInitialTab, setJourneyInitialTab] = useState<'journey' | 'medals'>('journey');
+  const [journeyRoute, setJourneyRoute] = useState<'journey' | 'medals' | null>(null);
   const [celebrationXp, setCelebrationXp] = useState<number | null>(null);
   const latestXpEventRef = useRef<string | null | undefined>(undefined);
 
@@ -144,7 +143,7 @@ export function AchievementsScreen() {
           milestone={rescueMilestone}
           milestoneTitle={rescueMilestone ? copy.badges.items[rescueMilestone.code] : null}
           money={money}
-          onOpenMilestone={() => { setJourneyInitialTab('journey'); setJourneyVisible(true); }}
+          onOpenMilestone={() => setJourneyRoute('journey')}
         />
 
         <AchievementQuestSection
@@ -160,7 +159,7 @@ export function AchievementsScreen() {
         {rerollError ? <Text style={styles.rerollError}>{rerollError}</Text> : null}
 
         <View style={styles.card}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text><Pressable accessibilityRole="button" onPress={() => { setJourneyInitialTab('medals'); setJourneyVisible(true); }} style={styles.viewAll}><Text style={styles.viewAllText}>{language === 'zh' ? '查看奖牌馆' : 'View medals'}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={14} /></Pressable></View>
+          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text><Pressable accessibilityRole="button" onPress={() => setJourneyRoute('medals')} style={styles.viewAll}><Text style={styles.viewAllText}>{language === 'zh' ? '查看奖牌馆' : 'View medals'}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={14} /></Pressable></View>
           <View style={styles.badgeRow}>
             {dashboard.achievements.filter(isAchievementBadgeVisible).map((achievement) => {
               // Arthur: NarIyirm
@@ -262,7 +261,10 @@ export function AchievementsScreen() {
           ) : null}
         </View>
       </Modal>
-      <AchievementJourneyModal badgeCopy={copy.badges} dashboard={dashboard} initialTab={journeyInitialTab} language={language} onClose={() => setJourneyVisible(false)} visible={journeyVisible} />
+      {/* Arthur: NarIyirm
+          中文：路由值同时表达“是否打开”和“打开哪个标签”，并在关闭时卸载原生 Modal，避免首次唤起显示隐藏期间缓存的旧视图。
+          EN: One route value owns both visibility and the initial tab, while closing unmounts the native Modal so its first presentation cannot reveal a stale hidden view. */}
+      {journeyRoute ? <AchievementJourneyModal badgeCopy={copy.badges} dashboard={dashboard} initialTab={journeyRoute} language={language} onClose={() => setJourneyRoute(null)} visible /> : null}
       {celebrationXp !== null ? <AchievementCelebration onDone={() => setCelebrationXp(null)} xp={celebrationXp} /> : null}
     </View>
   );

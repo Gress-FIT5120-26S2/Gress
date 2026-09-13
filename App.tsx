@@ -4,7 +4,7 @@ import { BlurTargetView } from 'expo-blur';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
 import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
@@ -629,8 +629,11 @@ function KitchMemoApp() {
 }
 
 export default function App() {
+  // Arthur: NarIyirm
+  // 中文：首帧注入原生窗口安全区，避免首次打开全屏 Modal 时顶部 inset 暂时为 0。
+  // EN: Seed the provider with native window metrics so a full-screen Modal never receives a zero top inset on its first frame.
   return (
-    <SafeAreaProvider style={styles.root}>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
       <RealtimeSyncProvider>
         <AchievementDataProvider>
           <I18nProvider>
