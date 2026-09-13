@@ -8,6 +8,7 @@ import { supabase } from '../supabase.js';
 const assistantRouter = Router();
 const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const INVENTORY_UNITS = new Set(['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box']);
+const DISCARD_REASONS = new Set(['spoiled', 'overbought', 'forgotten', 'unwanted', 'quality_rejected', 'other', 'confirmed_use_by_expiry']);
 
 function quantityLimit(unit) {
   return unit === 'g' || unit === 'ml' ? 1_000_000 : 1_000;
@@ -28,7 +29,7 @@ function finiteNumber(value, minimum = 0) {
 
 function validateActionProposal(action) {
   if (!action || !presentString(action.summary, 300)) throw new Error('assistant_action_invalid');
-  const needsTarget = ['archive_batch', 'adjust_quantity', 'mark_consumed', 'edit_use_by'].includes(action.actionType);
+  const needsTarget = ['archive_batch', 'discard_batch', 'adjust_quantity', 'mark_consumed', 'edit_use_by'].includes(action.actionType);
   if (needsTarget && !UUID_PATTERN.test(action.targetBatchUid ?? '')) throw new Error('assistant_action_invalid');
 
   switch (action.actionType) {
@@ -40,6 +41,10 @@ function validateActionProposal(action) {
       }
       break;
     case 'archive_batch':
+      if (action.reasonCode !== 'data_correction') throw new Error('assistant_action_invalid');
+      break;
+    case 'discard_batch':
+      if (!DISCARD_REASONS.has(action.reasonCode)) throw new Error('assistant_action_invalid');
       break;
     case 'adjust_quantity':
       if (!finiteNumber(action.quantity)) throw new Error('assistant_action_invalid');
@@ -287,7 +292,7 @@ async function stageAction(action, conversationUid, request) {
   if (action.targetBatchUid) {
     const { data, error } = await supabase
       .from('inventory_batches')
-      .select('version,unit,stocked_at,initial_quantity')
+      .select('version,unit,stocked_at,initial_quantity,use_by_at')
       .eq('batch_uid', action.targetBatchUid)
       .eq('fridge_uid', request.fridgeUid)
       .eq('lifecycle_state', 'active')
@@ -299,6 +304,13 @@ async function stageAction(action, conversationUid, request) {
   }
   if (action.actionType === 'adjust_quantity' && (action.quantity > Number(targetBatch.initial_quantity) || action.quantity >= quantityLimit(targetBatch.unit))) {
     throw new Error('assistant_action_invalid');
+  }
+  // Arthur: NarIyirm
+  // 中文：待确认动作入库前用权威批次时间再做一次安全检查，避免仅依赖模型返回的库存判断。
+  // EN: Recheck the authoritative batch deadline before staging so safety never depends only on the model's interpretation of tool output.
+  if (targetBatch?.use_by_at && Date.parse(targetBatch.use_by_at) <= Date.now()
+    && !['discard_batch', 'archive_batch'].includes(action.actionType)) {
+    throw new Error('assistant_expired_action_invalid');
   }
   if (action.actionType === 'edit_use_by' && Date.parse(action.useByAt) < Date.parse(targetBatch.stocked_at)) {
     throw new Error('assistant_action_invalid');
@@ -322,6 +334,7 @@ async function stageAction(action, conversationUid, request) {
       quantity: action.quantity,
       unit: targetBatch?.unit ?? action.unit,
       useByAt: action.useByAt,
+      reasonCode: action.reasonCode,
       enabled: action.enabled,
       minimumQuantity: action.minimumQuantity,
       targetQuantity: action.targetQuantity,
@@ -490,11 +503,12 @@ assistantRouter.post('/assistant/actions/:actionUid/confirm', async (request, re
 
     const batchUid = data.result?.batchUid;
     if (data.status === 'executed' && !data.replayed && batchUid) {
-      await notifySharedInventory(request.deviceId, batchUid, data.actionType === 'archive_batch' ? 'removed' : 'updated');
+      await notifySharedInventory(request.deviceId, batchUid, ['archive_batch', 'discard_batch'].includes(data.actionType) ? 'removed' : 'updated');
     }
     return sendAssistantActionStatus(response, data);
   } catch (error) {
     if (error.message?.includes('Assistant action not found')) return response.status(404).json({ error: 'assistant_action_not_found' });
+    if (error.message?.includes('inventory_use_by_expired')) return response.status(409).json({ error: 'inventory_use_by_expired' });
     console.error('Assistant action confirmation failed:', error.message);
     return response.status(503).json({ error: 'assistant_action_unavailable' });
   }

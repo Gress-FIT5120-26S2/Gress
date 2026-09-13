@@ -76,7 +76,7 @@ async function cleanup() {
   // Arthur: NarIyirm
   // 中文：只按本次随机 fridge/device 精确清理，并依外键逆序删除；不会使用名称模糊条件触碰现有开发数据。
   // EN: Cleanup targets this run's random fridge/device exactly and follows reverse FK order; no broad name filter can touch existing development data.
-  for (const table of ['assistant_feedback', 'assistant_pending_actions', 'assistant_request_audit', 'assistant_messages', 'assistant_conversations', 'notifications', 'shopping_cart_items', 'inventory_events', 'inventory_batches', 'restock_rules', 'food_categories', 'fridge_achievements', 'fridge_invites', 'fridge_members', 'fridge_sync_versions']) {
+  for (const table of ['assistant_feedback', 'assistant_pending_actions', 'assistant_request_audit', 'assistant_messages', 'assistant_conversations', 'notifications', 'shopping_cart_items', 'fridge_xp_events', 'inventory_events', 'inventory_batches', 'restock_rules', 'food_categories', 'fridge_achievements', 'fridge_invites', 'fridge_members', 'fridge_sync_versions']) {
     const query = supabase.from(table).delete();
     const { error } = table === 'assistant_feedback'
       ? await query.eq('creator_device_id', deviceId)
@@ -137,8 +137,25 @@ async function main() {
   const consumedResult = await confirm(await createAction('mark_consumed', { quantity: 0, summary: 'Mark used up' }, batch));
   assert(consumedResult.result.remainingQuantity === 0, 'Consumed confirmation did not set quantity to zero');
 
+  const discardBatch = await createBatch(`Discard ${runId}`, 4);
+  const discardResult = await confirm(await createAction('discard_batch', { reasonCode: 'spoiled', summary: 'Discard spoiled batch' }, discardBatch));
+  assert(discardResult.result.lifecycleState === 'discarded', 'Discard confirmation did not settle the batch as discarded');
+
+  const { data: outcomeEvents, error: outcomeEventsError } = await supabase
+    .from('inventory_events')
+    .select('batch_uid,event_type,reason_code')
+    .in('batch_uid', [batch.batch_uid, discardBatch.batch_uid]);
+  if (outcomeEventsError) throw outcomeEventsError;
+  assert(outcomeEvents.some((event) => event.batch_uid === batch.batch_uid && event.event_type === 'consume' && event.reason_code === 'used'), 'Assistant consumption did not create the achievement consume event');
+  assert(outcomeEvents.some((event) => event.batch_uid === discardBatch.batch_uid && event.event_type === 'discard' && event.reason_code === 'spoiled'), 'Assistant discard did not create the achievement discard event');
+
+  const { data: dashboard, error: dashboardError } = await supabase.rpc('get_achievement_dashboard', { p_device_id: deviceId });
+  if (dashboardError) throw dashboardError;
+  assert(Number(dashboard.metrics.consumedBatchCount) >= 1, 'Assistant consumption did not reach achievement metrics');
+  assert(Number(dashboard.metrics.discardedBatchCount) >= 1, 'Assistant discard did not reach achievement metrics');
+
   const archiveBatch = await createBatch(`Archive ${runId}`, 3);
-  const archiveResult = await confirm(await createAction('archive_batch', { summary: 'Archive batch' }, archiveBatch));
+  const archiveResult = await confirm(await createAction('archive_batch', { reasonCode: 'data_correction', summary: 'Archive mistaken entry' }, archiveBatch));
   assert(archiveResult.status === 'executed', 'Archive confirmation did not execute');
 
   const staleBatch = await createBatch(`Stale ${runId}`, 9);
@@ -179,7 +196,7 @@ async function main() {
 
   console.log(JSON.stringify({
     valid: true,
-    verified: ['atomic-idempotency', 'cart', 'quantity', 'use-by', 'restock', 'consumed', 'archive', 'version-conflict', 'cancel', 'expiry', 'creator-isolation'],
+    verified: ['atomic-idempotency', 'cart', 'quantity', 'use-by', 'restock', 'consumed', 'discard', 'achievement-outcomes', 'archive', 'version-conflict', 'cancel', 'expiry', 'creator-isolation'],
   }));
 }
 

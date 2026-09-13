@@ -3,6 +3,7 @@ import { Image } from 'expo-image';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
 import { AccessibilityInfo, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native';
 import { useI18n } from '../i18n';
+import { EdgeSwipeBackView } from './navigation/EdgeSwipeBackView';
 
 type FirstUseJourneyProps = {
   onComplete: () => void;
@@ -75,7 +76,7 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
 
   return (
     <Modal animationType="fade" onRequestClose={pageIndex > 0 ? goBack : () => undefined} presentationStyle="fullScreen" visible={visible}>
-      <View style={[styles.screen, sceneStyles[page].screen]}>
+      <EdgeSwipeBackView enabled={pageIndex > 0} onBack={goBack} resetKey={pageIndex}><View style={[styles.screen, sceneStyles[page].screen]}>
         <View style={styles.topBar}>
           <Text style={[styles.brand, sceneStyles[page].foreground]}>KITCHMEMO</Text>
           <Text accessibilityLiveRegion="polite" style={[styles.progressLabel, sceneStyles[page].muted]}>
@@ -116,7 +117,7 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
             <Ionicons color={sceneStyles[page].nextIconColor} name={isLastPage ? 'home-outline' : 'arrow-forward'} size={20} />
           </Pressable>
         </View>
-      </View>
+      </View></EdgeSwipeBackView>
     </Modal>
   );
 }

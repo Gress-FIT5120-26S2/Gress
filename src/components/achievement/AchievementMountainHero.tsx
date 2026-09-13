@@ -2,7 +2,7 @@ import * as Haptics from 'expo-haptics';
 import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, StyleSheet, Text, useWindowDimensions, View, type GestureResponderEvent, type LayoutChangeEvent } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { AchievementDashboard, AchievementLevelCode } from '../../services/achievementApi';
@@ -53,6 +53,7 @@ const LEVEL_VISUALS: Record<AchievementLevelCode, LevelVisual> = {
 };
 
 const HERO_MAX_WIDTH = 560;
+const HEADING_HEIGHT_FALLBACK = 108;
 const SWIPE_DISTANCE = 42;
 const SWIPE_AXIS_RATIO = 1.2;
 const CLOUD_BACK = require('../../assets/achievements/cloud-back.png');
@@ -70,6 +71,7 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
   const swipeStart = useRef<{ x: number; y: number } | null>(null);
   const transitionDirection = useRef(0);
   const [viewedLevel, setViewedLevel] = useState(dashboard.level.current);
+  const [headingHeight, setHeadingHeight] = useState(0);
   const viewedDefinition = dashboard.levelCatalog.find((definition) => definition.level === viewedLevel) ?? dashboard.levelCatalog[dashboard.level.current - 1];
   const viewedCode = viewedDefinition?.code ?? dashboard.level.code;
   const levelVisual = LEVEL_VISUALS[viewedCode];
@@ -88,6 +90,16 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
   const nextLevel = viewedLevel < dashboard.levelCatalog.length ? viewedLevel + 1 : null;
   const heroWidth = Math.min(width, HERO_MAX_WIDTH);
   const heroHeight = Math.max(430, Math.min(476, heroWidth * 1.14));
+  const headingTop = Math.max(insets.top, 12) + 6;
+  const mountainLabelTop = headingTop + Math.max(headingHeight, HEADING_HEIGHT_FALLBACK) + 12;
+
+  // Arthur: NarIyirm
+  // 中文：用标题区的实际高度推导山峰标签位置，避免英文长文案、安全区或字体缩放与它重叠。
+  // EN: Derive the mountain label position from the measured heading height so longer English copy, safe areas, and text scaling cannot overlap it.
+  const rememberHeadingHeight = (event: LayoutChangeEvent) => {
+    const nextHeight = Math.ceil(event.nativeEvent.layout.height);
+    setHeadingHeight((currentHeight) => currentHeight === nextHeight ? currentHeight : nextHeight);
+  };
 
   useEffect(() => {
     onTailColorChange?.(levelVisual.colors[2]);
@@ -187,8 +199,9 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
       <Animated.View
         accessibilityLabel={`${copy.title}. ${copy.subtitle}. ${copy.hero.accessibilitySummary(viewedLevel, dashboard.level.current, levelName, dashboard.level.totalXp, dashboard.metrics.rescuedBatchCount, rescuedValue)}`}
         accessible
+        onLayout={rememberHeadingHeight}
         pointerEvents="none"
-        style={[styles.heading, contentStyle, { top: Math.max(insets.top, 12) + 6 }]}
+        style={[styles.heading, contentStyle, { top: headingTop }]}
       >
         {/* Arthur: NarIyirm
             中文：补充规范要求页面展示 Kitchen Wins 标题与副标题；等级文案紧随其后，共用同一安全区顶部。
@@ -204,8 +217,8 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
         </View>
       </Animated.View>
 
-      <Animated.View pointerEvents="none" style={[styles.mountainLabel, contentStyle]}>
-        <Text numberOfLines={1} style={styles.mountainName}>{mountain.name}</Text>
+      <Animated.View pointerEvents="none" style={[styles.mountainLabel, contentStyle, { top: mountainLabelTop }]}>
+        <Text adjustsFontSizeToFit minimumFontScale={0.8} numberOfLines={1} style={styles.mountainName}>{mountain.name}</Text>
         <Text style={styles.mountainElevation}>{mountain.elevation}</Text>
       </Animated.View>
 
@@ -361,7 +374,7 @@ const styles = StyleSheet.create({
   levelPager: { height: 10, flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 9 },
   levelPagerDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: 'rgba(255,255,255,0.38)' },
   levelPagerDotActive: { width: 16, backgroundColor: 'rgba(255,255,255,0.94)' },
-  mountainLabel: { position: 'absolute', zIndex: 6, top: 128, left: 20, maxWidth: 142 },
+  mountainLabel: { position: 'absolute', zIndex: 6, left: 20, maxWidth: 142 },
   mountainName: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', textShadowColor: 'rgba(13,62,104,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   mountainElevation: { marginTop: 4, color: 'rgba(255,255,255,0.86)', fontSize: 12, fontWeight: '600' },
   cloudBackLayer: { position: 'absolute', zIndex: 1, top: 156, right: -34, left: -34, height: 126, overflow: 'hidden' },

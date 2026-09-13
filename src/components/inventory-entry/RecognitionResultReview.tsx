@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { FoodPresetSuggestion } from '../../services/inventoryApi';
+import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import type { RecognitionFreshness, RecognisedFood } from '../../services/recognitionApi';
 import type { InventoryEntryInitialValues, InventoryUnit } from './InventoryEntryFlow';
 
@@ -132,7 +133,7 @@ export function RecognitionResultReview({ draft, onClose, onContinue, onRetake, 
 
   return (
     <Modal animationType={reduceMotion ? 'fade' : 'slide'} onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-      <View style={styles.root}>
+      <EdgeSwipeBackView onBack={onClose}><View style={styles.root}>
         <StatusBar barStyle="dark-content" backgroundColor="#F6F8F6" />
         <ScrollView contentContainerStyle={[styles.content, { paddingTop: topInset + 6 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
@@ -230,7 +231,7 @@ export function RecognitionResultReview({ draft, onClose, onContinue, onRetake, 
             <Ionicons color="#FFFFFF" name="arrow-forward" size={20} />
           </Pressable>
         </View>
-      </View>
+      </View></EdgeSwipeBackView>
     </Modal>
   );
 }

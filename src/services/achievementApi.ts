@@ -18,7 +18,28 @@ export type QuestCode =
   | 'shop_from_what_you_have'
   | 'duplicate_defender'
   | 'strong_utilisation_week'
-  | 'know_the_outcome';
+  | 'know_the_outcome'
+  | 'use_oldest_first'
+  | 'use_earliest_first'
+  | 'finish_opened'
+  | 'use_two_items'
+  | 'use_three_items'
+  | 'use_two_categories'
+  | 'use_chilled'
+  | 'use_frozen'
+  | 'use_pantry'
+  | 'use_two_warning_items'
+  | 'five_day_rhythm'
+  | 'finish_three'
+  | 'finish_opened_two'
+  | 'oldest_first_three'
+  | 'three_categories_week'
+  | 'two_zones_week'
+  | 'quantity_care_week'
+  | 'warning_clearance_week'
+  | 'low_waste_week'
+  | 'shared_kitchen_relay'
+  | 'rescue_two_days';
 
 export type FridgeQuestAssignment = {
   assignmentUid: string;
@@ -38,12 +59,17 @@ export type FridgeQuestAssignment = {
   timeZone: string;
   completedAt: string | null;
   ruleVersion: number;
+  slotIndex: number;
+  effectiveStartAt: string;
   canReroll: boolean;
 };
 
 export type FridgeQuests = {
   daily: FridgeQuestAssignment | null;
   weekly: FridgeQuestAssignment | null;
+  dailyAssignments: FridgeQuestAssignment[];
+  weeklyAssignments: FridgeQuestAssignment[];
+  dailyRerollsRemaining: number;
   weeklyRerollsRemaining: number;
   updatedAt: string;
 };
@@ -120,6 +146,12 @@ export function getAchievementDashboard(): Promise<AchievementDashboard> {
   return requestApi<AchievementDashboard>('/api/achievements');
 }
 
-export function rerollWeeklyQuest(): Promise<{ quests: FridgeQuests }> {
-  return requestApi<{ quests: FridgeQuests }>('/api/achievements/quests/reroll', { method: 'POST' });
+// Arthur: NarIyirm
+// 中文：按服务端分配 ID 更换单个槽位；客户端不自行挑选候选，也不沿用旧任务进度。
+// EN: Reroll one server-owned slot by assignment ID; the client neither chooses candidates nor carries old progress forward.
+export function rerollQuest(assignmentUid: string): Promise<{ quests: FridgeQuests }> {
+  return requestApi<{ quests: FridgeQuests }>('/api/achievements/quests/reroll', {
+    method: 'POST',
+    body: JSON.stringify({ assignmentUid }),
+  });
 }

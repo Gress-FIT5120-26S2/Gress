@@ -21,6 +21,7 @@ import {
 } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
+import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import { useI18n } from '../../i18n';
 import { getApiErrorCode } from '../../services/apiClient';
 import {
@@ -317,7 +318,7 @@ export function SharedFridgeFlowModal({
 
   return (
     <Modal animationType="slide" onRequestClose={goBack} presentationStyle="fullScreen" statusBarTranslucent visible={visible}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { paddingTop: topInset }]}>
+      <EdgeSwipeBackView onBack={goBack} resetKey={screen}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={[styles.root, { paddingTop: topInset }]}>
         {screen === 'scan' ? (
           <Scanner
             copy={copy}
@@ -509,7 +510,7 @@ export function SharedFridgeFlowModal({
             ) : null}
           </ScrollView>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView></EdgeSwipeBackView>
     </Modal>
   );
 }

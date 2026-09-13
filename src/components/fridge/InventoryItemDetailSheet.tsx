@@ -28,6 +28,7 @@ import {
   type InventoryCategoryCode,
   type InventoryOutcomeReason,
 } from '../../services/inventoryApi';
+import { notifyLocalSync } from '../../services/realtimeSync';
 import {
   InventoryEntryFlow,
   type InventoryEntryInitialValues,
@@ -479,6 +480,7 @@ export function InventoryItemDetailSheet({
         nearExpiry ? 'consume' : 'discard',
         hardExpired ? 'confirmed_use_by_expiry' : nearExpiry ? 'used' : discardReason ?? 'other',
       );
+      notifyLocalSync(['inventory']);
       await onChanged();
       setShowRemoveConfirm(false);
       await animateClosed();

@@ -65,6 +65,13 @@ export function subscribeToSync(topics: SyncTopic[], listener: SyncListener) {
 }
 
 // Arthur: NarIyirm
+// 中文：本机 mutation 已在 HTTP 成功响应时完成提交，直接失效相关快照，避免等待广播或下一次版本探针。
+// EN: A successful local mutation is committed when its HTTP response returns, so invalidate related snapshots directly instead of waiting for broadcast or the next version probe.
+export function notifyLocalSync(topics: SyncTopic[]) {
+  dispatchTopics(topics);
+}
+
+// Arthur: NarIyirm
 // 中文：数据库四个版本域映射到页面主题；inventory 变化还需要刷新补货、通知和首页摘要。
 // EN: Four database version domains map to screen topics; inventory changes also refresh restock, notifications, and home summaries.
 function topicsForDomain(domain: SyncDomain): SyncTopic[] {

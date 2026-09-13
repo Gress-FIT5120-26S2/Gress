@@ -17,6 +17,7 @@
 - 已在开发库和生产库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。数据库契约已经进入生产，但生产知识内容摄取、OpenAI 环境变量、Express API 部署和端到端验收仍需单独完成。
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
+- `20260913170000_assistant_inventory_outcomes.sql` 将助手的整批使用、明确丢弃和录入纠错统一接入 `resolve_inventory_batch`：使用写 `consume/used`，丢弃写带稳定原因的 `discard`，只有明确录入错误才写 `adjust/data_correction`。这些权威流水会被现有成就、XP、环境指标和挑战聚合直接消费；模糊的非过期“删除”请求必须先澄清结果类型。
 
 实际实现的权威来源：
 
@@ -829,6 +830,8 @@ GET /api/achievements
 `20260913010000_achievement_badge_progress.sql` 扩展同一 RPC 的成就数组：每个徽章权威返回 `status`（`locked` / `in_progress` / `unlocked`；`unavailable` 预留给缺依赖功能的未来成就）、`progressCurrent`、`progressTarget`、`progressLabelKey` 与 `ruleVersion`；保留 `unlocked` 布尔字段兼容旧客户端。Express 仍只透传 `get_achievement_dashboard` 结果并附加 `levelCatalog`，不在 Node 侧重算状态。验证脚本 `server/scripts/verify-achievements.js` 覆盖初始等级、XP 防重复、徽章状态流转（locked → in_progress → unlocked）与进度分母。
 
 `20260913160000_fridge_daily_weekly_quests.sql` 新增 `quest_definitions` 与 `fridge_quest_assignments`，以及 `get_fridge_quests` / `reroll_weekly_quest`。读取 `GET /api/achievements` 时 Express 并行调用 `get_fridge_quests`，把 `quests.daily` / `quests.weekly` / `quests.weeklyRerollsRemaining` 并入同一快照；完成与 XP（`reason_code = quest_completed`，`source_key = quest:{assignmentUid}`）只在数据库结算。购物/检查类挑战定义已入库但 `is_enabled = false`，待支撑事件落地后再打开。`POST /api/achievements/quests/reroll` 每周允许更换一次。验证脚本：`npm run verify:quests`。
+
+`20260913180000_expand_quest_library_and_slots.sql` 在不改写已部署 migration 的前提下扩展为 14 个可启用每日模板与 16 个可启用每周模板。任务按冻结资格快照分配：每日依据可用库存展示 2–3 个、每周展示 7–9 个；响应新增 `dailyAssignments` / `weeklyAssignments`、`dailyRerollsRemaining`，并保留旧 `daily` / `weekly` 首项字段用于兼容。每个周期类型可更换 3 次，`POST /api/achievements/quests/reroll` 现在必须提交 `assignmentUid`；数据库验证冰箱归属、同周期历史去重与资格，新任务沿用槽位且只从 `effectiveStartAt` 之后计算进度。旧 `reroll_weekly_quest` 仅保留给已发布客户端，新客户端使用 `reroll_quest`。
 
 ## 15. Migration 工作流
 

@@ -4,6 +4,7 @@ import { Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, Vi
 import { useI18n } from '../../i18n';
 import type { BarcodeProduct } from '../../services/barcodeApi';
 import type { FoodPresetSuggestion } from '../../services/inventoryApi';
+import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import type { InventoryEntryInitialValues } from './InventoryEntryFlow';
 
 export type BarcodeDraft = {
@@ -63,7 +64,7 @@ export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visi
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-      <View style={styles.root}>
+      <EdgeSwipeBackView onBack={onClose}><View style={styles.root}>
         <StatusBar barStyle="dark-content" backgroundColor="#F6F8F6" />
         <ScrollView contentContainerStyle={[styles.content, { paddingTop: topInset + 6 }]} showsVerticalScrollIndicator={false}>
           <View style={styles.header}>
@@ -146,7 +147,7 @@ export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visi
             <Ionicons color="#FFFFFF" name="arrow-forward" size={20} />
           </Pressable>
         </View>
-      </View>
+      </View></EdgeSwipeBackView>
     </Modal>
   );
 }
