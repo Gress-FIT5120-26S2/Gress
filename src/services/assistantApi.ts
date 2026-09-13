@@ -5,6 +5,7 @@ export type AssistantRiskLevel = 'danger' | 'info' | 'warning';
 export type AssistantActionType =
   | 'adjust_quantity'
   | 'archive_batch'
+  | 'discard_batch'
   | 'edit_use_by'
   | 'mark_consumed'
   | 'prepare_cart_item'
@@ -21,6 +22,7 @@ export type AssistantActionProposal = {
   itemName: string | null;
   minimumQuantity: number | null;
   quantity: number | null;
+  reasonCode: 'confirmed_use_by_expiry' | 'data_correction' | 'forgotten' | 'other' | 'overbought' | 'quality_rejected' | 'spoiled' | 'unwanted' | null;
   summary: string;
   targetBatchUid: string | null;
   targetQuantity: number | null;

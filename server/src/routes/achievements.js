@@ -39,23 +39,27 @@ router.get('/achievements', requireFridge, async (request, response) => {
 });
 
 // Arthur: NarIyirm
-// 中文：每周挑战更换由数据库校验次数与可完成性；Express 只透传结果与稳定错误码。
-// EN: Weekly quest rerolls are validated for quota and eligibility in the database; Express only forwards the result and stable error codes.
+// 中文：任一每日/每周任务都可按分配 ID 更换；数据库统一校验归属、次数与候选可完成性。
+// EN: Any daily or weekly slot can reroll by assignment ID; the database validates ownership, quota, and replacement eligibility.
 router.post('/achievements/quests/reroll', requireFridge, async (request, response) => {
-  const { data, error } = await supabase.rpc('reroll_weekly_quest', { p_device_id: request.deviceId });
+  const assignmentUid = typeof request.body?.assignmentUid === 'string' ? request.body.assignmentUid : '';
+  if (!/^[0-9a-f]{8}-[0-9a-f-]{27}$/i.test(assignmentUid)) {
+    return response.status(400).json({ error: 'invalid_quest_assignment' });
+  }
+  const { data, error } = await supabase.rpc('reroll_quest', { p_device_id: request.deviceId, p_assignment_uid: assignmentUid });
   if (error) {
     const message = error.message ?? '';
-    if (message.includes('weekly_quest_reroll_exhausted')) {
-      return response.status(409).json({ error: 'weekly_quest_reroll_exhausted' });
+    if (message.includes('quest_reroll_exhausted')) {
+      return response.status(409).json({ error: 'quest_reroll_exhausted' });
     }
-    if (message.includes('weekly_quest_not_rerollable')) {
-      return response.status(409).json({ error: 'weekly_quest_not_rerollable' });
+    if (message.includes('quest_not_rerollable')) {
+      return response.status(409).json({ error: 'quest_not_rerollable' });
     }
-    if (message.includes('weekly_quest_reroll_unavailable')) {
-      return response.status(409).json({ error: 'weekly_quest_reroll_unavailable' });
+    if (message.includes('quest_reroll_unavailable')) {
+      return response.status(409).json({ error: 'quest_reroll_unavailable' });
     }
-    console.error('Weekly quest reroll failed:', message);
-    return response.status(503).json({ error: 'weekly_quest_reroll_unavailable' });
+    console.error('Quest reroll failed:', message);
+    return response.status(503).json({ error: 'quest_reroll_unavailable' });
   }
   return response.json({ quests: data });
 });

@@ -19,6 +19,7 @@ import {
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import { ApiRequestError } from '../../services/apiClient';
+import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import {
   cancelAssistantAction,
   confirmAssistantAction,
@@ -374,7 +375,7 @@ export function FridgeAssistantScreen({
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+      <EdgeSwipeBackView onBack={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
         <View style={styles.header}>
           <View style={styles.headerSide}>
             <Pressable accessibilityLabel={isHistoryVisible ? copy.backToChat : copy.back} accessibilityRole="button" hitSlop={8} onPress={isHistoryVisible ? () => setIsHistoryVisible(false) : onClose} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
@@ -497,7 +498,7 @@ export function FridgeAssistantScreen({
             </View>
           </>
         )}
-      </KeyboardAvoidingView>
+      </KeyboardAvoidingView></EdgeSwipeBackView>
     </Modal>
   );
 }

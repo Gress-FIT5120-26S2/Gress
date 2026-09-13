@@ -1,14 +1,17 @@
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../i18n';
 import { getApiErrorCode } from '../services/apiClient';
-import type { AchievementCode, AchievementDashboard } from '../services/achievementApi';
-import { rerollWeeklyQuest } from '../services/achievementApi';
+import type { AchievementCode, AchievementDashboard, FridgeQuestAssignment } from '../services/achievementApi';
+import { rerollQuest } from '../services/achievementApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
+import { AchievementCelebration } from './achievement/AchievementCelebration';
+import { AchievementImpactCard } from './achievement/AchievementImpactCard';
+import { AchievementJourneyModal } from './achievement/AchievementJourneyModal';
 import { AchievementMountainHero } from './achievement/AchievementMountainHero';
 import { AchievementQuestSection } from './achievement/AchievementQuestSection';
 import {
@@ -41,8 +44,24 @@ export function AchievementsScreen() {
   const [heroTailColor, setHeroTailColor] = useState('#60C7F5');
   const [heldAchievement, setHeldAchievement] = useState<AchievementDashboard['achievements'][number] | null>(null);
   const [badgeScrollEnabled, setBadgeScrollEnabled] = useState(true);
-  const [rerollingWeekly, setRerollingWeekly] = useState(false);
+  const [rerollingAssignmentUid, setRerollingAssignmentUid] = useState<string | null>(null);
   const [rerollError, setRerollError] = useState<string | null>(null);
+  const [journeyVisible, setJourneyVisible] = useState(false);
+  const [journeyInitialTab, setJourneyInitialTab] = useState<'journey' | 'medals'>('journey');
+  const [celebrationXp, setCelebrationXp] = useState<number | null>(null);
+  const latestXpEventRef = useRef<string | null | undefined>(undefined);
+
+  // Arthur: NarIyirm
+  // 中文：仅在当前会话观察到新的任务完成 XP 时庆祝，首次加载历史记录不会误触发动画。
+  // EN: Celebrate only a newly observed quest XP event in this session; loading historical events never triggers the animation.
+  useEffect(() => {
+    const latest = dashboard?.recentXpEvents[0] ?? null;
+    if (latestXpEventRef.current !== undefined && latest?.id !== latestXpEventRef.current && latest?.reasonCode === 'quest_completed') {
+      setCelebrationXp(latest.points);
+      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
+    }
+    latestXpEventRef.current = latest?.id ?? null;
+  }, [dashboard?.recentXpEvents]);
 
   // Arthur: NarIyirm
   // 中文：点击或长按打开 Modal；按下时暂停 ScrollView，避免滚动抢手势。松手不关，点遮罩才关。
@@ -57,25 +76,25 @@ export function AchievementsScreen() {
     setBadgeScrollEnabled(true);
   };
 
-  const handleRerollWeekly = async () => {
-    if (rerollingWeekly) return;
-    setRerollingWeekly(true);
+  const handleReroll = async (assignment: FridgeQuestAssignment) => {
+    if (rerollingAssignmentUid) return;
+    setRerollingAssignmentUid(assignment.assignmentUid);
     setRerollError(null);
     try {
-      await rerollWeeklyQuest();
+      await rerollQuest(assignment.assignmentUid);
       await refresh(true);
       void Haptics.selectionAsync().catch(() => undefined);
     } catch (error) {
       const code = getApiErrorCode(error);
       setRerollError(
-        code === 'weekly_quest_reroll_exhausted'
+        code === 'quest_reroll_exhausted'
           ? copy.quests.rerollUsed
-          : code === 'weekly_quest_not_rerollable'
+          : code === 'quest_not_rerollable'
             ? copy.quests.rerollUnavailable
             : copy.quests.rerollFailed,
       );
     } finally {
-      setRerollingWeekly(false);
+      setRerollingAssignmentUid(null);
     }
   };
 
@@ -94,11 +113,11 @@ export function AchievementsScreen() {
   }
 
   if (!dashboard) return null;
-  const hasSettledData = dashboard.metrics.consumedBatchCount + dashboard.metrics.discardedBatchCount > 0;
   const currency = dashboard.metrics.currency === 'AUD' ? 'A$' : dashboard.metrics.currency;
   const numberLocale = language === 'zh' ? 'zh-CN' : 'en-AU';
   const money = (value: number) => `${currency}${Number(value).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatUnlockDate = (value: string) => new Intl.DateTimeFormat(numberLocale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
+  const rescueMilestone = dashboard.achievements.find((achievement) => achievement.code === 'rescue_ten' && achievement.status !== 'unlocked' && achievement.status !== 'unavailable') ?? null;
 
   return (
     <View style={styles.screen}>
@@ -119,31 +138,29 @@ export function AchievementsScreen() {
         {/* EN: The preview level's tail color flows into the content area and fades behind the first card, creating one continuous cross-component background. */}
         <LinearGradient colors={[heroTailColor, '#F7FBFA']} end={{ x: 0.5, y: 1 }} pointerEvents="none" start={{ x: 0.5, y: 0 }} style={styles.sectionTransitionGradient} />
         <View style={styles.sections}>
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>📊</Text><Text style={styles.sectionTitle}>{copy.impact.title}</Text></View>
-          {hasSettledData ? (
-            <>
-              <ImpactRow label={copy.impact.rescuedValue} value={money(dashboard.metrics.rescuedValue)} tone="#32915C" />
-              <ImpactRow label={copy.impact.consumedValue} value={money(dashboard.metrics.consumedValue)} tone="#258BB8" />
-              <ImpactRow label={copy.impact.discardedValue} value={money(dashboard.metrics.discardedValue)} tone="#D27619" last />
-              {dashboard.metrics.priceCoverageRate !== null && dashboard.metrics.priceCoverageRate < 0.8 ? <Text style={styles.coverageNote}>{copy.impact.partialCoverage(Math.round(dashboard.metrics.priceCoverageRate * 100))}</Text> : null}
-            </>
-          ) : <Text style={styles.emptyText}>{copy.impact.empty}</Text>}
-        </View>
+        <AchievementImpactCard
+          copy={copy.impact}
+          metrics={dashboard.metrics}
+          milestone={rescueMilestone}
+          milestoneTitle={rescueMilestone ? copy.badges.items[rescueMilestone.code] : null}
+          money={money}
+          onOpenMilestone={() => { setJourneyInitialTab('journey'); setJourneyVisible(true); }}
+        />
 
         <AchievementQuestSection
           copy={copy.quests}
-          daily={dashboard.quests?.daily ?? null}
+          daily={dashboard.quests?.dailyAssignments ?? (dashboard.quests?.daily ? [dashboard.quests.daily] : [])}
+          dailyRerollsRemaining={dashboard.quests?.dailyRerollsRemaining ?? 0}
           formatEndsAt={(iso) => new Intl.DateTimeFormat(numberLocale, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))}
-          onRerollWeekly={() => { void handleRerollWeekly(); }}
-          rerolling={rerollingWeekly}
-          weekly={dashboard.quests?.weekly ?? null}
+          onReroll={(assignment) => { void handleReroll(assignment); }}
+          rerollingAssignmentUid={rerollingAssignmentUid}
+          weekly={dashboard.quests?.weeklyAssignments ?? (dashboard.quests?.weekly ? [dashboard.quests.weekly] : [])}
           weeklyRerollsRemaining={dashboard.quests?.weeklyRerollsRemaining ?? 0}
         />
         {rerollError ? <Text style={styles.rerollError}>{rerollError}</Text> : null}
 
         <View style={styles.card}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text></View>
+          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text><Pressable accessibilityRole="button" onPress={() => { setJourneyInitialTab('medals'); setJourneyVisible(true); }} style={styles.viewAll}><Text style={styles.viewAllText}>{language === 'zh' ? '查看奖牌馆' : 'View medals'}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={14} /></Pressable></View>
           <View style={styles.badgeRow}>
             {dashboard.achievements.filter(isAchievementBadgeVisible).map((achievement) => {
               // Arthur: NarIyirm
@@ -206,9 +223,9 @@ export function AchievementsScreen() {
         <View style={[styles.card, styles.lastCard]}>
           <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>✨</Text><Text style={styles.sectionTitle}>{copy.recent.title}</Text></View>
           {dashboard.recentXpEvents.length === 0 ? <Text style={styles.emptyText}>{copy.recent.empty}</Text> : dashboard.recentXpEvents.slice(0, 5).map((event, index) => (
-            <View key={event.id} style={[styles.xpRow, index === Math.min(4, dashboard.recentXpEvents.length - 1) && styles.impactRowLast]}>
+            <View key={event.id} style={[styles.xpRow, index === Math.min(4, dashboard.recentXpEvents.length - 1) && styles.rowLast]}>
               <View style={styles.xpIcon}><Ionicons name="sparkles" size={16} color="#2A8A61" /></View>
-              <View style={styles.impactCopy}>
+              <View style={styles.rowCopy}>
                 <Text style={styles.xpReason}>{copy.recent.reasons[event.reasonCode as keyof typeof copy.recent.reasons] ?? copy.recent.fallback}</Text>
                 <Text style={styles.xpDate}>{new Intl.DateTimeFormat(numberLocale, { dateStyle: 'medium' }).format(new Date(event.occurredAt))}</Text>
               </View>
@@ -245,12 +262,10 @@ export function AchievementsScreen() {
           ) : null}
         </View>
       </Modal>
+      <AchievementJourneyModal badgeCopy={copy.badges} dashboard={dashboard} initialTab={journeyInitialTab} language={language} onClose={() => setJourneyVisible(false)} visible={journeyVisible} />
+      {celebrationXp !== null ? <AchievementCelebration onDone={() => setCelebrationXp(null)} xp={celebrationXp} /> : null}
     </View>
   );
-}
-
-function ImpactRow({ label, last = false, tone, value }: { label: string; last?: boolean; tone: string; value: string }) {
-  return <View style={[styles.impactRow, last && styles.impactRowLast]}><View style={[styles.impactDot, { backgroundColor: tone }]} /><View style={styles.impactCopy}><Text style={styles.impactLabel}>{label}</Text><Text style={styles.impactValue}>{value}</Text></View></View>;
 }
 
 const styles = StyleSheet.create({
@@ -268,14 +283,11 @@ const styles = StyleSheet.create({
   lastCard: { marginBottom: 8 },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
   sectionIcon: { fontSize: 16 },
-  sectionTitle: { color: '#173D31', fontSize: 17, fontWeight: '900' },
-  impactRow: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DCE8E3' },
-  impactRowLast: { borderBottomWidth: 0 },
-  impactDot: { width: 10, height: 10, borderRadius: 5 },
-  impactCopy: { flex: 1, minWidth: 0 },
-  impactLabel: { color: '#5E756D', fontSize: 12.5, fontWeight: '600' },
-  impactValue: { marginTop: 3, color: '#173D31', fontSize: 16, fontWeight: '800' },
-  coverageNote: { marginTop: 12, padding: 10, borderRadius: 11, backgroundColor: '#FFF6E9', color: '#8B632E', fontSize: 11.5, fontWeight: '700', lineHeight: 17 },
+  sectionTitle: { color: '#173D31', fontSize: 17, fontWeight: '900', flex: 1 },
+  viewAll: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 10 },
+  viewAllText: { color: '#2A8A61', fontSize: 11, fontWeight: '800' },
+  rowLast: { borderBottomWidth: 0 },
+  rowCopy: { flex: 1, minWidth: 0 },
   emptyText: { color: '#70827A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
   rerollError: { marginTop: 8, marginHorizontal: 18, color: '#B42318', fontSize: 12, fontWeight: '700' },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
