@@ -16,6 +16,8 @@ import {
 } from 'react-native';
 import { useI18n } from '../i18n';
 import { updateDeviceProfile, type DeviceProfile, type ProfileAvatarKey } from '../services/profileApi';
+import { useAchievementData } from './AchievementDataProvider';
+import { AchievementMedalWall } from './achievement/AchievementMedalWall';
 import { DeviceRecoverySettings } from './DeviceRecoverySettings';
 import { NotificationSettingsModal } from './NotificationSettingsModal';
 import { ProfileBottomSheet } from './ProfileBottomSheet';
@@ -42,12 +44,14 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
   const { language, t } = useI18n();
   const copy = t.profile;
   const { failed, fridgeContext: context, loading, profile, refresh, setProfile } = useProfileData();
+  const { dashboard: achievementDashboard, refresh: refreshAchievements } = useAchievementData();
   const [editVisible, setEditVisible] = useState(false);
   const [notificationSettingsVisible, setNotificationSettingsVisible] = useState(false);
   const [languageVisible, setLanguageVisible] = useState(false);
   const [recoveryVisible, setRecoveryVisible] = useState(false);
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [replayVisible, setReplayVisible] = useState(false);
+  const [medalWallVisible, setMedalWallVisible] = useState(false);
 
   const displayName = profile?.displayName ?? null;
   const avatar = AVATAR_COLOURS[profile?.avatarKey ?? 'sage'];
@@ -108,6 +112,28 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
             <Ionicons color="#D96818" name="pencil-outline" size={17} />
             <Text style={styles.editButtonText}>{copy.editProfile}</Text>
           </Pressable>
+        </View>
+
+        <Text style={styles.sectionTitle}>{copy.collectionTitle}</Text>
+        <View style={styles.listSurface}>
+          <ProfileRow
+            detail={achievementDashboard
+              ? copy.medalWallDetail(
+                achievementDashboard.achievements.filter((item) => item.status === 'unlocked' || item.unlocked).length,
+                achievementDashboard.achievements.filter((item) => item.status !== 'unavailable').length,
+              )
+              : copy.medalWallLoading}
+            icon="medal-outline"
+            isLast
+            onPress={() => {
+              // Arthur: NarIyirm
+              // 中文：奖章墙从个人资产入口打开；快照尚未就绪时先刷新，避免创建一份客户端猜测的成就状态。
+              // EN: The wall opens from personal assets; when its snapshot is not ready, refresh instead of inventing client-side achievement state.
+              if (achievementDashboard) setMedalWallVisible(true);
+              else void refreshAchievements().then(() => setMedalWallVisible(true));
+            }}
+            title={copy.medalWallTitle}
+          />
         </View>
 
         <Text style={styles.sectionTitle}>{copy.preferencesTitle}</Text>
@@ -184,6 +210,14 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
         onReplay={onReplayOnboarding}
         visible={replayVisible}
       />
+      {medalWallVisible && achievementDashboard ? (
+        <AchievementMedalWall
+          badgeCopy={t.wins.badges}
+          dashboard={achievementDashboard}
+          onClose={() => setMedalWallVisible(false)}
+          visible
+        />
+      ) : null}
     </View>
   );
 }
