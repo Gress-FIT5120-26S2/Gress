@@ -34,12 +34,19 @@ function copyForItem(t: Translation, item: KitchenNotification) {
   return { title: t.notifications.messages.expiring.title(name, Number(item.payload.daysLeft ?? 0)), detail: t.notifications.messages.expiring.detail };
 }
 
-type NotificationInboxProps = { initialNotificationId?: string | null; onBack: () => void; onCountsChange?: (badgeCount: number, unreadCount: number) => void };
+type NotificationInboxProps = {
+  initialNotificationId?: string | null;
+  onBack: () => void;
+  onCountsChange?: (badgeCount: number, unreadCount: number) => void;
+  // 中文：补货提醒详情里的"去购物车"按钮；未传时按钮不显示（保持这个组件在其他挂载点可选）。
+  // EN: Powers the "Go to cart" button on a restock notification's detail sheet; omitted callers simply don't get the button.
+  onGoToRestock?: () => void;
+};
 
 // Arthur: NarIyirm
 // 中文：消息页使用完整页面层级；空状态、列表、详情和当前设备已读状态共用同一个权威快照。
 // EN: The notification centre is a full page whose empty state, list, detail view, and device-specific read state share one authoritative snapshot.
-export function NotificationInbox({ initialNotificationId, onBack, onCountsChange }: NotificationInboxProps) {
+export function NotificationInbox({ initialNotificationId, onBack, onCountsChange, onGoToRestock }: NotificationInboxProps) {
   const { language, t } = useI18n();
   const [items, setItems] = useState<KitchenNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -153,6 +160,18 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
               <Text style={styles.detailTitle}>{selectedCopy.title}</Text>
               <Text style={styles.detailBody}>{selectedCopy.detail}</Text>
               <Text style={styles.detailTime}>{selectedTime}</Text>
+              {/* 中文：补货提醒直达购物车的"建议购物"页，省得用户自己切 tab 找。 */}
+              {/* EN: A restock notification jumps straight to the cart's suggested-buys tab instead of leaving the user to switch tabs themselves. */}
+              {selected.type === 'restock' && onGoToRestock ? (
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => { setSelected(null); onGoToRestock(); }}
+                  style={({ pressed }) => [styles.goToCartButton, pressed && styles.itemPressed]}
+                >
+                  <Ionicons color="#FFFFFF" name="cart-outline" size={16} />
+                  <Text style={styles.goToCartText}>{t.notifications.detail.goToCart}</Text>
+                </Pressable>
+              ) : null}
               <Pressable accessibilityRole="button" onPress={() => setSelected(null)} style={({ pressed }) => [styles.doneButton, pressed && styles.itemPressed]}><Text style={styles.doneText}>{t.notifications.detail.close}</Text></Pressable>
             </View>
           ) : null}
@@ -192,4 +211,6 @@ const styles = StyleSheet.create({
   detailTitle: { marginTop: 18, color: '#1F4035', fontSize: 22, fontWeight: '900', lineHeight: 28 }, detailBody: { marginTop: 9, color: '#536D64', fontSize: 14, lineHeight: 21 },
   detailTime: { marginTop: 16, color: '#7A8B85', fontSize: 12 }, doneButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24, borderRadius: 15, backgroundColor: '#168ACB' },
   doneText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  goToCartButton: { flexDirection: 'row', gap: 7, minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 24, borderRadius: 15, backgroundColor: '#2e7d32' },
+  goToCartText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
 });
