@@ -89,7 +89,7 @@ const zh = {
     filterSwipeHint: '向左滑查看更多',
     categories: { all: '全部', meat: '肉蛋', vegetables: '蔬菜', fruit: '水果', staples: '主食', condiments: '调料', drinks: '饮品', other: '其他' },
     categoryHeading: '分类',
-    categoryRail: { add: '新增自定义分类', addShort: '新增', collapse: '收起分类栏', expand: '展开分类栏' },
+    categoryRail: { add: '新增自定义分类', addShort: '新增', hideEmpty: '收起零库存分类', showEmpty: '展开零库存分类' },
     customCategory: {
       title: '新增自定义分类', example: '例如：冷冻、零食、宝宝辅食', nameLabel: '分类名称', placeholder: '输入分类名称',
       aiHint: 'AI 将生成统一风格图标', creating: '正在生成分类图标…', create: '生成并保存', cancel: '取消', close: '关闭新增分类',
@@ -1156,7 +1156,7 @@ const en: Translation = {
     filterSwipeHint: 'Swipe for more',
     categories: { all: 'All', meat: 'Meat & eggs', vegetables: 'Vegetables', fruit: 'Fruit', staples: 'Staples', condiments: 'Condiments', drinks: 'Drinks', other: 'Other' },
     categoryHeading: 'Categories',
-    categoryRail: { add: 'Add custom category', addShort: 'Add', collapse: 'Collapse categories', expand: 'Expand categories' },
+    categoryRail: { add: 'Add custom category', addShort: 'Add', hideEmpty: 'Hide empty categories', showEmpty: 'Show empty categories' },
     customCategory: {
       title: 'Add custom category', example: 'For example: Frozen, Snacks, Baby food', nameLabel: 'Category name', placeholder: 'Enter a category name',
       aiHint: 'AI will create a matching icon', creating: 'Generating category icon…', create: 'Generate and save', cancel: 'Cancel', close: 'Close new category',
