@@ -7,6 +7,7 @@ import type { KitchenTimePhase } from './KitchenTimeLighting';
 
 type HomeAmbientOverlayProps = {
   blurTarget: RefObject<View | null>;
+  badgeCount: number;
   expiringCount: number;
   onOpenExpiring: () => void;
   onOpenNotifications: () => void;
@@ -25,6 +26,7 @@ const NIGHT_STARS = [
 
 export function HomeAmbientOverlay({
   blurTarget,
+  badgeCount,
   expiringCount,
   onOpenExpiring,
   onOpenNotifications,
@@ -34,7 +36,8 @@ export function HomeAmbientOverlay({
 }: HomeAmbientOverlayProps) {
   const { t } = useI18n();
   const isNight = phase === 'night';
-  const headline = expiringCount > 0 ? t.home.expiring(expiringCount) : t.home.freshnessGood;
+  const hasExpiring = expiringCount > 0;
+  const headline = hasExpiring ? t.home.expiring(expiringCount) : t.home.useFirst;
 
   return (
     <View pointerEvents="box-none" style={StyleSheet.absoluteFill}>
@@ -71,7 +74,13 @@ export function HomeAmbientOverlay({
         <Text style={[styles.periodLabel, isNight ? styles.nightPrimary : styles.dayPrimary]}>
           {t.home.period[phase]}
         </Text>
-        <Text style={[styles.freshnessHeadline, isNight ? styles.nightPrimary : styles.dayPrimary]}>
+        <Text
+          style={[
+            styles.freshnessHeadline,
+            !hasExpiring && styles.useFirstHeadline,
+            isNight ? styles.nightPrimary : styles.dayPrimary,
+          ]}
+        >
           {headline}
         </Text>
       </Pressable>
@@ -94,6 +103,11 @@ export function HomeAmbientOverlay({
         >
           <Ionicons name={unreadCount > 0 ? 'mail-unread-outline' : 'mail-outline'} size={25} color={isNight ? '#F1F4F5' : '#365048'} />
         </BlurView>
+        {badgeCount > 0 ? (
+          <View style={styles.mailBadge}>
+            <Text adjustsFontSizeToFit numberOfLines={1} style={styles.mailBadgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+          </View>
+        ) : null}
       </Pressable>
 
       {showInteractionHint ? (
@@ -113,6 +127,7 @@ const styles = StyleSheet.create({
   copyPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   periodLabel: { fontSize: 14, fontWeight: '600', lineHeight: 19 },
   freshnessHeadline: { marginTop: 7, fontSize: 23, fontWeight: '700', lineHeight: 30, letterSpacing: -0.35 },
+  useFirstHeadline: { fontSize: 28, lineHeight: 34, letterSpacing: -0.4 },
   nightPrimary: { color: '#F2D5AC' },
   dayPrimary: { color: '#633F2D' },
   nightSecondary: { color: 'rgba(218,231,242,0.72)' },
@@ -122,6 +137,8 @@ const styles = StyleSheet.create({
   mailGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1 },
   mailGlassNight: { borderColor: 'rgba(226,237,247,0.22)', backgroundColor: 'rgba(91,112,132,0.26)' },
   mailGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
+  mailBadge: { position: 'absolute', top: -5, right: -5, minWidth: 22, height: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: 11, borderWidth: 2, borderColor: '#F7FBFA', backgroundColor: '#F06B24' },
+  mailBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', lineHeight: 13 },
   interactionHint: { position: 'absolute', right: 24, bottom: '18%', left: 24, alignItems: 'center' },
   interactionHintText: { fontSize: 13, fontWeight: '600', lineHeight: 18, letterSpacing: 0.15 },
 });

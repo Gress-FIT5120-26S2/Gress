@@ -1,20 +1,33 @@
 import { StatusBar } from 'expo-status-bar';
 import { Asset } from 'expo-asset';
 import { BlurTargetView } from 'expo-blur';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
-import { getApiHealth } from './src/api';
+import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
+import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
+import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
+import { SPOONIE_MODEL_ASSET } from './src/assets/spoonieModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
-import { FridgeScreen } from './src/components/FridgeScreen';
+import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
+import { countExpiringBatches, getInventorySnapshot, type InventorySnapshot } from './src/services/inventoryApi';
 import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
-import { LanguageSettingsModal, ProfileSettingsButton } from './src/components/ProfileSettings';
+import { FirstUseJourney } from './src/components/FirstUseJourney';
+import { ProfileScreen } from './src/components/ProfileScreen';
+import { ProfileDataProvider } from './src/components/ProfileDataProvider';
+import { AchievementDataProvider } from './src/components/AchievementDataProvider';
+import { AchievementsScreen } from './src/components/AchievementsScreen';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
-import { error } from 'three';
+import { ShoppingScreen } from './src/components/shopping/ShoppingScreen';
+import { RealtimeSyncProvider, requestImmediateSyncProbe, subscribeToSync } from './src/services/realtimeSync';
+import { addSystemNotificationResponseListener, openLastSystemNotification, refreshSystemNotificationDelivery, scheduleExpiryReminders, setSystemNotificationBadge } from './src/services/systemNotifications';
+import { SpooniePetEntry } from './src/components/assistant/SpooniePetEntry';
+import { FridgeAssistantScreen } from './src/components/fridge/FridgeAssistantScreen';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -34,19 +47,9 @@ const transitionTones: Record<AppTab, string> = {
 const SCREEN_EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 // Arthur: NarIyirm
-// 中文：临期数量先使用首页视觉样例值，后续只需把 Supabase 查询结果传入同一入口。
-// EN: The home preview uses a sample freshness count for now; the Supabase query can later feed this single entry point.
-const HOME_PREVIEW_EXPIRING_COUNT = 2;
-
-// Arthur: NarIyirm
 // 中文：购物车容量与冰箱库存共用一个 0–1 数据入口；目前是样例值，之后由 Supabase 库存统计替换。
 // EN: Cart fullness and fridge stock share one 0–1 data entry; Supabase inventory totals will replace this preview value.
 const HOME_PREVIEW_INVENTORY_FILL_RATIO = 0.72;
-
-// Arthur: NarIyirm
-// 中文：未读数量同时驱动三维信箱、右上角角标和通知页；以后由 Supabase 的未读查询替换此样例值。
-// EN: One unread count drives the 3D mailbox, top-right badge, and inbox; a Supabase unread query can replace this preview value later.
-const HOME_PREVIEW_UNREAD_COUNT = 5;
 
 // Arthur: NarIyirm
 // 中文：首页先展示雨夜视觉样例，接入天气服务后只需把实时结果传给同一个 3D 场景入口。
@@ -54,9 +57,12 @@ const HOME_PREVIEW_UNREAD_COUNT = 5;
 const HOME_PREVIEW_WEATHER = 'rain' as const;
 
 type ConnectionState = 'connecting' | 'connected' | 'disconnected';
+type FirstUseJourneyState = 'checking' | 'pending' | 'complete';
+
+const FIRST_USE_JOURNEY_KEY = 'kitchmemo:first-use-journey:v1';
 
 function KitchMemoApp() {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   // Arthur: NarIyirm
@@ -67,15 +73,30 @@ function KitchMemoApp() {
   const [canMountKitchen, setCanMountKitchen] = useState(false);
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
+  const [activeApiRequests, setActiveApiRequests] = useState(0);
+  const [showApiActivity, setShowApiActivity] = useState(false);
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
+  const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
+  const [expiringCount, setExpiringCount] = useState(0);
+  const [fridgeFocusFilter, setFridgeFocusFilter] = useState<FridgeFilter | null>(null);
+  const [assistantVisible, setAssistantVisible] = useState(false);
+  const [assistantSnapshot, setAssistantSnapshot] = useState<InventorySnapshot | null>(null);
+  const [assistantBatchRequestUid, setAssistantBatchRequestUid] = useState<string | null>(null);
+  const [assistantAddRequestToken, setAssistantAddRequestToken] = useState(0);
+  const [assistantActivitySignal, setAssistantActivitySignal] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>('home');
-  const [isSettingsVisible, setIsSettingsVisible] = useState(false);
+  const [notificationReturnTab, setNotificationReturnTab] = useState<'home' | 'profile'>('home');
+  const [notificationTargetId, setNotificationTargetId] = useState<string | null>(null);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
   const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
+  const [firstUseJourneyState, setFirstUseJourneyState] = useState<FirstUseJourneyState>('checking');
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
+  const notificationNavigationReadyRef = useRef(false);
+  const pendingSystemNotificationRef = useRef<{ notificationId?: string } | null>(null);
   const chromeOpacity = useRef(new Animated.Value(1)).current;
   const screenOpacity = useRef(new Animated.Value(1)).current;
   const screenScale = useRef(new Animated.Value(1)).current;
@@ -87,6 +108,21 @@ function KitchMemoApp() {
   const kitchenLighting = useKitchenTimeLighting();
   const screen = t.screens[activeTab];
   const status = t.status[connectionState];
+  const isFirstUseJourneyVisible = !isOpening && firstUseJourneyState === 'pending';
+
+  useEffect(() => subscribeToApiActivity(setActiveApiRequests), []);
+
+  useEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：短于 220ms 的请求不闪烁全局提示，较慢请求则持续显示到所有并发请求完成。
+    // EN: Requests under 220ms avoid flashing global feedback, while slower work stays visible until every concurrent request completes.
+    if (activeApiRequests === 0) {
+      setShowApiActivity(false);
+      return;
+    }
+    const timer = setTimeout(() => setShowApiActivity(true), 220);
+    return () => clearTimeout(timer);
+  }, [activeApiRequests]);
 
   useEffect(() => {
     let mounted = true;
@@ -104,10 +140,27 @@ function KitchMemoApp() {
   }, []);
 
   useEffect(() => {
+    let mounted = true;
+    // Arthur: NarIyirm
+    // 中文：首次使用标记与设备本地存储绑定；启动动画结束后才根据读取结果显示引导。
+    // EN: The first-use flag is device-local; its result gates the journey only after the opening animation finishes.
+    AsyncStorage.getItem(FIRST_USE_JOURNEY_KEY)
+      .then((value) => {
+        if (mounted) setFirstUseJourneyState(value === 'complete' ? 'complete' : 'pending');
+      })
+      .catch(() => {
+        if (mounted) setFirstUseJourneyState('pending');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  useEffect(() => {
     // Arthur: NarIyirm
     // 中文：开场动画播放时先把 GLB 放入本地缓存，稍后创建 Canvas 时可直接进入解析阶段。
     // EN: Cache the GLB while the opener plays so Canvas can proceed directly to parsing when it mounts.
-    void Asset.loadAsync(KITCHEN_MODEL_ASSET).catch(() => undefined);
+    void Asset.loadAsync([KITCHEN_MODEL_ASSET, SPOONIE_MODEL_ASSET]).catch(() => undefined);
   }, []);
 
   useEffect(() => {
@@ -118,6 +171,66 @@ function KitchMemoApp() {
       .then(() => setConnectionState('connected'))
       .catch(() => setConnectionState('disconnected'));
   }, []);
+
+  useEffect(() => {
+    if (activeTab !== 'home') return;
+    // Arthur: NarIyirm
+    // 中文：根节点只在首页刷新角标；通知页挂载时会自行读取同一快照并回传计数，避免重复请求。
+    // EN: The root refreshes badges only on Home; the mounted inbox reads the same snapshot and reports counts back, avoiding duplicate requests.
+    fetchNotifications()
+      .then((snapshot) => {
+        setUnreadNotificationCount(snapshot.unreadCount);
+        setNotificationBadgeCount(snapshot.badgeCount);
+        void setSystemNotificationBadge(snapshot.badgeCount).catch(() => undefined);
+        void fetchNotificationPreferences()
+          .then((preferences) => refreshSystemNotificationDelivery(preferences, language))
+          .catch(() => undefined);
+      })
+      .catch(() => undefined);
+  }, [activeTab, language]);
+
+  useEffect(() => subscribeToSync(['notifications', 'home'], () => {
+    if (activeTab !== 'home') return;
+    void fetchNotifications()
+      .then((snapshot) => {
+        setUnreadNotificationCount(snapshot.unreadCount);
+        setNotificationBadgeCount(snapshot.badgeCount);
+        void setSystemNotificationBadge(snapshot.badgeCount).catch(() => undefined);
+      })
+      .catch(() => undefined);
+  }), [activeTab]);
+
+  useEffect(() => {
+    let mounted = true;
+    // Arthur: NarIyirm
+    // 中文：首页计数和系统临期提醒共用同一库存快照，避免两个入口对“快过期”产生不同判断。
+    // EN: The home count and native expiry reminders share one inventory snapshot so both entry points use the same expiring rule.
+    getInventorySnapshot()
+      .then((snapshot) => {
+        if (!mounted) return;
+        setAssistantSnapshot(snapshot);
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+        void fetchNotificationPreferences()
+          .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
+          .catch(() => undefined);
+      })
+      .catch(() => undefined);
+    return () => {
+      mounted = false;
+    };
+  }, [activeTab, language]);
+
+  useEffect(() => subscribeToSync(['inventory', 'home'], () => {
+    void getInventorySnapshot()
+      .then((snapshot) => {
+        setAssistantSnapshot(snapshot);
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+        void fetchNotificationPreferences()
+          .then((preferences) => scheduleExpiryReminders(snapshot.batches, preferences, language))
+          .catch(() => undefined);
+      })
+      .catch(() => undefined);
+  }), [language]);
 
   useEffect(() => {
     let mounted = true;
@@ -167,8 +280,11 @@ function KitchMemoApp() {
     }).start();
   }, [chromeOpacity, dismissHomeInteractionHint, reduceMotion]);
 
-  const handleCinematicNavigate = useCallback((targetTab: AppTab) => {
+  const handleCinematicNavigate = useCallback((targetTab: AppTab, fridgeFilter: FridgeFilter | null = null) => {
     if (transitionInProgressRef.current || targetTab === activeTab) return;
+    // 中文：只有首页临期文案会带上 expiring；3D 冰箱热点仍打开未筛选的冰箱页。
+    // EN: Only the home expiring headline passes expiring; the 3D fridge hotspot still opens an unfiltered fridge.
+    if (targetTab === 'fridge') setFridgeFocusFilter(fridgeFilter);
     transitionInProgressRef.current = true;
     setIsCinematicActive(true);
     setIsTransitionOverlayVisible(true);
@@ -237,61 +353,213 @@ function KitchMemoApp() {
 
   const openExpiringFridge = useCallback(() => {
     dismissHomeInteractionHint();
-    handleCinematicNavigate('fridge');
+    handleCinematicNavigate('fridge', 'expiring');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
   const openNotifications = useCallback(() => {
     dismissHomeInteractionHint();
+    setNotificationReturnTab('home');
+    setNotificationTargetId(null);
     handleCinematicNavigate('notifications');
   }, [dismissHomeInteractionHint, handleCinematicNavigate]);
 
+  // Arthur: NarIyirm
+  // 中文：通知页的加载 effect 依赖这个回调；保持引用稳定可避免每次计数更新都重新触发列表请求。
+  // EN: The inbox loading effect depends on this callback; a stable reference prevents count updates from retriggering list requests.
+  const handleNotificationCountsChange = useCallback((badgeCount: number, unreadCount: number) => {
+    setNotificationBadgeCount(badgeCount);
+    setUnreadNotificationCount(unreadCount);
+    void setSystemNotificationBadge(badgeCount).catch(() => undefined);
+  }, []);
+
+  const openSystemNotification = useCallback((notificationId?: string) => {
+    setNotificationReturnTab('home');
+    setNotificationTargetId(notificationId ?? null);
+    setActiveTab('notifications');
+  }, []);
+
+  const queueOrOpenSystemNotification = useCallback((notificationId?: string) => {
+    if (!notificationNavigationReadyRef.current) {
+      pendingSystemNotificationRef.current = { notificationId };
+      return;
+    }
+    openSystemNotification(notificationId);
+  }, [openSystemNotification]);
+
+  useEffect(() => {
+    const subscription = addSystemNotificationResponseListener(queueOrOpenSystemNotification);
+    void openLastSystemNotification(queueOrOpenSystemNotification);
+    return () => subscription.remove();
+  }, [queueOrOpenSystemNotification]);
+
+  useEffect(() => {
+    const navigationReady = !isOpening && firstUseJourneyState === 'complete';
+    notificationNavigationReadyRef.current = navigationReady;
+    if (!navigationReady || !pendingSystemNotificationRef.current) return;
+
+    // Arthur: NarIyirm
+    // 中文：冷启动通知会先排队，等待开场动画和首次引导全部结束后才打开通知详情，避免弹窗覆盖加载过程。
+    // EN: Cold-start notification navigation waits until the opener and first-use journey finish so its detail cannot cover app loading.
+    const pending = pendingSystemNotificationRef.current;
+    pendingSystemNotificationRef.current = null;
+    openSystemNotification(pending.notificationId);
+  }, [firstUseJourneyState, isOpening, openSystemNotification]);
+
+  const completeFirstUseJourney = useCallback(() => {
+    setFirstUseJourneyState('complete');
+    void AsyncStorage.setItem(FIRST_USE_JOURNEY_KEY, 'complete').catch(() => undefined);
+  }, []);
+
+  const refreshAssistantSnapshot = useCallback(() => {
+    return getInventorySnapshot()
+      .then((snapshot) => {
+        setAssistantSnapshot(snapshot);
+        setExpiringCount(countExpiringBatches(snapshot.batches));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  // Arthur: NarIyirm
+  // 中文：冰箱固定按钮和其他主页面的边缘勺勺共用唯一助手实例，因此切换入口不会复制或丢失会话状态。
+  // EN: The fixed fridge button and edge-docked Spoonie share one assistant instance, so changing entry points never duplicates or drops conversation state.
+  const openAssistant = useCallback(() => {
+    setAssistantVisible(true);
+    void refreshAssistantSnapshot();
+  }, [refreshAssistantSnapshot]);
+
+  const closeAssistant = useCallback(() => setAssistantVisible(false), []);
+  const clearAssistantBatchRequest = useCallback(() => setAssistantBatchRequestUid(null), []);
+
+  const handleAssistantDataChanged = useCallback(() => {
+    requestImmediateSyncProbe();
+    void refreshAssistantSnapshot();
+  }, [refreshAssistantSnapshot]);
+
+  const handleAssistantOpenItem = useCallback((batchUid: string) => {
+    setAssistantVisible(false);
+    setAssistantBatchRequestUid(batchUid);
+    setFridgeFocusFilter(null);
+    setActiveTab('fridge');
+  }, []);
+
+  const handleAssistantAddItem = useCallback(() => {
+    setAssistantVisible(false);
+    setAssistantAddRequestToken((current) => current + 1);
+    setFridgeFocusFilter(null);
+    setActiveTab('fridge');
+  }, []);
+
+  // Arthur: NarIyirm
+  // 中文：根视图把任意触摸转换成轻量计数信号，边缘助手据此取消表演并重新开始无操作计时。
+  // EN: The root view turns any touch into a lightweight counter signal so the edge assistant cancels its performance and restarts the inactivity timer.
+  const markAssistantPageActivity = useCallback(() => {
+    setAssistantActivitySignal((current) => current + 1);
+  }, []);
+
   return (
-    <View style={styles.container}>
+    <View onTouchStart={markAssistantPageActivity} style={styles.container}>
       {/* Arthur: NarIyirm
           中文：内容层是导航栏的模糊目标；导航栏在它之后渲染才能获得真实毛玻璃效果。
           EN: This content layer is the blur target; it renders before the bar for a real glass effect. */}
       <BlurTargetView ref={blurTargetRef} style={styles.content}>
         <Animated.View
-          style={[
-            styles.screenStage,
-            activeTab === 'home' ? styles.homeContent : activeTab === 'fridge' ? styles.fridgeContent : styles.standardContent,
-            { opacity: screenOpacity, transform: [{ scale: screenScale }] },
-          ]}
+          style={[styles.screenStage, { opacity: screenOpacity, transform: [{ scale: screenScale }] }]}
         >
-          {activeTab === 'home' && canMountKitchen ? (
-            <Suspense fallback={<KitchenLoading />}>
-              <Kitchen3DPrototype
-                expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
-                inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
-                lighting={kitchenLighting}
-                onExplore={dismissHomeInteractionHint}
-                onInteractionStart={beginCinematicFocus}
-                onNavigate={handleCinematicNavigate}
-                onReady={markKitchenReady}
-                unreadNotificationCount={HOME_PREVIEW_UNREAD_COUNT}
-                weather={HOME_PREVIEW_WEATHER}
-              />
-            </Suspense>
-          ) : activeTab === 'home' && !isOpening ? (
-            <KitchenLoading />
-          ) : activeTab === 'fridge' ? (
-            <FridgeScreen />
-          ) : activeTab !== 'home' ? (
-            <>
-              <View style={styles.glow} />
-              <Text style={styles.greeting}>KITCHMEMO</Text>
-              <View style={styles.screenCopy}>
-                <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
-                <Text style={styles.title}>{screen.title}</Text>
-                <Text style={styles.description}>{screen.description}</Text>
-                {activeTab === 'notifications' ? <NotificationInbox unreadCount={HOME_PREVIEW_UNREAD_COUNT} /> : null}
-                <Text style={styles.connection}>{status}</Text>
-              </View>
-            </>
+          {/* Arthur: NarIyirm
+              中文：首页 GL Canvas 在首次创建后保持挂载；切走时只暂停并隐藏，返回时复用已经绘制的纹理和 GL 上下文，消除重新建场景产生的白帧。
+              EN: Keep the Home GL canvas mounted after its first creation; hide and pause it off-tab so returning reuses the rendered texture and GL context without a reconstruction flash. */}
+          <View
+            pointerEvents={activeTab === 'home' ? 'auto' : 'none'}
+            style={[
+              styles.homeSceneLayer,
+              { backgroundColor: kitchenLighting.background },
+              activeTab !== 'home' && styles.homeSceneLayerHidden,
+            ]}
+          >
+            {canMountKitchen ? (
+              <Suspense fallback={<KitchenLoading />}>
+                <Kitchen3DPrototype
+                  active={activeTab === 'home'}
+                  batches={assistantSnapshot?.batches ?? []}
+                  expiringCount={expiringCount}
+                  inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
+                  lighting={kitchenLighting}
+                  onExplore={dismissHomeInteractionHint}
+                  onInteractionStart={beginCinematicFocus}
+                  onNavigate={handleCinematicNavigate}
+                  onOpenAssistant={openAssistant}
+                  onReady={markKitchenReady}
+                  unreadNotificationCount={unreadNotificationCount}
+                  weather={HOME_PREVIEW_WEATHER}
+                />
+              </Suspense>
+            ) : !isOpening ? <KitchenLoading /> : null}
+          </View>
+
+          {activeTab !== 'home' ? (
+            <View
+              style={[
+                styles.activeScreen,
+                activeTab === 'fridge'
+                  ? styles.fridgeContent
+                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements'
+                    ? styles.profileContent
+                    : styles.standardContent,
+                { backgroundColor: transitionTones[activeTab] },
+              ]}
+            >
+              {activeTab === 'fridge' ? (
+                <FridgeScreen
+                  assistantAddRequestToken={assistantAddRequestToken}
+                  assistantBatchRequestUid={assistantBatchRequestUid}
+                  blurTarget={blurTargetRef}
+                  initialFilter={fridgeFocusFilter}
+                  key={fridgeFocusFilter ?? 'unfiltered'}
+                  onAssistantBatchRequestHandled={clearAssistantBatchRequest}
+                  onOpenAssistant={openAssistant}
+                />
+              ) : activeTab === 'shopping' ? (
+                <ShoppingScreen />
+              ) : activeTab === 'notifications' ? (
+                <NotificationInbox
+                  initialNotificationId={notificationTargetId}
+                  onBack={() => setActiveTab(notificationReturnTab)}
+                  onCountsChange={handleNotificationCountsChange}
+                  onGoToRestock={() => setActiveTab('shopping')}
+                />
+              ) : activeTab === 'profile' ? (
+                <ProfileScreen
+                  onOpenNotifications={() => {
+                    setNotificationReturnTab('profile');
+                    setNotificationTargetId(null);
+                    setActiveTab('notifications');
+                  }}
+                  onReplayOnboarding={() => {
+                    // Arthur: NarIyirm
+                    // 中文：个人页重播只切换当前会话的引导状态，不清除首次完成标记或任何业务数据。
+                    // EN: Profile replay changes only the current session's journey state without clearing completion or business data.
+                    setFirstUseJourneyState('pending');
+                  }}
+                />
+              ) : activeTab === 'achievements' ? (
+                <AchievementsScreen />
+              ) : (
+                <>
+                  <View style={styles.glow} />
+                  <Text style={styles.greeting}>KITCHMEMO</Text>
+                  <View style={styles.screenCopy}>
+                    <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
+                    <Text style={styles.title}>{screen.title}</Text>
+                    <Text style={styles.description}>{screen.description}</Text>
+                    <Text style={styles.connection}>{status}</Text>
+                  </View>
+                </>
+              )}
+            </View>
           ) : null}
         </Animated.View>
       </BlurTargetView>
-      {!isOpening && (
+      {!isOpening && firstUseJourneyState === 'complete' && (
         <Animated.View
           pointerEvents={isCinematicActive ? 'none' : 'box-none'}
           style={[styles.chromeLayer, { opacity: chromeOpacity }]}
@@ -299,18 +567,32 @@ function KitchMemoApp() {
           {activeTab === 'home' ? (
             <HomeAmbientOverlay
               blurTarget={blurTargetRef}
-              expiringCount={HOME_PREVIEW_EXPIRING_COUNT}
+              badgeCount={notificationBadgeCount}
+              expiringCount={expiringCount}
               onOpenExpiring={openExpiringFridge}
               onOpenNotifications={openNotifications}
               phase={kitchenLighting.phase}
               showInteractionHint={showHomeInteractionHint}
-              unreadCount={HOME_PREVIEW_UNREAD_COUNT}
+              unreadCount={unreadNotificationCount}
             />
           ) : null}
-          {activeTab === 'profile' ? (
-            <ProfileSettingsButton blurTarget={blurTargetRef} onPress={() => setIsSettingsVisible(true)} />
-          ) : null}
-          <FloatingTabBar activeTab={activeTab} onChange={setActiveTab} blurTarget={blurTargetRef} />
+          <SpooniePetEntry
+            activitySignal={assistantActivitySignal}
+            onOpen={openAssistant}
+            visible={!assistantVisible && (activeTab === 'shopping' || activeTab === 'achievements' || activeTab === 'profile')}
+          />
+          <FloatingTabBar
+            activeTab={activeTab}
+            // Arthur: NarIyirm
+            // 中文：主页底部安全区与按时间插值的 3D 天空共用颜色，其他页面仍使用稳定的浅色导航底座。
+            // EN: Home shares the time-interpolated 3D sky colour with the bottom safe area while other screens keep a stable light navigation base.
+            bottomMaskColor={activeTab === 'home' ? kitchenLighting.background : '#F7FBFA'}
+            onChange={(tab) => {
+              if (tab === 'fridge') setFridgeFocusFilter(null);
+              setActiveTab(tab);
+            }}
+            blurTarget={blurTargetRef}
+          />
         </Animated.View>
       )}
       {isTransitionOverlayVisible ? (
@@ -319,7 +601,22 @@ function KitchMemoApp() {
           style={[styles.transitionOverlay, { backgroundColor: transitionTone, opacity: transitionOverlayOpacity }]}
         />
       ) : null}
-      <StatusBar style={activeTab === 'home' && kitchenLighting.phase === 'night' ? 'light' : 'dark'} />
+      {showApiActivity && !isOpening ? (
+        <View accessibilityLabel={t.status.connecting} accessibilityLiveRegion="polite" pointerEvents="none" style={styles.apiActivity}>
+          <ActivityIndicator color="#168ACB" size="small" />
+          <Text style={styles.apiActivityText}>{t.status.connecting}</Text>
+        </View>
+      ) : null}
+      <FridgeAssistantScreen
+        batches={assistantSnapshot?.batches ?? []}
+        fridgeUid={assistantSnapshot?.fridge.uid ?? null}
+        onAddItem={handleAssistantAddItem}
+        onClose={closeAssistant}
+        onDataChanged={handleAssistantDataChanged}
+        onOpenItem={handleAssistantOpenItem}
+        visible={assistantVisible}
+      />
+      <StatusBar style={!isFirstUseJourneyVisible && ((activeTab === 'home' && kitchenLighting.phase === 'night') || activeTab === 'achievements') ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
           canReveal={canRevealKitchen}
@@ -327,16 +624,27 @@ function KitchMemoApp() {
           onFinish={finishOpening}
         />
       )}
-      <LanguageSettingsModal onClose={() => setIsSettingsVisible(false)} visible={isSettingsVisible} />
+      <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
     </View>
   );
 }
 
 export default function App() {
+  // Arthur: NarIyirm
+  // 中文：首帧注入原生窗口安全区，避免首次打开全屏 Modal 时顶部 inset 暂时为 0。
+  // EN: Seed the provider with native window metrics so a full-screen Modal never receives a zero top inset on its first frame.
   return (
-    <I18nProvider>
-      <KitchMemoApp />
-    </I18nProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
+      <RealtimeSyncProvider>
+        <AchievementDataProvider>
+          <I18nProvider>
+            <ProfileDataProvider>
+              <KitchMemoApp />
+            </ProfileDataProvider>
+          </I18nProvider>
+        </AchievementDataProvider>
+      </RealtimeSyncProvider>
+    </SafeAreaProvider>
   );
 }
 
@@ -352,14 +660,20 @@ function KitchenLoading() {
 }
 
 const styles = StyleSheet.create({
+  root: { flex: 1 },
   container: { flex: 1, backgroundColor: '#F5F4EE' },
   content: { flex: 1, overflow: 'hidden' },
   screenStage: { flex: 1, overflow: 'hidden' },
-  homeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  homeSceneLayer: { ...StyleSheet.absoluteFill },
+  homeSceneLayerHidden: { opacity: 0 },
+  activeScreen: { flex: 1 },
   fridgeContent: { paddingHorizontal: 0, paddingTop: 0 },
+  profileContent: { paddingHorizontal: 0, paddingTop: 0 },
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
   chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
   transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
+  apiActivity: { position: 'absolute', top: 54, alignSelf: 'center', zIndex: 30, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#F7FBFA', boxShadow: '0 3px 8px rgba(23, 61, 49, 0.16)' },
+  apiActivityText: { color: '#315F54', fontSize: 12, fontWeight: '700' },
   glow: { position: 'absolute', top: -120, right: -70, width: 310, height: 310, borderRadius: 180, backgroundColor: '#F6CC83', opacity: 0.5 },
   glowCool: { backgroundColor: '#9FD7D7' },
   greeting: { color: '#6C786F', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },

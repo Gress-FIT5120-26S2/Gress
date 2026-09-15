@@ -20,22 +20,27 @@ import {
 import type { OrbitControls as OrbitControlsImpl } from 'three-stdlib';
 import { KITCHEN_MODEL_ASSET } from '../assets/kitchenModel';
 import { useI18n } from '../i18n';
+import type { InventoryBatch } from '../services/inventoryApi';
 import type { AppTab } from './FloatingTabBar';
 import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
 import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
 import { KitchenShoppingCart, SHOPPING_CART_POSITION } from './KitchenShoppingCart';
+import { SpoonieWorldCharacter } from './SpoonieWorldCharacter';
 import {
   KitchenTimeEnvironment,
   type KitchenLightingState,
 } from './KitchenTimeLighting';
 
 type Kitchen3DPrototypeProps = {
+  active?: boolean;
+  batches?: InventoryBatch[];
   expiringCount?: number;
   inventoryFillRatio?: number;
   lighting: KitchenLightingState;
   onExplore?: () => void;
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
+  onOpenAssistant: () => void;
   onReady?: () => void;
   unreadNotificationCount?: number;
   weather?: KitchenWeather;
@@ -76,7 +81,10 @@ type CameraMotion = {
   thetaDelta: number;
 };
 type KitchenSceneProps = {
+  active: boolean;
   activeInteraction: KitchenInteraction;
+  activitySignal: number;
+  batches: InventoryBatch[];
   cameraResetRequest: number;
   effectInteraction: KitchenInteraction;
   expiringCount: number;
@@ -90,13 +98,16 @@ type KitchenSceneProps = {
   onCameraResetComplete: () => void;
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
+  onOpenAssistant: () => void;
   onReady?: () => void;
   onSelectFeature: (feature: KitchenFeature) => void;
+  onSpeechChange: (message: string | null) => void;
   pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
   isResettingCamera: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
+  language: 'en' | 'zh';
 };
 
 const CAMERA_TARGET: [number, number, number] = [0, 1.3, 0];
@@ -168,14 +179,19 @@ function PulseMarker({ hasStatus = false, position, reduceMotion, selected = fal
 
     const breathing = reduceMotion ? 1 : 0.92 + ((Math.sin(clock.elapsedTime * 2.1) + 1) / 2) * 0.14;
     const blinking = reduceMotion ? 1 : 0.38 + ((Math.sin(clock.elapsedTime * 5.4) + 1) / 2) * 0.62;
+    const alertCycle = clock.elapsedTime % 2.8;
+    const alertJump = !reduceMotion && hasStatus && alertCycle < 0.58
+      ? Math.sin((alertCycle / 0.58) * Math.PI) * 0.13
+      : 0;
     const targetScale = selected ? 0.04 : breathing;
     const nextScale = MathUtils.damp(marker.scale.x, targetScale, selected ? 18 : 8, Math.min(delta, 0.05));
     marker.scale.setScalar(nextScale);
+    marker.position.y = alertJump;
 
     if (whiteMaterialRef.current) whiteMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : 0.9;
     if (alertMaterialRef.current) alertMaterialRef.current.opacity = selected ? Math.max(0, nextScale - 0.04) : blinking;
-    if (lightRef.current) lightRef.current.intensity = selected ? 0 : hasStatus ? 0.5 * blinking : 0.34 * breathing;
-    if (Math.abs(nextScale - targetScale) > 0.01) invalidate();
+    if (lightRef.current) lightRef.current.intensity = selected ? 0 : hasStatus ? (0.58 + alertJump * 2.4) * blinking : 0.34 * breathing;
+    if ((!reduceMotion && hasStatus) || Math.abs(nextScale - targetScale) > 0.01) invalidate();
   });
 
   return (
@@ -190,8 +206,8 @@ function PulseMarker({ hasStatus = false, position, reduceMotion, selected = fal
               <capsuleGeometry args={[0.045, 0.12, 6, 14]} />
               <meshBasicMaterial ref={alertMaterialRef} color="#FFC24F" transparent opacity={1} depthTest={false} toneMapped={false} />
             </mesh>
-            <mesh position={[0, -0.075, 0]} renderOrder={20}>
-              <cylinderGeometry args={[0.032, 0.042, 0.045, 14]} />
+            <mesh position={[0, -0.085, 0]} renderOrder={20}>
+              <sphereGeometry args={[0.038, 14, 14]} />
               <meshBasicMaterial color="#A86822" depthTest={false} toneMapped={false} />
             </mesh>
           </>
@@ -298,6 +314,7 @@ function KitchenModel({
   onSelectFeature,
   pressedFeature,
   reduceMotion,
+  sceneVisible,
   unreadNotificationCount,
   weather,
 }: {
@@ -312,6 +329,7 @@ function KitchenModel({
   onSelectFeature: (feature: KitchenFeature) => void;
   pressedFeature: KitchenFeature | null;
   reduceMotion: boolean;
+  sceneVisible: boolean;
   unreadNotificationCount: number;
   weather: KitchenWeather;
 }) {
@@ -346,7 +364,7 @@ function KitchenModel({
   }, [invalidate, scene]);
 
   useEffect(() => {
-    if (reduceMotion) {
+    if (reduceMotion || !sceneVisible) {
       invalidate();
       return;
     }
@@ -356,7 +374,7 @@ function KitchenModel({
     // EN: One low-frequency invalidation loop drives rain, steam, flame, and pulse cues instead of giving every detail its own render loop.
     const interval = setInterval(invalidate, 90);
     return () => clearInterval(interval);
-  }, [invalidate, reduceMotion]);
+  }, [invalidate, reduceMotion, sceneVisible]);
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
@@ -492,6 +510,7 @@ function KitchenCameraControls({
   onExplore,
   onFocusComplete,
   reduceMotion,
+  sceneActive,
 }: {
   activeInteraction: KitchenInteraction;
   cameraResetRequest: number;
@@ -503,6 +522,7 @@ function KitchenCameraControls({
   onExplore?: () => void;
   onFocusComplete: (feature: KitchenNavigationFeature) => void;
   reduceMotion: boolean;
+  sceneActive: boolean;
 }) {
   const { scene } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
   const controlsRef = useRef<OrbitControlsImpl>(null);
@@ -511,6 +531,13 @@ function KitchenCameraControls({
   const invalidate = useThree((state) => state.invalidate);
   const canvasWidth = useThree((state) => state.size.width);
   const canvasHeight = useThree((state) => state.size.height);
+  // Arthur: NarIyirm
+  // 中文：焦点完成回调经 ref 读取，避免父组件因切 tab 换引用时重跑镜头 effect、再次导航到冰箱。
+  // EN: Read focus callbacks via refs so parent tab-switch identity changes do not restart the camera effect and re-navigate to fridge.
+  const onEffectCueRef = useRef(onEffectCue);
+  const onFocusCompleteRef = useRef(onFocusComplete);
+  onEffectCueRef.current = onEffectCue;
+  onFocusCompleteRef.current = onFocusComplete;
 
   useLayoutEffect(() => {
     // Arthur: NarIyirm
@@ -525,6 +552,21 @@ function KitchenCameraControls({
     invalidate();
   }, [camera, canvasHeight, canvasWidth, invalidate]);
 
+  useLayoutEffect(() => {
+    if (sceneActive) return;
+
+    // Arthur: NarIyirm
+    // 中文：切离首页时立刻复位镜头；隐藏态下 demand 帧循环可能不跑完动画复位。
+    // EN: Snap the camera as soon as home deactivates; a paused demand loop may never finish an animated reset.
+    cameraMotionRef.current = null;
+    camera.position.set(...INITIAL_CAMERA_POSITION);
+    camera.up.set(0, 1, 0);
+    controlsRef.current?.target.set(...CAMERA_TARGET);
+    controlsRef.current?.update();
+    camera.lookAt(...CAMERA_TARGET);
+    camera.updateMatrixWorld();
+  }, [camera, sceneActive]);
+
   useEffect(() => {
     if (!activeInteraction) {
       cameraMotionRef.current = null;
@@ -532,16 +574,16 @@ function KitchenCameraControls({
     }
 
     if (reduceMotion) {
-      onEffectCue(activeInteraction);
-      const timer = setTimeout(() => onFocusComplete(activeInteraction), REDUCED_MOTION_DELAY);
+      onEffectCueRef.current(activeInteraction);
+      const timer = setTimeout(() => onFocusCompleteRef.current(activeInteraction), REDUCED_MOTION_DELAY);
       return () => clearTimeout(timer);
     }
 
     const focus = CAMERA_FOCUS[activeInteraction];
     const anchor = focus.anchorName ? scene.getObjectByName(focus.anchorName) : undefined;
     if (!anchor && !focus.worldPosition) {
-      onEffectCue(activeInteraction);
-      onFocusComplete(activeInteraction);
+      onEffectCueRef.current(activeInteraction);
+      onFocusCompleteRef.current(activeInteraction);
       return;
     }
 
@@ -575,7 +617,7 @@ function KitchenCameraControls({
       thetaDelta,
     };
     invalidate();
-  }, [activeInteraction, camera, invalidate, onEffectCue, onFocusComplete, reduceMotion, scene]);
+  }, [activeInteraction, camera, invalidate, reduceMotion, scene]);
 
   useEffect(() => {
     if (cameraResetRequest === 0 || activeInteraction) return;
@@ -620,7 +662,7 @@ function KitchenCameraControls({
 
     if (motion.feature && !motion.hasCuedEffect && progress >= EFFECT_CUE_PROGRESS) {
       motion.hasCuedEffect = true;
-      onEffectCue(motion.feature);
+      onEffectCueRef.current(motion.feature);
     }
 
     motion.currentTarget.lerpVectors(motion.startTarget, motion.endTarget, moveProgress);
@@ -640,9 +682,9 @@ function KitchenCameraControls({
       return;
     }
 
-    if (motion.feature && !motion.hasCuedEffect) onEffectCue(motion.feature);
+    if (motion.feature && !motion.hasCuedEffect) onEffectCueRef.current(motion.feature);
     cameraMotionRef.current = null;
-    if (motion.feature) onFocusComplete(motion.feature);
+    if (motion.feature) onFocusCompleteRef.current(motion.feature);
     else {
       controlsRef.current?.update();
       onCameraResetComplete();
@@ -674,7 +716,7 @@ function KitchenCameraControls({
   );
 }
 
-function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isResettingCamera, isStoveLit, lighting, onCameraActivity, onCameraChanged, onCameraResetComplete, onEffectCue, onExplore, onFocusComplete, onReady, onSelectFeature, pressedFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
+function KitchenScene({ active, activeInteraction, activitySignal, batches, cameraResetRequest, effectInteraction, expiringCount, inventoryFillRatio, isRecipeBookOpen, isResettingCamera, isStoveLit, language, lighting, onCameraActivity, onCameraChanged, onCameraResetComplete, onEffectCue, onExplore, onFocusComplete, onOpenAssistant, onReady, onSelectFeature, onSpeechChange, pressedFeature, reduceMotion, unreadNotificationCount, weather }: KitchenSceneProps) {
   return (
     <>
       <KitchenTimeEnvironment lighting={lighting} weather={weather} />
@@ -692,6 +734,7 @@ function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction
           onSelectFeature={onSelectFeature}
           pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
+          sceneVisible={active}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
@@ -706,14 +749,24 @@ function KitchenScene({ activeInteraction, cameraResetRequest, effectInteraction
           onExplore={onExplore}
           onFocusComplete={onFocusComplete}
           reduceMotion={reduceMotion}
+          sceneActive={active}
+        />
+        <SpoonieWorldCharacter
+          activitySignal={activitySignal}
+          batches={batches}
+          language={language}
+          onOpenAssistant={onOpenAssistant}
+          onSpeechChange={onSpeechChange}
+          reduceMotion={reduceMotion}
+          sceneBusy={!active || activeInteraction !== null || isResettingCamera}
         />
       </Suspense>
     </>
   );
 }
 
-export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
-  const { t } = useI18n();
+export function Kitchen3DPrototype({ active = true, batches = [], expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onOpenAssistant, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
+  const { language, t } = useI18n();
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
   const [effectInteraction, setEffectInteraction] = useState<KitchenInteraction>(null);
@@ -724,6 +777,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   const [isResettingCamera, setIsResettingCamera] = useState(false);
   const [isStoveLit, setIsStoveLit] = useState(false);
   const [pressedFeature, setPressedFeature] = useState<KitchenFeature | null>(null);
+  const [spoonieSpeech, setSpoonieSpeech] = useState<string | null>(null);
   const [reduceMotion, setReduceMotion] = useState(false);
   const interactionRef = useRef<KitchenInteraction>(null);
   const markerFeedbackTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -741,6 +795,22 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
   useEffect(() => () => {
     if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
   }, []);
+
+  useEffect(() => {
+    if (active) return;
+
+    // Arthur: NarIyirm
+    // 中文：首页 Canvas 切走后仍挂载；必须清掉冰箱等焦点锁，否则父层切 tab 时旧交互会再次触发导航。
+    // EN: The home Canvas stays mounted off-tab; clear fridge focus locks so stale interactions cannot re-fire navigation on later tab changes.
+    if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
+    interactionRef.current = null;
+    setActiveInteraction(null);
+    setEffectInteraction(null);
+    setPressedFeature(null);
+    setIsRecipeBookOpen(false);
+    setIsCameraModified(false);
+    setIsResettingCamera(false);
+  }, [active]);
 
   const registerCameraActivity = useCallback(() => {
     setCameraActivityVersion((version) => version + 1);
@@ -807,6 +877,12 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
 
   const handleFocusComplete = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current !== feature) return;
+    // Arthur: NarIyirm
+    // 中文：导航发出后立刻释放交互锁，避免 keep-alive 场景在切页后重复完成焦点并跳回冰箱。
+    // EN: Release the interaction lock as soon as navigation fires so a kept-alive scene cannot complete focus again and bounce back to fridge.
+    interactionRef.current = null;
+    setActiveInteraction(null);
+    setPressedFeature(null);
     onNavigate(feature === 'fridge' ? 'fridge' : feature === 'shopping' ? 'shopping' : 'notifications');
   }, [onNavigate]);
 
@@ -821,7 +897,10 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
         gl={{ antialias: false, alpha: false }}
       >
         <KitchenScene
+          active={active}
           activeInteraction={activeInteraction}
+          activitySignal={cameraActivityVersion}
+          batches={batches}
           cameraResetRequest={cameraResetRequest}
           effectInteraction={effectInteraction}
           expiringCount={expiringCount}
@@ -829,6 +908,7 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
           isRecipeBookOpen={isRecipeBookOpen}
           isResettingCamera={isResettingCamera}
           isStoveLit={isStoveLit}
+          language={language}
           lighting={lighting}
           onCameraActivity={registerCameraActivity}
           onCameraChanged={handleCameraChanged}
@@ -836,14 +916,33 @@ export function Kitchen3DPrototype({ expiringCount = 0, inventoryFillRatio = 0, 
           onEffectCue={handleEffectCue}
           onExplore={onExplore}
           onFocusComplete={handleFocusComplete}
+          onOpenAssistant={onOpenAssistant}
           onReady={onReady}
           onSelectFeature={handleSelectFeature}
+          onSpeechChange={setSpoonieSpeech}
           pressedFeature={pressedFeature}
           reduceMotion={reduceMotion}
           unreadNotificationCount={unreadNotificationCount}
           weather={weather}
         />
       </Canvas>
+      {spoonieSpeech && !activeInteraction ? (
+        <Pressable
+          accessibilityLabel={`${t.fridge.assistant.assistantName}: ${spoonieSpeech}`}
+          accessibilityRole="button"
+          onPress={onOpenAssistant}
+          style={({ pressed }) => [
+            styles.spoonieSpeech,
+            lighting.phase === 'night' ? styles.spoonieSpeechNight : styles.spoonieSpeechDay,
+            pressed && styles.spoonieSpeechPressed,
+          ]}
+        >
+          <Text style={[styles.spoonieSpeechName, lighting.phase === 'night' && styles.spoonieSpeechNameNight]}>
+            {t.fridge.assistant.assistantName}
+          </Text>
+          <Text style={[styles.spoonieSpeechText, lighting.phase === 'night' && styles.spoonieSpeechTextNight]}>{spoonieSpeech}</Text>
+        </Pressable>
+      ) : null}
       {isCameraModified && !activeInteraction && !isResettingCamera ? (
         <Pressable
           accessibilityHint={t.kitchen.resetCameraHint}
@@ -882,6 +981,18 @@ function KitchenLoading({ label, backgroundColor }: { label: string; backgroundC
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
+  spoonieSpeech: {
+    position: 'absolute', right: 36, bottom: '25%', maxWidth: 246, minHeight: 74, justifyContent: 'center',
+    paddingHorizontal: 18, paddingVertical: 13, borderRadius: 22, borderWidth: 1,
+    shadowColor: '#173D31', shadowOpacity: 0.16, shadowRadius: 14, shadowOffset: { width: 0, height: 8 }, elevation: 8,
+  },
+  spoonieSpeechDay: { borderColor: 'rgba(72,117,96,0.16)', backgroundColor: 'rgba(255,253,247,0.94)' },
+  spoonieSpeechNight: { borderColor: 'rgba(214,235,226,0.2)', backgroundColor: 'rgba(31,57,51,0.94)' },
+  spoonieSpeechPressed: { opacity: 0.9, transform: [{ scale: 0.98 }] },
+  spoonieSpeechName: { marginBottom: 3, color: '#D66E16', fontSize: 11, fontWeight: '800', letterSpacing: 1.2, textTransform: 'uppercase' },
+  spoonieSpeechNameNight: { color: '#FFB564' },
+  spoonieSpeechText: { color: '#294A3F', fontSize: 14, fontWeight: '600', lineHeight: 20 },
+  spoonieSpeechTextNight: { color: '#F1F6F2' },
   resetCameraButton: { position: 'absolute', top: 136, right: 24, width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, borderWidth: 1 },
   resetCameraButtonDay: { borderColor: 'rgba(255,255,255,0.76)', backgroundColor: 'rgba(241,248,246,0.82)' },
   resetCameraButtonNight: { borderColor: 'rgba(226,237,247,0.24)', backgroundColor: 'rgba(47,68,87,0.82)' },

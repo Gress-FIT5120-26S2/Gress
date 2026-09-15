@@ -1,0 +1,736 @@
+import { Ionicons } from '@expo/vector-icons';
+import { BlurView } from 'expo-blur';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import {
+  AccessibilityInfo,
+  Keyboard,
+  KeyboardAvoidingView,
+  Modal,
+  Platform,
+  Pressable,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
+import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inventoryApi';
+import { useI18n } from '../../i18n';
+import { ReminderSettingsSection } from './ReminderSettingsSection';
+import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
+import { getMaxInventoryQuantity, MAX_INVENTORY_NAME_LENGTH, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
+
+export type InventoryEntrySource = 'manual' | 'recognition' | 'barcode';
+export type InventoryDeadlineType = 'use_by' | 'best_before';
+export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
+export type InventoryCategoryCode = 'meat' | 'vegetables' | 'fruit' | 'staples' | 'condiments' | 'drinks' | 'other';
+export type InventoryUnit = 'item' | 'g' | 'kg' | 'ml' | 'L' | 'bag' | 'bottle' | 'box';
+
+export type InventoryEntryInitialValues = Partial<{
+  categoryCode: InventoryCategoryCode;
+  deadlineType: InventoryDeadlineType;
+  expiryEnabled: boolean;
+  expiryDate: string;
+  expiryTime: string;
+  expiryWarningDays: number;
+  name: string;
+  price: string;
+  quantity: string;
+  storageZone: InventoryStorageZone;
+  unit: InventoryUnit;
+  restockEnabled: boolean;
+  restockMinimumQuantity: number;
+  restockTargetQuantity: number;
+}>;
+
+export type InventoryEntrySubmission = {
+  batch: {
+    categoryCode: InventoryCategoryCode;
+    currency: 'AUD';
+    deadlineType: InventoryDeadlineType;
+    expiresAt: string | null;
+    initialQuantity: number;
+    matchedPresetUid: string | null;
+    name: string;
+    purchasePrice: number;
+    priceSource: InventoryEntrySource;
+    remainingQuantity: number;
+    stockedAt: string;
+    storageZone: InventoryStorageZone;
+    unit: InventoryUnit;
+  };
+  expiryWarningDays: number | null;
+  restockRule: {
+    enabled: true;
+    minimumQuantity: number;
+    targetQuantity: number;
+    unit: InventoryUnit;
+  } | null;
+  source: InventoryEntrySource;
+};
+
+type InventoryEntryFlowProps = {
+  blurTarget?: RefObject<View | null>;
+  initialValues?: InventoryEntryInitialValues;
+  mode?: 'create' | 'edit';
+  onClose: () => void;
+  onSubmit: (submission: InventoryEntrySubmission) => void | Promise<void>;
+  presentation?: 'embedded' | 'modal';
+  source?: InventoryEntrySource;
+  visible: boolean;
+};
+
+const STORAGE_OPTIONS: InventoryStorageZone[] = ['pantry', 'chilled', 'frozen'];
+const CATEGORY_OPTIONS: InventoryCategoryCode[] = ['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other'];
+const UNIT_OPTIONS: InventoryUnit[] = ['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box'];
+function formatDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function formatTime(date: Date) {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+function addDays(date: Date, days: number) {
+  const result = new Date(date);
+  result.setDate(result.getDate() + days);
+  return result;
+}
+
+function parseLocalDateTime(date: string, time: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !/^\d{2}:\d{2}$/.test(time)) return null;
+  const parsed = new Date(`${date}T${time}:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+// Arthur: NarIyirm
+// 中文：手动录入、识别预填和资料编辑共用此两步表单；父级 FridgeScreen 通过 onSubmit 决定创建还是更新请求。
+// EN: Manual entry, recognition-prefill, and detail editing share this two-step form; FridgeScreen chooses create or update through onSubmit.
+export function InventoryEntryFlow({
+  blurTarget,
+  initialValues,
+  mode = 'create',
+  onClose,
+  onSubmit,
+  presentation = 'modal',
+  source = 'manual',
+  visible,
+}: InventoryEntryFlowProps) {
+  const { t } = useI18n();
+  const copy = t.fridge.manualEntry;
+  const [reduceMotion, setReduceMotion] = useState(false);
+  const [name, setName] = useState('');
+  const [quantity, setQuantity] = useState('');
+  const [unit, setUnit] = useState<InventoryUnit>('item');
+  const [price, setPrice] = useState('');
+  const [deadlineType, setDeadlineType] = useState<InventoryDeadlineType>('best_before');
+  const [storageZone, setStorageZone] = useState<InventoryStorageZone>('chilled');
+  const [categoryCode, setCategoryCode] = useState<InventoryCategoryCode>('other');
+  const [suggestion, setSuggestion] = useState<StorageSuggestion | null>(null);
+  const [suggestionApplied, setSuggestionApplied] = useState(false);
+  const [suggestionLoading, setSuggestionLoading] = useState(false);
+  const [suggestionLookupFinished, setSuggestionLookupFinished] = useState(false);
+  const [suggestionGenerating, setSuggestionGenerating] = useState(false);
+  const [suggestionGenerationError, setSuggestionGenerationError] = useState(false);
+  const [expiryEnabled, setExpiryEnabled] = useState(true);
+  const [expiryDate, setExpiryDate] = useState('');
+  const [expiryTime, setExpiryTime] = useState('');
+  const [warningDays, setWarningDays] = useState(3);
+  const [restockEnabled, setRestockEnabled] = useState(false);
+  const [minimumQuantity, setMinimumQuantity] = useState(1);
+  const [targetQuantity, setTargetQuantity] = useState(2);
+  const [nameError, setNameError] = useState<string | null>(null);
+  const [quantityError, setQuantityError] = useState<string | null>(null);
+  const [priceError, setPriceError] = useState<string | null>(null);
+  const [expiryError, setExpiryError] = useState<string | null>(null);
+  const [restockError, setRestockError] = useState<string | null>(null);
+  const [saveError, setSaveError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [pendingSubmission, setPendingSubmission] = useState<InventoryEntrySubmission | null>(null);
+  const [confirmationReasons, setConfirmationReasons] = useState<string[]>([]);
+  const latestNameRef = useRef('');
+  const unitLabel = copy.units[unit];
+
+  useLayoutEffect(() => {
+    if (!visible) return;
+    const now = new Date();
+    const defaultExpiry = addDays(now, 7);
+
+    // Arthur: NarIyirm
+    // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和识别录入因此可以复用同一套表单。
+    // EN: Each opening initialises its draft from initialValues so create, edit, and recognition flows can share one form.
+    setName(initialValues?.name ?? '');
+    latestNameRef.current = initialValues?.name ?? '';
+    setQuantity(initialValues?.quantity ?? '');
+    setUnit(initialValues?.unit ?? 'item');
+    setPrice(initialValues?.price ?? '');
+    setDeadlineType(initialValues?.deadlineType ?? 'best_before');
+    setStorageZone(initialValues?.storageZone ?? 'chilled');
+    setCategoryCode(initialValues?.categoryCode ?? 'other');
+    setSuggestion(null);
+    setSuggestionApplied(false);
+    setSuggestionLoading(false);
+    setSuggestionLookupFinished(false);
+    setSuggestionGenerating(false);
+    setSuggestionGenerationError(false);
+    setExpiryEnabled(initialValues?.expiryEnabled ?? true);
+    setExpiryDate(initialValues?.expiryDate ?? formatDate(defaultExpiry));
+    setExpiryTime(initialValues?.expiryTime ?? formatTime(now));
+    setWarningDays(initialValues?.expiryWarningDays ?? 3);
+    setRestockEnabled(initialValues?.restockEnabled ?? false);
+    setMinimumQuantity(initialValues?.restockMinimumQuantity ?? 1);
+    setTargetQuantity(initialValues?.restockTargetQuantity ?? 2);
+    setNameError(null);
+    setQuantityError(null);
+    setPriceError(null);
+    setExpiryError(null);
+    setRestockError(null);
+    setSaveError(null);
+    setIsSaving(false);
+    setPendingSubmission(null);
+    setConfirmationReasons([]);
+  }, [initialValues, visible]);
+
+  useEffect(() => {
+    let mounted = true;
+    AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
+      if (mounted) setReduceMotion(enabled);
+    });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => {
+      mounted = false;
+      subscription.remove();
+    };
+  }, []);
+
+  const handleNameChange = useCallback((value: string) => {
+    setName(value);
+    latestNameRef.current = value;
+    setNameError(null);
+    setSuggestion(null);
+    setSuggestionApplied(false);
+    setSuggestionLoading(false);
+    setSuggestionLookupFinished(false);
+    setSuggestionGenerating(false);
+    setSuggestionGenerationError(false);
+  }, []);
+
+  useEffect(() => {
+    const query = name.trim();
+    if (!visible || !query) {
+      setSuggestion(null);
+      setSuggestionApplied(false);
+      setSuggestionLoading(false);
+      setSuggestionLookupFinished(false);
+      return;
+    }
+
+    let active = true;
+    const lookupTimer = setTimeout(() => {
+      // Arthur: NarIyirm
+      // 中文：输入停顿后才查询 Express，并忽略过期响应，避免快速输入时较早的名称覆盖最新建议。
+      // EN: Query Express only after typing pauses and ignore stale responses so an earlier name cannot overwrite the latest suggestion.
+      setSuggestionLoading(true);
+      setSuggestionLookupFinished(false);
+      void getFoodPresetSuggestion(query)
+        .then(({ suggestion: nextSuggestion }) => {
+          if (!active) return;
+          setSuggestion(nextSuggestion ? {
+            canonicalName: nextSuggestion.canonicalName,
+            category: nextSuggestion.categoryCode,
+            iconEmoji: nextSuggestion.iconEmoji,
+            iconUrl: nextSuggestion.iconUrl,
+            presetUid: nextSuggestion.presetUid,
+            shelfLifeDays: nextSuggestion.shelfLifeDays,
+            storageZone: nextSuggestion.storageZone,
+          } : null);
+          setSuggestionApplied(false);
+          setSuggestionLookupFinished(true);
+        })
+        .catch(() => {
+          if (!active) return;
+          setSuggestion(null);
+          setSuggestionLookupFinished(true);
+        })
+        .finally(() => {
+          if (active) setSuggestionLoading(false);
+        });
+    }, 280);
+
+    return () => {
+      active = false;
+      clearTimeout(lookupTimer);
+    };
+  }, [name, visible]);
+
+  const generateStorageAdvice = useCallback(async () => {
+    const query = name.trim();
+    if (!query) return;
+    setSuggestionGenerating(true);
+    setSuggestionGenerationError(false);
+    try {
+      const { suggestion: generatedSuggestion } = await generateFoodPreset(query);
+      if (latestNameRef.current.trim() !== query) return;
+      // Arthur: NarIyirm
+      // 中文：生成接口已经完成别名去重、图标标准化和 preset 缓存；这里只把可编辑结果带回当前表单。
+      // EN: The generation endpoint already deduplicates aliases, normalises the icon, and caches the preset; this only brings its editable result into the current form.
+      setSuggestion({
+        canonicalName: generatedSuggestion.canonicalName,
+        category: generatedSuggestion.categoryCode,
+        iconEmoji: generatedSuggestion.iconEmoji,
+        iconUrl: generatedSuggestion.iconUrl,
+        presetUid: generatedSuggestion.presetUid,
+        shelfLifeDays: generatedSuggestion.shelfLifeDays,
+        storageZone: generatedSuggestion.storageZone,
+      });
+      setSuggestionApplied(false);
+      setSuggestionLookupFinished(true);
+    } catch {
+      if (latestNameRef.current.trim() === query) setSuggestionGenerationError(true);
+    } finally {
+      if (latestNameRef.current.trim() === query) setSuggestionGenerating(false);
+    }
+  }, [name]);
+
+  // Arthur: NarIyirm
+  // 中文：只把 food preset 的储存区、分类和参考天数复制到本地表单；用户仍可修改，数据库此时没有写入。
+  // EN: This only copies food-preset storage, category, and shelf-life guidance into local form state; it remains editable and writes no database data yet.
+  const applySuggestion = useCallback(() => {
+    if (!suggestion) return;
+    const now = new Date();
+    setStorageZone(suggestion.storageZone);
+    setCategoryCode(suggestion.category);
+    setExpiryEnabled(true);
+    setExpiryDate(formatDate(addDays(now, suggestion.shelfLifeDays)));
+    setExpiryTime(formatTime(now));
+    setSuggestionApplied(true);
+  }, [suggestion]);
+
+  const validateBasics = useCallback(() => {
+    const parsedQuantity = Number(quantity);
+    const parsedPrice = price.trim().length > 0 ? Number(price) : null;
+    const trimmedName = name.trim();
+    const nextNameError = trimmedName.length === 0
+      ? copy.validation.name
+      : trimmedName.length > MAX_INVENTORY_NAME_LENGTH
+        ? copy.validation.nameLength
+        : null;
+    const nextQuantityError = !Number.isFinite(parsedQuantity) || parsedQuantity <= 0
+      ? copy.validation.quantity
+      : parsedQuantity >= getMaxInventoryQuantity(unit)
+        ? copy.validation.quantityLimit(getMaxInventoryQuantity(unit), unitLabel)
+        : null;
+    const nextPriceError = parsedPrice !== null && Number.isFinite(parsedPrice) && parsedPrice >= 0 ? null : copy.validation.price;
+    setNameError(nextNameError);
+    setQuantityError(nextQuantityError);
+    setPriceError(nextPriceError);
+    return !nextNameError && !nextQuantityError && !nextPriceError;
+  }, [copy.validation, name, price, quantity, unit, unitLabel]);
+
+  const updateMinimumQuantity = useCallback((value: number) => {
+    setMinimumQuantity(value);
+    setTargetQuantity((current) => Math.max(current, value + 1));
+    setRestockError(null);
+  }, []);
+
+  const submitInventory = useCallback(async (submission: InventoryEntrySubmission) => {
+    setIsSaving(true);
+    try {
+      await onSubmit(submission);
+      onClose();
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : copy.validation.save;
+      console.error('Inventory save failed:', detail);
+      setSaveError(detail);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [copy.validation.save, onClose, onSubmit]);
+
+  // Arthur: NarIyirm
+  // 中文：保存按钮在此完成前端校验并组装 InventoryEntrySubmission；真正 HTTP 请求由父组件传入的 onSubmit 发起。
+  // EN: The save button validates and builds InventoryEntrySubmission here; the parent-provided onSubmit performs the actual HTTP request.
+  const handleSubmit = useCallback(async () => {
+    const expiry = expiryEnabled ? parseLocalDateTime(expiryDate, expiryTime) : null;
+    const nextExpiryError = expiryEnabled && (!expiry || expiry.getTime() < Date.now()) ? copy.validation.expiry : null;
+    const maxQuantity = getMaxInventoryQuantity(unit);
+    const nextRestockError = restockEnabled && (minimumQuantity >= maxQuantity || targetQuantity >= maxQuantity)
+      ? copy.validation.restockLimit(maxQuantity, unitLabel)
+      : restockEnabled && targetQuantity <= minimumQuantity
+        ? copy.validation.restock
+        : null;
+    setExpiryError(nextExpiryError);
+    setRestockError(nextRestockError);
+    setSaveError(null);
+    if (nextExpiryError || nextRestockError || !validateBasics()) return;
+
+    const numericQuantity = Number(quantity);
+    const numericPrice = Number(price);
+    const submission: InventoryEntrySubmission = {
+      source,
+      batch: {
+        categoryCode,
+        currency: 'AUD',
+        deadlineType,
+        expiresAt: expiry?.toISOString() ?? null,
+        initialQuantity: numericQuantity,
+        matchedPresetUid: suggestion?.presetUid ?? null,
+        name: name.trim(),
+        purchasePrice: numericPrice,
+        priceSource: source,
+        remainingQuantity: numericQuantity,
+        stockedAt: new Date().toISOString(),
+        storageZone,
+        unit,
+      },
+      // Arthur: NarIyirm
+      // 中文：把用户选择的临期提前天数随批次资料提交；关闭有效期时发送 null 以同步停用该批次的本地提醒。
+      // EN: Submit the selected expiry lead time with batch details; send null when expiry is disabled to stop that batch's local reminder.
+      expiryWarningDays: expiryEnabled ? warningDays : null,
+      restockRule: restockEnabled ? {
+        enabled: true,
+        minimumQuantity,
+        targetQuantity,
+        unit,
+      } : null,
+    };
+
+    // Arthur: NarIyirm
+    // 中文：未匹配食材资料或数量虽合法但偏大时暂停一次，让用户复核；确认只放行本次提交，硬上限仍不可绕过。
+    // EN: Pause once when the name is unverified or the valid quantity is unusually large; confirmation releases only this submission and never bypasses hard limits.
+    const reasons = [
+      ...(!suggestion ? [copy.confirmation.unverifiedName(submission.batch.name)] : []),
+      ...(needsLargeQuantityConfirmation(numericQuantity, unit) ? [copy.confirmation.largeQuantity(numericQuantity, unitLabel)] : []),
+    ];
+    if (reasons.length > 0) {
+      Keyboard.dismiss();
+      setPendingSubmission(submission);
+      setConfirmationReasons(reasons);
+      return;
+    }
+
+    await submitInventory(submission);
+  }, [categoryCode, copy.confirmation, copy.validation, deadlineType, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays]);
+
+  const confirmSubmission = useCallback(() => {
+    if (!pendingSubmission) return;
+    const submission = pendingSubmission;
+    setPendingSubmission(null);
+    setConfirmationReasons([]);
+    void submitInventory(submission);
+  }, [pendingSubmission, submitInventory]);
+
+  const topInset = presentation === 'embedded' ? 0 : Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 47;
+
+  return (
+    <InventoryEntryPresentation blurTarget={blurTarget} onClose={onClose} presentation={presentation} reduceMotion={reduceMotion} visible={visible}>
+        <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalRoot}>
+          <View style={[styles.header, presentation === 'embedded' && styles.embeddedHeader, { paddingTop: topInset + 8 }]}>
+            <Pressable accessibilityRole="button" hitSlop={8} onPress={onClose} style={({ pressed }) => [styles.headerButton, pressed ? styles.pressed : null]}>
+              <Text style={styles.headerButtonText}>{copy.cancel}</Text>
+            </Pressable>
+            <View pointerEvents="none" style={styles.headerTitleWrap}>
+              <Text numberOfLines={1} style={styles.headerTitle}>{mode === 'edit' ? copy.editTitle : copy.title}</Text>
+            </View>
+            <View style={styles.headerSpacer} />
+          </View>
+
+          <ScrollView
+            contentContainerStyle={styles.scrollContent}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+          >
+            <View style={styles.section}>
+              <FieldHeading icon="restaurant-outline" label={copy.name.label} tone="#F07B22" tint="#FFF0E5" />
+              <TextInput
+                accessibilityLabel={copy.name.label}
+                autoCapitalize="sentences"
+                autoCorrect={false}
+                onChangeText={handleNameChange}
+                placeholder={copy.name.placeholder}
+                placeholderTextColor="#68776F"
+                returnKeyType="next"
+                style={[styles.largeInput, nameError ? styles.inputError : null]}
+                value={name}
+              />
+              {nameError ? <Text style={styles.errorText}>{nameError}</Text> : null}
+              <StorageSuggestionCard
+                applied={suggestionApplied}
+                isLoading={suggestionLoading}
+                lookupFinished={suggestionLookupFinished}
+                onApply={applySuggestion}
+                generationError={suggestionGenerationError}
+                isGenerating={suggestionGenerating}
+                onGenerate={() => { void generateStorageAdvice(); }}
+                query={name.trim()}
+                suggestion={suggestion}
+              />
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="calculator-outline" label={copy.quantity.label} tone="#0AAFC3" tint="#E7F9FC" />
+              <View style={styles.quantityRow}>
+                <TextInput
+                  accessibilityLabel={copy.quantity.label}
+                  inputMode="decimal"
+                  onChangeText={(value) => { setQuantity(value); setQuantityError(null); }}
+                  placeholder={copy.quantity.placeholder}
+                  placeholderTextColor="#68776F"
+                  style={[styles.quantityInput, quantityError ? styles.inputError : null]}
+                  value={quantity}
+                />
+                <View style={styles.currentUnit}><Text style={styles.currentUnitText}>{unitLabel}</Text></View>
+              </View>
+              {quantityError ? <Text style={styles.errorText}>{quantityError}</Text> : null}
+              <Text style={styles.subLabel}>{copy.unitsLabel}</Text>
+              <ScrollView horizontal contentContainerStyle={styles.chipRow} showsHorizontalScrollIndicator={false}>
+                {UNIT_OPTIONS.map((option) => (
+                  <ChoiceChip key={option} label={copy.units[option]} onPress={() => setUnit(option)} selected={unit === option} tone="orange" />
+                ))}
+              </ScrollView>
+
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="snow-outline" label={copy.storageLabel} tone="#168ACB" tint="#E8F6FD" />
+              <View style={styles.threeColumnRow}>
+                {STORAGE_OPTIONS.map((option) => (
+                  <ChoiceChip
+                    fill
+                    icon={option === 'chilled' ? 'water-outline' : option === 'frozen' ? 'snow-outline' : 'cube-outline'}
+                    key={option}
+                    label={copy.storage[option]}
+                    onPress={() => { setStorageZone(option); setSuggestionApplied(false); }}
+                    selected={storageZone === option}
+                    tone="blue"
+                  />
+                ))}
+              </View>
+
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="grid-outline" label={copy.categoryLabel} tone="#159766" tint="#E9F8F0" />
+              <ScrollView horizontal contentContainerStyle={styles.chipRow} showsHorizontalScrollIndicator={false}>
+                {CATEGORY_OPTIONS.map((option) => (
+                  <ChoiceChip key={option} label={t.fridge.categories[option]} onPress={() => { setCategoryCode(option); setSuggestionApplied(false); }} selected={categoryCode === option} tone="green" />
+                ))}
+              </ScrollView>
+
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="wallet-outline" label={copy.price.label} tone="#9A7448" tint="#F6F0E8" />
+              <View style={styles.priceRow}>
+                <Text style={styles.currencyText}>AUD</Text>
+                <TextInput
+                  accessibilityLabel={copy.price.label}
+                  inputMode="decimal"
+                  onChangeText={(value) => { setPrice(value); setPriceError(null); }}
+                  placeholder={copy.price.placeholder}
+                  placeholderTextColor="#68776F"
+                  style={[styles.priceInput, priceError ? styles.inputError : null]}
+                  value={price}
+                />
+              </View>
+              <Text style={styles.helperText}>{copy.price.helper}</Text>
+              {priceError ? <Text style={styles.errorText}>{priceError}</Text> : null}
+
+              <View style={styles.sectionDivider} />
+              <FieldHeading icon="calendar-outline" label={copy.expiry.typeLabel} tone="#D87519" tint="#FFF2E3" />
+              <View style={styles.twoColumnRow}>
+                <ChoiceChip fill label={copy.expiry.bestBefore} onPress={() => setDeadlineType('best_before')} selected={deadlineType === 'best_before'} tone="orange" />
+                <ChoiceChip fill label={copy.expiry.useBy} onPress={() => setDeadlineType('use_by')} selected={deadlineType === 'use_by'} tone="orange" />
+              </View>
+              <Text style={styles.helperText}>{deadlineType === 'use_by' ? copy.expiry.useByHelper : copy.expiry.bestBeforeHelper}</Text>
+            </View>
+
+            <ReminderSettingsSection
+              expiryDate={expiryDate}
+              expiryEnabled={expiryEnabled}
+              expiryError={expiryError}
+              expiryTime={expiryTime}
+              minimumQuantity={minimumQuantity}
+              onExpiryDateChange={(value) => { setExpiryDate(value); setExpiryError(null); }}
+              onExpiryEnabledChange={setExpiryEnabled}
+              onExpiryTimeChange={(value) => { setExpiryTime(value); setExpiryError(null); }}
+              onMinimumQuantityChange={updateMinimumQuantity}
+              onRestockEnabledChange={setRestockEnabled}
+              onTargetQuantityChange={(value) => { setTargetQuantity(value); setRestockError(null); }}
+              onWarningDaysChange={setWarningDays}
+              restockEnabled={restockEnabled}
+              restockError={restockError}
+              reduceMotion={reduceMotion}
+              targetQuantity={targetQuantity}
+              unitLabel={unitLabel}
+              warningDays={warningDays}
+            />
+          </ScrollView>
+
+          <View style={styles.footer}>
+            <Pressable
+              accessibilityRole="button"
+              disabled={isSaving}
+              onPress={handleSubmit}
+              style={({ pressed }) => [styles.primaryButton, isSaving ? styles.disabledButton : null, pressed ? styles.pressed : null]}
+            >
+              <Text style={styles.primaryButtonText}>{isSaving ? copy.saving : mode === 'edit' ? copy.saveChanges : copy.save}</Text>
+              <Ionicons name="checkmark-circle" size={19} color="#FFFFFF" />
+            </Pressable>
+            {saveError ? <Text style={styles.footerError}>{saveError}</Text> : null}
+          </View>
+          {pendingSubmission ? (
+            <View accessibilityViewIsModal style={styles.confirmLayer}>
+              <View style={styles.confirmCard}>
+                <View style={styles.confirmHeader}>
+                  <View style={styles.confirmIcon}><Ionicons name="alert-circle" size={23} color="#D87519" /></View>
+                  <View style={styles.confirmHeaderCopy}>
+                    <Text style={styles.confirmTitle}>{copy.confirmation.title}</Text>
+                    <Text style={styles.confirmDescription}>{copy.confirmation.description}</Text>
+                  </View>
+                </View>
+                <View style={styles.confirmReasons}>
+                  {confirmationReasons.map((reason) => (
+                    <View key={reason} style={styles.confirmReasonRow}>
+                      <Ionicons name="alert-circle-outline" size={18} color="#C86D1C" />
+                      <Text style={styles.confirmReasonText}>{reason}</Text>
+                    </View>
+                  ))}
+                </View>
+                <View style={styles.confirmActions}>
+                  <Pressable accessibilityRole="button" onPress={confirmSubmission} style={({ pressed }) => [styles.confirmButton, pressed ? styles.pressed : null]}>
+                    <Ionicons name="checkmark-circle" size={19} color="#FFFFFF" />
+                    <Text style={styles.confirmButtonText}>{copy.confirmation.continue}</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" onPress={() => { setPendingSubmission(null); setConfirmationReasons([]); }} style={({ pressed }) => [styles.reviewButton, pressed ? styles.pressed : null]}>
+                    <Text style={styles.reviewButtonText}>{copy.confirmation.review}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            </View>
+          ) : null}
+        </KeyboardAvoidingView>
+    </InventoryEntryPresentation>
+  );
+}
+
+function InventoryEntryPresentation({ blurTarget, children, onClose, presentation, reduceMotion, visible }: {
+  blurTarget?: RefObject<View | null>;
+  children: ReactNode;
+  onClose: () => void;
+  presentation: 'embedded' | 'modal';
+  reduceMotion: boolean;
+  visible: boolean;
+}) {
+  if (presentation === 'embedded') {
+    return visible ? <View style={styles.embeddedBackdrop}>{children}</View> : null;
+  }
+
+  return (
+    <Modal animationType={reduceMotion ? 'fade' : 'slide'} onRequestClose={onClose} presentationStyle="overFullScreen" statusBarTranslucent transparent visible={visible}>
+      {/* Arthur: NarIyirm
+          中文：独立新增流程使用全屏毛玻璃；详情内编辑则复用已有抽屉，不创建第二个原生 Modal。
+          EN: Standalone creation uses a full-screen glass surface, while detail editing reuses its existing sheet instead of presenting a second native Modal. */}
+      <BlurView blurMethod="dimezisBlurViewSdk31Plus" blurTarget={blurTarget} intensity={Platform.OS === 'ios' ? 56 : 34} tint="systemUltraThinMaterialLight" style={styles.frostedBackdrop}>
+        {children}
+      </BlurView>
+    </Modal>
+  );
+}
+
+function FieldHeading({ icon, label, tint, tone }: { icon: keyof typeof Ionicons.glyphMap; label: string; tint: string; tone: string }) {
+  return (
+    <View style={styles.fieldHeading}>
+      <View style={[styles.fieldIcon, { backgroundColor: tint }]}><Ionicons name={icon} size={20} color={tone} /></View>
+      <Text style={styles.fieldTitle}>{label}</Text>
+    </View>
+  );
+}
+
+function ChoiceChip({
+  fill = false,
+  icon,
+  label,
+  onPress,
+  selected,
+  tone,
+}: {
+  fill?: boolean;
+  icon?: keyof typeof Ionicons.glyphMap;
+  label: string;
+  onPress: () => void;
+  selected: boolean;
+  tone: 'blue' | 'green' | 'orange';
+}) {
+  const palette = tone === 'blue'
+    ? { active: '#168ACB', inactive: '#EDF8FC', text: '#16789F' }
+    : tone === 'green'
+      ? { active: '#159766', inactive: '#ECF9F2', text: '#157A56' }
+      : { active: '#FF812B', inactive: '#FFF2E8', text: '#C96B1D' };
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ selected }}
+      onPress={onPress}
+      style={({ pressed }) => [styles.choiceChip, fill ? styles.choiceChipFill : null, { backgroundColor: selected ? palette.active : palette.inactive }, pressed ? styles.pressed : null]}
+    >
+      {icon ? <Ionicons name={icon} size={16} color={selected ? '#FFFFFF' : palette.text} /> : null}
+      <Text style={[styles.choiceChipText, { color: selected ? '#FFFFFF' : palette.text }]}>{label}</Text>
+    </Pressable>
+  );
+}
+
+const styles = StyleSheet.create({
+  frostedBackdrop: { flex: 1, backgroundColor: 'rgba(236, 243, 240, 0.54)' },
+  embeddedBackdrop: { flex: 1, backgroundColor: '#F7F9F8' },
+  modalRoot: { flex: 1 },
+  header: { minHeight: 92, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 18, paddingBottom: 12, backgroundColor: 'rgba(250, 252, 250, 0.46)' },
+  embeddedHeader: { minHeight: 64, paddingBottom: 8, backgroundColor: '#F7F9F8' },
+  headerButton: { minWidth: 74, minHeight: 44, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 15, borderRadius: 22, borderCurve: 'continuous', backgroundColor: '#FFFFFF' },
+  headerButtonText: { color: '#263C34', fontSize: 15, fontWeight: '700' },
+  headerTitleWrap: { position: 'absolute', right: 94, bottom: 16, left: 94, alignItems: 'center' },
+  headerTitle: { color: '#172E26', fontSize: 18, fontWeight: '900', letterSpacing: -0.25 },
+  headerSpacer: { flex: 1 },
+  scrollContent: { paddingHorizontal: 15, paddingTop: 15, paddingBottom: 24, gap: 12 },
+  section: { padding: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.84)', borderRadius: 16, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.76)' },
+  fieldHeading: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 11 },
+  fieldIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 12, borderCurve: 'continuous' },
+  fieldTitle: { flex: 1, color: '#173D31', fontSize: 17, fontWeight: '800' },
+  largeInput: { minHeight: 56, marginTop: 12, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DDE5E1', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#F8FAF9', color: '#173D31', fontSize: 18, fontWeight: '700' },
+  quantityRow: { flexDirection: 'row', alignItems: 'stretch', gap: 9, marginTop: 12 },
+  quantityInput: { minHeight: 56, flex: 1, paddingHorizontal: 14, borderWidth: 1, borderColor: '#DDE5E1', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#F8FAF9', color: '#173D31', fontSize: 22, fontWeight: '800' },
+  currentUnit: { minWidth: 76, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 12, borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#FFF0E5' },
+  currentUnitText: { color: '#D46F1A', fontSize: 15, fontWeight: '800' },
+  subLabel: { marginTop: 14, marginBottom: 9, color: '#5E7068', fontSize: 12.5, fontWeight: '700' },
+  chipRow: { gap: 8, paddingRight: 8 },
+  threeColumnRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  twoColumnRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+  choiceChip: { minHeight: 43, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, paddingHorizontal: 15, borderRadius: 14, borderCurve: 'continuous' },
+  choiceChipFill: { flex: 1, paddingHorizontal: 8 },
+  choiceChipText: { fontSize: 13, fontWeight: '800' },
+  sectionDivider: { height: 1, marginVertical: 17, backgroundColor: '#EDF0EE' },
+  priceRow: { minHeight: 54, flexDirection: 'row', alignItems: 'center', marginTop: 12, borderWidth: 1, borderColor: '#DDE5E1', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#F8FAF9', overflow: 'hidden' },
+  currencyText: { paddingHorizontal: 14, color: '#8A693F', fontSize: 13, fontWeight: '800' },
+  priceInput: { flex: 1, minHeight: 52, paddingHorizontal: 12, borderLeftWidth: 1, borderLeftColor: '#E2E8E4', color: '#173D31', fontSize: 18, fontWeight: '700' },
+  helperText: { marginTop: 9, color: '#718079', fontSize: 12, fontWeight: '600', lineHeight: 18 },
+  inputError: { borderColor: '#D94B5D', backgroundColor: '#FFF8F8' },
+  errorText: { marginTop: 7, color: '#C83D4C', fontSize: 12, fontWeight: '700', lineHeight: 18 },
+  footer: { minHeight: 82, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 15, paddingTop: 11, paddingBottom: Platform.OS === 'ios' ? 25 : 15, borderTopWidth: 1, borderTopColor: 'rgba(223, 231, 227, 0.78)', backgroundColor: 'rgba(250, 252, 250, 0.62)' },
+  primaryButton: { minHeight: 52, flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, paddingHorizontal: 18, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FF812B' },
+  primaryButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '800' },
+  disabledButton: { opacity: 0.55 },
+  footerError: { position: 'absolute', right: 16, bottom: 4, left: 16, color: '#C83D4C', fontSize: 10.5, fontWeight: '700', textAlign: 'center' },
+  confirmLayer: { ...StyleSheet.absoluteFill, zIndex: 20, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 26, backgroundColor: 'rgba(23,32,29,0.42)' },
+  confirmCard: { width: '100%', maxWidth: 370, padding: 18, borderRadius: 20, backgroundColor: '#FFFFFF', shadowColor: '#14241E', shadowOffset: { width: 0, height: 8 }, shadowOpacity: 0.16, shadowRadius: 8, elevation: 12 },
+  confirmHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: 12 },
+  confirmHeaderCopy: { flex: 1, minWidth: 0 },
+  confirmIcon: { width: 42, height: 42, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#FFF2E3' },
+  confirmTitle: { color: '#172E26', fontSize: 18, fontWeight: '900', lineHeight: 23 },
+  confirmDescription: { marginTop: 4, color: '#55685F', fontSize: 13, lineHeight: 18 },
+  confirmReasons: { gap: 8, marginTop: 15 },
+  confirmReasonRow: { minHeight: 44, flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingHorizontal: 12, paddingVertical: 11, borderRadius: 12, backgroundColor: '#FFF8F1' },
+  confirmReasonText: { flex: 1, color: '#47372A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  confirmActions: { gap: 9, marginTop: 17 },
+  reviewButton: { minHeight: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: '#F0F3F1' },
+  reviewButtonText: { color: '#40564D', fontSize: 14, fontWeight: '800' },
+  confirmButton: { minHeight: 52, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8, borderRadius: 14, backgroundColor: '#FF812B' },
+  confirmButtonText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
+  pressed: { opacity: 0.75, transform: [{ scale: 0.98 }] },
+});

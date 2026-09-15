@@ -1,0 +1,782 @@
+import { Router } from 'express';
+import { randomUUID } from 'node:crypto';
+import { waitUntil } from '@vercel/functions';
+import { supabase } from '../supabase.js';
+import {
+  CLOUDFLARE_ICON_MODEL,
+  GEMINI_PRESET_MODEL,
+  ICON_PROMPT_VERSION,
+  generateFoodPresetIcon,
+  generateFoodPresetMetadata,
+} from '../services/foodPresetAi.js';
+import { deliverSharedNotification } from '../services/pushNotifications.js';
+import { consumeRateLimit, rateLimitPolicies } from '../middleware/rateLimit.js';
+
+const inventoryRouter = Router();
+const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
+const STORAGE_ZONES = new Set(['chilled', 'frozen', 'pantry']);
+const INVENTORY_UNITS = new Set(['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box']);
+const INVENTORY_DEADLINE_TYPES = new Set(['use_by', 'best_before']);
+const INVENTORY_OUTCOMES = new Set(['consume', 'discard', 'correction']);
+const INVENTORY_OUTCOME_REASONS = new Set(['used', 'spoiled', 'overbought', 'forgotten', 'unwanted', 'quality_rejected', 'other', 'confirmed_use_by_expiry', 'data_correction']);
+const INVENTORY_PRICE_SOURCES = new Set(['user', 'barcode', 'recognition']);
+const MAX_INVENTORY_NAME_LENGTH = 120;
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const PRESET_ICON_BUCKET = 'food-preset-icons';
+const CATEGORY_COLOURS = ['#147E8C', '#32915C', '#D94C8B', '#A8732D', '#D46A1C', '#6255D9'];
+
+function getMaxInventoryQuantity(unit) {
+  return unit === 'g' || unit === 'ml' ? 1_000_000 : 1_000;
+}
+
+function getDeviceId(request) {
+  const deviceId = request.get('Device-ID')?.trim();
+  return deviceId && deviceId.length >= 3 && deviceId.length <= 200 ? deviceId : null;
+}
+
+function normaliseName(value) {
+  return value.trim().toLocaleLowerCase();
+}
+
+function asNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// Arthur: NarIyirm
+// 中文：必填金额必须先排除 null、undefined 与空字符串；Number(null) 会得到 0，不能把缺失价格误记成免费。
+// EN: Required money fields reject null, undefined, and blanks before conversion because Number(null) is 0 and must not turn missing prices into free items.
+function asRequiredNumber(value) {
+  if (value === null || value === undefined || (typeof value === 'string' && value.trim() === '')) return null;
+  return asNumber(value);
+}
+
+// Arthur: NarIyirm
+// 中文：没有有效期时关闭批次提醒；旧版 App 未提交提前天数时沿用历史默认值 3，避免 API 发布造成兼容性中断。
+// EN: Disable batch reminders without an expiry; preserve the historical default of 3 for older app builds that omit the lead time.
+function getExpiryWarningDays(body) {
+  if (body.expiresAt == null) return null;
+  return body.expiryWarningDays === undefined ? 3 : asNumber(body.expiryWarningDays);
+}
+
+// Arthur: NarIyirm
+// 中文：库存写入后先持久化共享站内事件，外部 Push 在响应后执行，避免 Expo 网络延迟阻塞用户的保存状态。
+// EN: Persist the shared in-app event first, then deliver external push after the response so Expo network latency never blocks the user's save state.
+export async function notifySharedInventory(deviceId, batchUid, action) {
+  const { data: notificationUid, error } = await supabase.rpc('record_shared_inventory_notification', {
+    p_action: action,
+    p_batch_uid: batchUid,
+    p_device_id: deviceId,
+  });
+  if (error) {
+    console.error('Shared inventory notification could not be recorded:', error.message);
+    return;
+  }
+  if (!notificationUid) return;
+
+  const delivery = deliverSharedNotification(notificationUid, deviceId).catch((deliveryError) => {
+    console.error('Shared inventory push delivery failed:', deliveryError?.message ?? 'unknown error');
+  });
+
+  if (process.env.VERCEL) {
+    waitUntil(delivery);
+  } else {
+    void delivery;
+  }
+}
+
+function findPresetMatch(presets, query) {
+  const normalisedQuery = normaliseName(query);
+  return presets.find((preset) => (
+    normaliseName(preset.canonical_name) === normalisedQuery
+    || preset.aliases.some((alias) => normaliseName(alias) === normalisedQuery)
+  ));
+}
+
+function findPresetCandidateMatch(presets, candidates) {
+  return candidates.map((candidate) => findPresetMatch(presets, candidate)).find(Boolean) ?? null;
+}
+
+function getPresetIconUrl(iconPath) {
+  if (!iconPath) return null;
+  return supabase.storage.from(PRESET_ICON_BUCKET).getPublicUrl(iconPath).data.publicUrl;
+}
+
+function getCategoryColour(name) {
+  const index = [...name].reduce((total, character) => total + character.codePointAt(0), 0) % CATEGORY_COLOURS.length;
+  return CATEGORY_COLOURS[index];
+}
+
+function toPresetSuggestion(preset) {
+  return {
+    aliases: preset.aliases,
+    canonicalName: preset.canonical_name,
+    categoryCode: preset.suggested_category_code,
+    iconEmoji: preset.icon_emoji,
+    iconUrl: getPresetIconUrl(preset.icon_path),
+    notes: preset.notes,
+    presetUid: preset.preset_uid,
+    shelfLifeDays: preset.suggested_shelf_life_days,
+    source: preset.source_type,
+    storageZone: preset.suggested_storage_zone,
+  };
+}
+
+async function getEnabledFoodPresets() {
+  const { data, error } = await supabase
+    .from('food_presets')
+    .select('preset_uid, canonical_name, aliases, suggested_storage_zone, suggested_shelf_life_days, suggested_category_code, notes, icon_path, icon_emoji, source_type')
+    .eq('is_enabled', true);
+  if (error) throw error;
+  return data ?? [];
+}
+
+async function resolveFridge(deviceId) {
+  // Arthur: NarIyirm
+  // 中文：服务端从 Device-ID 决定当前冰箱，客户端不会提交或选择 fridge_uid，从而保持设备隔离边界。
+  // EN: The server derives the current fridge from Device-ID; clients never submit or choose a fridge_uid, preserving device isolation.
+  const { data, error } = await supabase.rpc('bootstrap_device', {
+    p_device_id: deviceId,
+    p_fridge_name: 'My Fridge',
+  });
+
+  if (error) throw error;
+  return data;
+}
+
+// Arthur: NarIyirm
+// 中文：GET /api/inventory 和 bootstrap 共用此读取器；并行查询冰箱、分类、活跃批次与规则，再组装前端 InventorySnapshot。
+// EN: GET /api/inventory and bootstrap share this reader, which queries fridge, categories, active batches, and rules in parallel before building InventorySnapshot.
+async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
+  const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
+  const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
+    supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
+    supabase.from('food_categories').select('category_uid, name, system_code, colour, icon, icon_path, is_default').eq('fridge_uid', fridgeUid).order('created_at'),
+    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
+    supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, target_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
+  ]);
+
+  const failed = [fridgeResult, categoriesResult, batchesResult, rulesResult].find(({ error }) => error);
+  if (failed?.error) throw failed.error;
+
+  const categories = categoriesResult.data ?? [];
+  const batches = batchesResult.data ?? [];
+  const presetUids = [...new Set(batches.map((batch) => batch.preset_uid).filter(Boolean))];
+  const presetsResult = presetUids.length > 0
+    ? await supabase.from('food_presets').select('preset_uid, icon_path, icon_emoji').in('preset_uid', presetUids)
+    : { data: [], error: null };
+  if (presetsResult.error) throw presetsResult.error;
+  const categoryByUid = new Map(categories.map((category) => [category.category_uid, category]));
+  const presetByUid = new Map((presetsResult.data ?? []).map((preset) => [preset.preset_uid, preset]));
+  const totalByNameAndUnit = new Map();
+  for (const batch of batches) {
+    const key = `${normaliseName(batch.name)}::${batch.unit}`;
+    totalByNameAndUnit.set(key, (totalByNameAndUnit.get(key) ?? 0) + Number(batch.remaining_quantity));
+  }
+  const ruleByNameAndUnit = new Map((rulesResult.data ?? []).map((rule) => [`${rule.normalized_item_name}::${rule.unit}`, rule]));
+
+  return {
+    fridge: {
+      uid: fridgeResult.data.fridge_uid,
+      name: fridgeResult.data.name,
+      mode: fridgeResult.data.mode,
+    },
+    categories: categories.map((category) => ({
+      code: category.system_code,
+      colour: category.colour,
+      icon: category.icon,
+      iconUrl: getPresetIconUrl(category.icon_path),
+      id: category.category_uid,
+      isDefault: category.is_default,
+      name: category.name,
+    })),
+    batches: batches.map((batch) => {
+      const key = `${normaliseName(batch.name)}::${batch.unit}`;
+      const rule = ruleByNameAndUnit.get(key);
+      const preset = batch.preset_uid ? presetByUid.get(batch.preset_uid) : null;
+      return {
+        categoryCode: categoryByUid.get(batch.category_uid)?.system_code ?? 'other',
+        categoryId: batch.category_uid,
+        categoryName: categoryByUid.get(batch.category_uid)?.name ?? 'Other',
+        currency: batch.currency,
+        deadlineType: batch.use_by_at ? 'use_by' : batch.best_before_at ? 'best_before' : null,
+        bestBeforeAt: batch.best_before_at,
+        estimatedQualityUntil: batch.estimated_quality_until,
+        expiresAt: batch.expires_at,
+        expiryWarningDays: batch.expiry_warning_days,
+        id: batch.batch_uid,
+        iconEmoji: preset?.icon_emoji ?? null,
+        iconUrl: getPresetIconUrl(preset?.icon_path),
+        initialQuantity: Number(batch.initial_quantity),
+        lifecycleState: batch.lifecycle_state,
+        name: batch.name,
+        needsRestock: Boolean(rule && totalByNameAndUnit.get(key) <= Number(rule.minimum_quantity)),
+        openedAt: batch.opened_at,
+        presetUid: batch.preset_uid,
+        purchasePrice: batch.purchase_price === null ? null : Number(batch.purchase_price),
+        priceSource: batch.price_source,
+        priceStatus: batch.price_status,
+        remainingQuantity: Number(batch.remaining_quantity),
+        restockRule: rule ? {
+          enabled: Boolean(rule.is_enabled),
+          minimumQuantity: Number(rule.minimum_quantity),
+          targetQuantity: Number(rule.target_quantity),
+        } : null,
+        stockedAt: batch.stocked_at,
+        storageZone: batch.storage_zone,
+        unit: batch.unit,
+        useByAt: batch.use_by_at,
+        version: batch.version,
+      };
+    }),
+  };
+}
+
+// Arthur: NarIyirm
+// 中文：单批次详情在此补读 version、初始数量、preset 图标和名称级补货规则；调用方是 GET /inventory/batches/:batchUid。
+// EN: Single-batch detail adds version, initial quantity, preset icon, and the name-level restock rule for GET /inventory/batches/:batchUid.
+async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUid = null) {
+  // Arthur: NarIyirm
+  // 中文：详情按 preset_uid 补读与列表相同的图标，同时加载批次版本、初始数量和名称级补货规则。
+  // EN: Detail resolves the same preset icon as the list while loading the batch version, stocked quantity, and name-level restock rule.
+  const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
+  const batchResult = await supabase
+    .from('inventory_batches')
+    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version')
+    .eq('fridge_uid', fridgeUid)
+    .eq('batch_uid', batchUid)
+    .eq('lifecycle_state', 'active')
+    .maybeSingle();
+
+  if (batchResult.error) throw batchResult.error;
+  if (!batchResult.data) return null;
+
+  const batch = batchResult.data;
+  const [categoryResult, ruleResult, presetResult] = await Promise.all([
+    supabase
+      .from('food_categories')
+      .select('name, system_code')
+      .eq('fridge_uid', fridgeUid)
+      .eq('category_uid', batch.category_uid)
+      .maybeSingle(),
+    supabase
+      .from('restock_rules')
+      .select('minimum_quantity, target_quantity, is_enabled')
+      .eq('fridge_uid', fridgeUid)
+      .eq('normalized_item_name', normaliseName(batch.name))
+      .eq('unit', batch.unit)
+      .maybeSingle(),
+    batch.preset_uid
+      ? supabase
+        .from('food_presets')
+        .select('icon_path, icon_emoji')
+        .eq('preset_uid', batch.preset_uid)
+        .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
+  ]);
+
+  const failed = [categoryResult, ruleResult, presetResult].find(({ error }) => error);
+  if (failed?.error) throw failed.error;
+
+  const rule = ruleResult.data;
+  return {
+    categoryCode: categoryResult.data?.system_code ?? 'other',
+    categoryName: categoryResult.data?.name ?? 'Other',
+    currency: batch.currency,
+    deadlineType: batch.use_by_at ? 'use_by' : batch.best_before_at ? 'best_before' : null,
+    bestBeforeAt: batch.best_before_at,
+    estimatedQualityUntil: batch.estimated_quality_until,
+    expiresAt: batch.expires_at,
+    expiryWarningDays: batch.expiry_warning_days,
+    id: batch.batch_uid,
+    iconEmoji: presetResult.data?.icon_emoji ?? null,
+    iconUrl: getPresetIconUrl(presetResult.data?.icon_path),
+    initialQuantity: Number(batch.initial_quantity),
+    lifecycleState: batch.lifecycle_state,
+    name: batch.name,
+    openedAt: batch.opened_at,
+    purchasePrice: batch.purchase_price === null ? null : Number(batch.purchase_price),
+    priceSource: batch.price_source,
+    priceStatus: batch.price_status,
+    presetUid: batch.preset_uid,
+    remainingQuantity: Number(batch.remaining_quantity),
+    restockRule: rule ? {
+      enabled: Boolean(rule.is_enabled),
+      minimumQuantity: Number(rule.minimum_quantity),
+      targetQuantity: Number(rule.target_quantity),
+    } : null,
+    stockedAt: batch.stocked_at,
+    storageZone: batch.storage_zone,
+    unit: batch.unit,
+    useByAt: batch.use_by_at,
+    version: batch.version,
+  };
+}
+
+function sendInvalidRequest(response, message) {
+  return response.status(400).json({ message });
+}
+
+function sendInventoryMutationError(response, error) {
+  if (error.message.includes('not found')) return response.status(404).json({ message: error.message });
+  if (error.message.includes('version conflict')) {
+    return response.status(409).json({ message: 'This item changed on another device. Reload it and try again.' });
+  }
+  if (error.message.includes('inventory_use_by_expired')) {
+    return response.status(409).json({ error: 'inventory_use_by_expired', message: 'This item is past its use-by time and cannot be recorded as consumed.' });
+  }
+  console.error('Inventory mutation failed:', error.message);
+  return response.status(503).json({ message: 'The inventory change could not be saved.' });
+}
+
+inventoryRouter.post('/devices/bootstrap', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+
+  try {
+    const snapshot = await getInventorySnapshot(deviceId);
+    return response.status(201).json({ fridge: snapshot.fridge, categories: snapshot.categories });
+  } catch (error) {
+    console.error('Device bootstrap failed:', error.message);
+    return response.status(503).json({ message: 'The inventory service is unavailable.' });
+  }
+});
+
+inventoryRouter.get('/inventory', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+
+  try {
+    return response.json(await getInventorySnapshot(deviceId, request.fridgeUid));
+  } catch (error) {
+    console.error('Inventory read failed:', error.message);
+    return response.status(503).json({ message: 'The inventory service is unavailable.' });
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：自定义分类由当前冰箱拥有，图标只在创建时生成并持久化；库存快照随后一次返回分类，页面进入时不会等待 AI。
+// EN: A custom category belongs to the current fridge and generates its persisted icon only at creation; later inventory snapshots return it without making page entry wait for AI.
+inventoryRouter.post('/inventory/categories', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const name = typeof request.body?.name === 'string' ? request.body.name.trim() : '';
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!name || name.length > 24) return sendInvalidRequest(response, 'A category name between 1 and 24 characters is required.');
+
+  try {
+    const existing = await supabase.from('food_categories').select('category_uid').eq('fridge_uid', request.fridgeUid).eq('normalized_name', normaliseName(name)).maybeSingle();
+    if (existing.error) throw existing.error;
+    if (existing.data) return response.status(409).json({ error: 'category_exists' });
+    const countResult = await supabase.from('food_categories').select('category_uid', { count: 'exact', head: true }).eq('fridge_uid', request.fridgeUid).eq('is_default', false);
+    if (countResult.error) throw countResult.error;
+    if ((countResult.count ?? 0) >= 12) return response.status(400).json({ error: 'category_limit_reached' });
+    if (!await consumeRateLimit({ identifier: deviceId, policy: rateLimitPolicies.aiGeneration, request, response })) return undefined;
+
+    const categoryUid = randomUUID();
+    const iconPath = `categories/${request.fridgeUid}/${categoryUid}/v${ICON_PROMPT_VERSION}.png`;
+    const iconBuffer = await generateFoodPresetIcon(name);
+    const uploadResult = await supabase.storage.from(PRESET_ICON_BUCKET).upload(iconPath, iconBuffer, { cacheControl: '31536000', contentType: 'image/png', upsert: false });
+    if (uploadResult.error) throw uploadResult.error;
+
+    const insertResult = await supabase.from('food_categories').insert({
+      category_uid: categoryUid,
+      colour: getCategoryColour(name),
+      created_by_device_id: deviceId,
+      fridge_uid: request.fridgeUid,
+      icon: 'sparkles-outline',
+      icon_path: iconPath,
+      icon_source: 'ai_generated',
+      is_default: false,
+      name,
+    }).select('category_uid, name, system_code, colour, icon, icon_path, is_default').single();
+    if (insertResult.error) {
+      await supabase.storage.from(PRESET_ICON_BUCKET).remove([iconPath]);
+      throw insertResult.error;
+    }
+    const category = insertResult.data;
+    return response.status(201).json({ category: { code: category.system_code, colour: category.colour, icon: category.icon, iconUrl: getPresetIconUrl(category.icon_path), id: category.category_uid, isDefault: category.is_default, name: category.name } });
+  } catch (error) {
+    console.error('Custom category generation failed:', error.message);
+    return response.status(503).json({ error: 'category_generation_unavailable' });
+  }
+});
+
+inventoryRouter.get('/inventory/batches/:batchUid', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+
+  try {
+    const batch = await getInventoryBatchDetail(deviceId, batchUid, request.fridgeUid);
+    return batch ? response.json({ batch }) : response.status(404).json({ message: 'Inventory batch not found.' });
+  } catch (error) {
+    console.error('Inventory detail read failed:', error.message);
+    return response.status(503).json({ message: 'The inventory item could not be loaded.' });
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：详情弹窗关闭时进入此路由；校验数量和版本后交给 adjust_inventory_batch_quantity 原子更新批次与流水。
+// EN: Detail-sheet close enters this route; validated quantity and version flow to adjust_inventory_batch_quantity for atomic batch and event updates.
+inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const remainingQuantity = asNumber(request.body?.remainingQuantity);
+  const expectedVersion = asNumber(request.body?.expectedVersion);
+  const unit = typeof request.body?.unit === 'string' ? request.body.unit.trim() : '';
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (remainingQuantity === null || remainingQuantity < 0 || !INVENTORY_UNITS.has(unit) || remainingQuantity >= getMaxInventoryQuantity(unit) || !Number.isInteger(expectedVersion)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit and a batch version are required.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('adjust_inventory_batch_quantity', {
+      p_batch_uid: batchUid,
+      p_device_id: deviceId,
+      p_expected_version: expectedVersion,
+      p_remaining_quantity: remainingQuantity,
+    });
+    if (error) throw error;
+    const updated = Array.isArray(data) ? data[0] : data;
+    await notifySharedInventory(deviceId, batchUid, 'updated');
+    return response.json({
+      batch: {
+        id: updated.batch_uid,
+        lifecycleState: updated.lifecycle_state,
+        remainingQuantity: Number(updated.remaining_quantity),
+        version: updated.version,
+      },
+    });
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：编辑表单在此更新完整批次资料；expectedVersion 冲突统一转换为 409，前端需重载后重试。
+// EN: The edit form updates full batch details here; expectedVersion conflicts become 409 so the client reloads before retrying.
+inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const body = request.body ?? {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const remainingQuantity = asNumber(body.remainingQuantity);
+  const purchasePrice = asRequiredNumber(body.purchasePrice);
+  const priceSource = body.priceSource ?? 'user';
+  const deadlineType = body.deadlineType ?? 'best_before';
+  const expectedVersion = asNumber(body.expectedVersion);
+  const expiryWarningDays = getExpiryWarningDays(body);
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
+    return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
+  }
+  if (remainingQuantity === null || remainingQuantity < 0 || !INVENTORY_UNITS.has(body.unit) || remainingQuantity >= getMaxInventoryQuantity(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
+  }
+  if (purchasePrice === null || purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price is required and cannot be negative.');
+  if (!INVENTORY_PRICE_SOURCES.has(priceSource)) return sendInvalidRequest(response, 'A valid price source is required.');
+  if (body.expiresAt != null && !INVENTORY_DEADLINE_TYPES.has(deadlineType)) return sendInvalidRequest(response, 'A valid deadline type is required.');
+  if (!Number.isInteger(expectedVersion)) return sendInvalidRequest(response, 'A batch version is required.');
+  if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
+    return sendInvalidRequest(response, 'Expiry time is invalid.');
+  }
+  if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
+    return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
+  }
+
+  try {
+    const { error } = await supabase.rpc('update_inventory_batch_details_v2', {
+      p_batch_uid: batchUid,
+      p_category_code: body.categoryCode,
+      p_device_id: deviceId,
+      p_expected_version: expectedVersion,
+      p_deadline_at: body.expiresAt ?? null,
+      p_deadline_type: body.expiresAt == null ? 'none' : deadlineType,
+      p_expiry_warning_days: expiryWarningDays,
+      p_name: name,
+      p_purchase_price: purchasePrice,
+      p_price_source: priceSource,
+      p_remaining_quantity: remainingQuantity,
+      p_storage_zone: body.storageZone,
+      p_unit: body.unit.trim(),
+    });
+    if (error) throw error;
+
+    const batch = await getInventoryBatchDetail(deviceId, batchUid, request.fridgeUid);
+    await notifySharedInventory(deviceId, batchUid, 'updated');
+    return response.json({ batch });
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：详情页只提交结果与原因；数据库函数在同一锁中决定 consume、discard 或 correction 流水并清零活跃库存。
+// EN: The detail screen submits only outcome and reason; the database function records consume, discard, or correction and clears active stock under one lock.
+inventoryRouter.post('/inventory/batches/:batchUid/resolve', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const expectedVersion = asNumber(request.body?.expectedVersion);
+  const outcome = request.body?.outcome;
+  const reasonCode = request.body?.reasonCode;
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (!Number.isInteger(expectedVersion) || !INVENTORY_OUTCOMES.has(outcome) || !INVENTORY_OUTCOME_REASONS.has(reasonCode)) {
+    return sendInvalidRequest(response, 'A batch version, outcome, and reason are required.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('resolve_inventory_batch', {
+      p_batch_uid: batchUid,
+      p_device_id: deviceId,
+      p_expected_version: expectedVersion,
+      p_outcome: outcome,
+      p_reason_code: reasonCode,
+    });
+    if (error) throw error;
+    const updated = Array.isArray(data) ? data[0] : data;
+    await notifySharedInventory(deviceId, batchUid, 'removed');
+    return response.json({
+      batch: {
+        id: updated.batch_uid,
+        lifecycleState: updated.lifecycle_state,
+        remainingQuantity: Number(updated.remaining_quantity),
+        version: updated.version,
+      },
+    });
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：详情或编辑表单从此设置名称和单位级补货规则；enabled=false 会关闭规则而不删除库存。
+// EN: Detail and edit forms set a name-and-unit restock rule here; enabled=false disables the rule without deleting inventory.
+inventoryRouter.put('/inventory/batches/:batchUid/restock-rule', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const enabled = request.body?.enabled === true;
+  const minimumQuantity = enabled ? asNumber(request.body?.minimumQuantity) : null;
+  const targetQuantity = enabled ? asNumber(request.body?.targetQuantity) : null;
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (enabled && (minimumQuantity === null || targetQuantity === null || minimumQuantity < 0 || minimumQuantity >= getMaxInventoryQuantity(request.body?.unit) || targetQuantity >= getMaxInventoryQuantity(request.body?.unit) || targetQuantity <= minimumQuantity)) {
+    return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
+  }
+
+  try {
+    const { error } = await supabase.rpc('set_inventory_restock_rule', {
+      p_batch_uid: batchUid,
+      p_device_id: deviceId,
+      p_enabled: enabled,
+      p_minimum_quantity: minimumQuantity,
+      p_target_quantity: targetQuantity,
+    });
+    if (error) throw error;
+    return response.json({
+      restockRule: enabled ? { enabled: true, minimumQuantity, targetQuantity } : null,
+    });
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：前端“移出冰箱”进入此路由；archive_inventory_batch 执行软归档并保留历史事件。
+// EN: The remove action enters this route; archive_inventory_batch soft-archives the row and preserves history events.
+inventoryRouter.delete('/inventory/batches/:batchUid', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const { batchUid } = request.params;
+  const expectedVersion = asNumber(request.body?.expectedVersion);
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!UUID_PATTERN.test(batchUid)) return sendInvalidRequest(response, 'A valid batch ID is required.');
+  if (!Number.isInteger(expectedVersion)) return sendInvalidRequest(response, 'A batch version is required.');
+
+  try {
+    const { error } = await supabase.rpc('archive_inventory_batch', {
+      p_batch_uid: batchUid,
+      p_device_id: deviceId,
+      p_expected_version: expectedVersion,
+    });
+    if (error) throw error;
+    await notifySharedInventory(deviceId, batchUid, 'removed');
+    return response.status(204).send();
+  } catch (error) {
+    return sendInventoryMutationError(response, error);
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：InventoryEntryFlow 的防抖查询进入此路由；只返回参考建议，不创建批次或修改用户数据。
+// EN: InventoryEntryFlow's debounced lookup enters here and returns guidance without creating a batch or mutating user data.
+inventoryRouter.get('/food-presets/suggestion', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const query = typeof request.query.q === 'string' ? request.query.q.trim() : '';
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!query) return response.json({ suggestion: null });
+
+  try {
+    // Arthur: NarIyirm
+    // 中文：预设是跨冰箱共享的参考数据，但仍经由 Express 返回；别名在服务端统一做大小写和空白规范化匹配。
+    // EN: Presets are global reference data but still return through Express; aliases are matched server-side after case and whitespace normalisation.
+    const preset = findPresetMatch(await getEnabledFoodPresets(), query);
+    if (!preset || !CATEGORY_CODES.has(preset.suggested_category_code)) {
+      return response.json({ suggestion: null });
+    }
+    return response.json({ suggestion: toPresetSuggestion(preset) });
+  } catch (error) {
+    console.error('Food preset lookup failed:', error.message);
+    return response.status(503).json({ message: 'Food suggestions are unavailable.' });
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：只有用户明确触发“一键生成”或条码扫描补全时才调用两个免费模型；标准名和别名二次命中时直接复用已有 preset 与图标。
+// EN: The two free models run only after an explicit one-tap generation or barcode enrichment scan; a second canonical/alias match reuses the existing preset and icon.
+inventoryRouter.post('/food-presets/generate', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  const inputName = typeof request.body?.name === 'string' ? request.body.name.trim() : '';
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+  if (!inputName || inputName.length > 120) {
+    return sendInvalidRequest(response, 'A food name between 1 and 120 characters is required.');
+  }
+
+  try {
+    const existingPreset = findPresetMatch(await getEnabledFoodPresets(), inputName);
+    if (existingPreset) return response.json({ generated: false, suggestion: toPresetSuggestion(existingPreset) });
+    if (!await consumeRateLimit({
+      identifier: deviceId,
+      policy: rateLimitPolicies.aiGeneration,
+      request,
+      response,
+    })) return undefined;
+
+    const metadata = await generateFoodPresetMetadata(inputName);
+    const candidates = [inputName, metadata.canonicalName, ...metadata.aliases];
+    const secondMatch = findPresetCandidateMatch(await getEnabledFoodPresets(), candidates);
+    if (secondMatch) return response.json({ generated: false, suggestion: toPresetSuggestion(secondMatch) });
+
+    const iconBuffer = await generateFoodPresetIcon(metadata.canonicalName);
+    const { data, error } = await supabase.rpc('save_generated_food_preset', {
+      p_aliases: metadata.aliases,
+      p_canonical_name: metadata.canonicalName,
+      p_category_code: metadata.categoryCode,
+      p_generation_model: GEMINI_PRESET_MODEL,
+      p_icon_emoji: metadata.fallbackEmoji,
+      p_input_name: inputName,
+      p_notes: metadata.notes,
+      p_shelf_life_days: metadata.shelfLifeDays,
+      p_storage_zone: metadata.storageZone,
+    });
+    if (error) throw error;
+    let preset = Array.isArray(data) ? data[0] : data;
+
+    if (!preset.icon_path) {
+      const iconPath = `ai/${preset.preset_uid}/v${ICON_PROMPT_VERSION}.png`;
+      const uploadResult = await supabase.storage
+        .from(PRESET_ICON_BUCKET)
+        .upload(iconPath, iconBuffer, { cacheControl: '31536000', contentType: 'image/png', upsert: false });
+      if (uploadResult.error && !uploadResult.error.message.toLowerCase().includes('already exists')) {
+        throw uploadResult.error;
+      }
+
+      const updateResult = await supabase
+        .from('food_presets')
+        .update({
+          generation_model: `${GEMINI_PRESET_MODEL} + ${CLOUDFLARE_ICON_MODEL}`,
+          generation_prompt_version: ICON_PROMPT_VERSION,
+          icon_path: iconPath,
+          icon_source: 'ai_generated',
+        })
+        .eq('preset_uid', preset.preset_uid)
+        .is('icon_path', null)
+        .select('preset_uid, canonical_name, aliases, suggested_storage_zone, suggested_shelf_life_days, suggested_category_code, notes, icon_path, icon_emoji, source_type')
+        .maybeSingle();
+      if (updateResult.error) throw updateResult.error;
+      preset = updateResult.data ?? { ...preset, icon_path: iconPath, icon_source: 'ai_generated' };
+    }
+
+    return response.status(201).json({ generated: true, suggestion: toPresetSuggestion(preset) });
+  } catch (error) {
+    const message = error?.message ?? 'The AI preset could not be generated.';
+    console.error('AI food preset generation failed:', message);
+    return response.status(503).json({ message: 'AI generation is temporarily unavailable. Check the server AI configuration and try again.' });
+  }
+});
+
+// Arthur: NarIyirm
+// 中文：手动与识别录入共用此创建路由；输入校验后由 create_inventory_batch RPC 原子写批次、stock 流水和规则。
+// EN: Manual and recognition entry share this create route; after validation, create_inventory_batch atomically writes the batch, stock event, and rule.
+inventoryRouter.post('/inventory/batches', async (request, response) => {
+  const deviceId = getDeviceId(request);
+  if (!deviceId) return sendInvalidRequest(response, 'A valid Device-ID header is required.');
+
+  const body = request.body ?? {};
+  const name = typeof body.name === 'string' ? body.name.trim() : '';
+  const quantity = asNumber(body.initialQuantity);
+  const purchasePrice = asRequiredNumber(body.purchasePrice);
+  const priceSource = body.priceSource ?? 'user';
+  const deadlineType = body.deadlineType ?? 'best_before';
+  const restock = body.restockRule;
+  const hasRestock = restock?.enabled === true;
+  const restockMinimum = hasRestock ? asNumber(restock.minimumQuantity) : null;
+  const restockTarget = hasRestock ? asNumber(restock.targetQuantity) : null;
+  const presetUid = body.presetUid === null || body.presetUid === undefined ? null : body.presetUid;
+  const expiryWarningDays = getExpiryWarningDays(body);
+
+  if (!name || name.length > MAX_INVENTORY_NAME_LENGTH || !CATEGORY_CODES.has(body.categoryCode) || !STORAGE_ZONES.has(body.storageZone)) {
+    return sendInvalidRequest(response, 'Name, category, and storage zone are required.');
+  }
+  if (quantity === null || quantity <= 0 || !INVENTORY_UNITS.has(body.unit) || quantity >= getMaxInventoryQuantity(body.unit)) {
+    return sendInvalidRequest(response, 'A quantity within the supported range for its unit is required.');
+  }
+  if (purchasePrice === null || purchasePrice < 0) return sendInvalidRequest(response, 'Purchase price is required and cannot be negative.');
+  if (!INVENTORY_PRICE_SOURCES.has(priceSource)) return sendInvalidRequest(response, 'A valid price source is required.');
+  if (body.expiresAt != null && !INVENTORY_DEADLINE_TYPES.has(deadlineType)) return sendInvalidRequest(response, 'A valid deadline type is required.');
+  if (body.expiresAt !== null && body.expiresAt !== undefined && Number.isNaN(Date.parse(body.expiresAt))) {
+    return sendInvalidRequest(response, 'Expiry time is invalid.');
+  }
+  if (body.expiresAt !== null && (!Number.isInteger(expiryWarningDays) || expiryWarningDays < 1 || expiryWarningDays > 7)) {
+    return sendInvalidRequest(response, 'Expiry warning days must be an integer from 1 to 7.');
+  }
+  if (hasRestock && (restockMinimum === null || restockTarget === null || restockMinimum < 0 || restockMinimum >= getMaxInventoryQuantity(body.unit) || restockTarget >= getMaxInventoryQuantity(body.unit) || restockTarget <= restockMinimum)) {
+    return sendInvalidRequest(response, 'Restock target must be higher than the minimum quantity.');
+  }
+  if (presetUid !== null && (typeof presetUid !== 'string' || !UUID_PATTERN.test(presetUid))) {
+    return sendInvalidRequest(response, 'A valid food preset ID is required.');
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('create_inventory_batch_v2', {
+      p_category_code: body.categoryCode,
+      p_device_id: deviceId,
+      p_deadline_at: body.expiresAt ?? null,
+      p_deadline_type: body.expiresAt == null ? 'none' : deadlineType,
+      p_expiry_warning_days: expiryWarningDays,
+      p_initial_quantity: quantity,
+      p_name: name,
+      p_purchase_price: purchasePrice,
+      p_price_source: priceSource,
+      p_preset_uid: presetUid,
+      p_restock_enabled: hasRestock,
+      p_restock_minimum_quantity: restockMinimum,
+      p_restock_target_quantity: restockTarget,
+      p_storage_zone: body.storageZone,
+      p_unit: body.unit.trim(),
+    });
+    if (error) throw error;
+
+    const created = Array.isArray(data) ? data[0] : data;
+    if (created?.batch_uid) await notifySharedInventory(deviceId, created.batch_uid, 'stocked');
+    return response.status(201).json({ batchUid: created?.batch_uid ?? null });
+  } catch (error) {
+    const message = error?.message ?? 'The item could not be saved.';
+    console.error('Inventory write failed:', message);
+    return response.status(503).json({ message });
+  }
+});
+
+export { inventoryRouter };

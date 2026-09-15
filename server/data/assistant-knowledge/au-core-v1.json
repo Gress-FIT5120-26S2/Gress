@@ -1,0 +1,221 @@
+{
+  "manifestVersion": "au-core-v1",
+  "sources": [
+    {
+      "title": "Use-by and best-before dates",
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/consumer/labelling/dates",
+      "jurisdiction": "AU",
+      "contentType": "food_safety",
+      "publishedAt": "2025-02-25T00:00:00Z",
+      "reviewedAt": "2026-09-10T00:00:00Z",
+      "trustLevel": "authoritative",
+      "documents": [
+        {
+          "title": "Date marking rules — English",
+          "language": "en",
+          "version": "2025-02-25-en-v1",
+          "chunks": [
+            {
+              "topic": "use_by",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Use-by dates",
+              "content": "A package use-by date is a safety deadline. Food should not be eaten after that date because it may pose a health or safety risk. KitchMemo must recommend disposal after useByAt and must never let an internal quality estimate extend or override that package deadline."
+            },
+            {
+              "topic": "best_before",
+              "riskLevel": "general",
+              "foodNames": [],
+              "sourceSection": "Best-before dates",
+              "content": "A package best-before date concerns expected quality rather than an automatic safety cutoff. Food may lose quality after that date. Required storage directions on the label still apply. KitchMemo's estimatedQualityUntil is a system-owned planning estimate, not a manufacturer date and not a safety guarantee."
+            }
+          ]
+        },
+        {
+          "title": "日期标识规则—中文",
+          "language": "zh",
+          "version": "2025-02-25-zh-v1",
+          "chunks": [
+            {
+              "topic": "use_by",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Use-by dates",
+              "content": "包装上的 use-by 是食品安全硬截止时间。超过该日期后食品可能造成健康或安全风险，不应食用。KitchMemo 在 useByAt 之后必须建议丢弃，系统内部的品质估算绝不能延长或覆盖该日期。"
+            },
+            {
+              "topic": "best_before",
+              "riskLevel": "general",
+              "foodNames": [],
+              "sourceSection": "Best-before dates",
+              "content": "包装上的 best-before 主要描述预期品质，并不自动等同于安全截止时间；超过后品质可能下降，同时仍须遵守标签储存要求。KitchMemo 的 estimatedQualityUntil 是系统生成的规划估算，不是厂商日期，也不是安全保证。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Food safety basics",
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/consumer/prevention-of-foodborne-illness/food-safety-basics",
+      "jurisdiction": "AU",
+      "contentType": "food_safety",
+      "publishedAt": null,
+      "reviewedAt": "2026-09-10T00:00:00Z",
+      "trustLevel": "authoritative",
+      "documents": [
+        {
+          "title": "Food safety basics — English",
+          "language": "en",
+          "version": "reviewed-2026-09-10-en-v1",
+          "chunks": [
+            {
+              "topic": "label_directions",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Check your food is safe to use",
+              "content": "Before using food, check that package storage instructions have been followed, especially refrigeration requirements. Do not eat food after its use-by date, and follow package preparation or cooking instructions."
+            },
+            {
+              "topic": "safety_uncertainty",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Check your food is safe to use",
+              "content": "Inventory dates alone cannot prove safe handling. If required storage conditions were not followed or the condition of a food is uncertain, KitchMemo should state the uncertainty and choose the safer action rather than reassuring the user."
+            }
+          ]
+        },
+        {
+          "title": "食品安全基础—中文",
+          "language": "zh",
+          "version": "reviewed-2026-09-10-zh-v1",
+          "chunks": [
+            {
+              "topic": "label_directions",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Check your food is safe to use",
+              "content": "使用食品前应确认已经遵守包装储存说明，尤其是冷藏要求。超过 use-by 日期的食品不得食用，并应遵循包装上的处理或烹调说明。"
+            },
+            {
+              "topic": "safety_uncertainty",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Check your food is safe to use",
+              "content": "仅凭库存日期不能证明食品一直被安全储存。如果必要储存条件没有得到遵守，或食品状况不确定，KitchMemo 应明确说明不确定性并采用更安全的处理建议，不能给出无依据的保证。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "Canned foods: purchasing and storing",
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/consumer/prevention-of-foodborne-illness/cannedfoods",
+      "jurisdiction": "AU",
+      "contentType": "food_storage",
+      "publishedAt": "2025-10-02T00:00:00Z",
+      "reviewedAt": "2026-09-10T00:00:00Z",
+      "trustLevel": "authoritative",
+      "documents": [
+        {
+          "title": "Canned food storage — English",
+          "language": "en",
+          "version": "2025-10-02-en-v1",
+          "chunks": [
+            {
+              "topic": "damaged_packaging",
+              "riskLevel": "safety_sensitive",
+              "foodNames": ["canned food"],
+              "sourceSection": "After opening and packaging condition",
+              "content": "Discard canned or shelf-stable packaged food without tasting when packaging or seals are damaged, leaking, swollen or under pressure, or when contents show unusual odour or colour. A date estimate must not override visible packaging danger signs."
+            },
+            {
+              "topic": "opened_cans",
+              "riskLevel": "safety_sensitive",
+              "foodNames": ["canned food"],
+              "sourceSection": "After opening",
+              "content": "After opening, canned food becomes perishable. If it is not used immediately, transfer it to a clean covered glass or plastic container and refrigerate it; do not treat the unopened package date as the remaining storage window."
+            }
+          ]
+        },
+        {
+          "title": "罐装食品储存—中文",
+          "language": "zh",
+          "version": "2025-10-02-zh-v1",
+          "chunks": [
+            {
+              "topic": "damaged_packaging",
+              "riskLevel": "safety_sensitive",
+              "foodNames": ["罐装食品"],
+              "sourceSection": "After opening and packaging condition",
+              "content": "如果罐头或常温包装出现封口破损、泄漏、鼓胀、受压，或内容物有异常气味或颜色，应在不试吃的情况下丢弃。任何日期估算都不能覆盖明显的包装危险信号。"
+            },
+            {
+              "topic": "opened_cans",
+              "riskLevel": "safety_sensitive",
+              "foodNames": ["罐装食品"],
+              "sourceSection": "After opening",
+              "content": "罐装食品开封后会变成易腐食品。如未立即用完，应转移到干净、有盖的玻璃或塑料容器中冷藏；不能继续把未开封包装日期当作剩余储存期限。"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "title": "2-hour / 4-hour rule",
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/business/food-safety/2-hour-4-hour-rule",
+      "jurisdiction": "AU",
+      "contentType": "food_storage",
+      "publishedAt": null,
+      "reviewedAt": "2026-09-10T00:00:00Z",
+      "trustLevel": "authoritative",
+      "documents": [
+        {
+          "title": "Temperature exposure rule — English",
+          "language": "en",
+          "version": "reviewed-2026-09-10-en-v1",
+          "chunks": [
+            {
+              "topic": "temperature_exposure",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "2-hour / 4-hour rule",
+              "content": "For potentially hazardous food held between 5°C and 60°C, count all time out of refrigeration cumulatively. Under 2 hours it may be used immediately or returned to refrigeration; between 2 and 4 hours it should be used immediately; after 4 hours it must be discarded."
+            },
+            {
+              "topic": "temperature_tracking",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Keeping track of time",
+              "content": "KitchMemo must ask about time and temperature exposure when that fact changes the safety outcome. If the cumulative exposure time is unknown, it must not invent a precise safe window from the normal fridge estimate."
+            }
+          ]
+        },
+        {
+          "title": "温度暴露规则—中文",
+          "language": "zh",
+          "version": "reviewed-2026-09-10-zh-v1",
+          "chunks": [
+            {
+              "topic": "temperature_exposure",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "2-hour / 4-hour rule",
+              "content": "潜在高风险食品处于 5°C 至 60°C 之间时，离开冷藏的累计时间必须合并计算：少于 2 小时可立即使用或放回冷藏；2 至 4 小时应立即使用；超过 4 小时必须丢弃。"
+            },
+            {
+              "topic": "temperature_tracking",
+              "riskLevel": "safety_sensitive",
+              "foodNames": [],
+              "sourceSection": "Keeping track of time",
+              "content": "当离开冷藏的时间和温度会改变安全结论时，KitchMemo 必须追问这些信息。如果累计暴露时间未知，不能依据正常冷藏品质估算虚构精确的安全剩余时间。"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

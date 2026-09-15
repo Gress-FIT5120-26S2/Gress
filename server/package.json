@@ -4,13 +4,33 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "node --watch src/index.js",
-    "start": "node src/index.js"
+    "backfill:preset-icons": "node scripts/backfill-preset-icons.js",
+    "ingest:assistant-knowledge": "node scripts/ingest-assistant-knowledge.js",
+    "dev": "node src/index.js",
+    "start": "node src/index.js",
+    "verify:notification-preferences": "node scripts/verify-notification-preferences.js",
+    "verify:expiry-warning-days": "node scripts/verify-expiry-warning-days.js",
+    "verify:inventory-outcomes": "node scripts/verify-inventory-outcomes.js",
+    "verify:achievements": "node scripts/verify-achievements.js",
+    "verify:quests": "node scripts/verify-quests.js",
+    "verify:api-security": "node scripts/verify-api-security.js",
+    "verify:api-security:live": "node scripts/verify-api-security.js --live",
+    "verify:assistant-rag": "node scripts/verify-assistant-rag.js",
+    "verify:assistant-orchestrator": "node scripts/verify-assistant-orchestrator.js",
+    "verify:assistant-actions": "node scripts/verify-assistant-actions.js",
+    "verify:assistant-history": "node scripts/verify-assistant-history.js",
+    "verify:profile": "node scripts/verify-profile.js",
+    "verify:shared-notifications": "node scripts/verify-shared-notifications.js",
+    "verify:sharing": "node scripts/verify-sharing.js",
+    "verify:sync": "node scripts/verify-sync.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.95.3",
+    "@vercel/functions": "^3.9.5",
     "cors": "^2.8.5",
     "dotenv": "^17.4.2",
-    "express": "^5.2.1"
+    "express": "^5.2.1",
+    "multer": "^2.3.0",
+    "sharp": "^0.35.4"
   }
 }
