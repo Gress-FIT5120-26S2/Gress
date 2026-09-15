@@ -17,6 +17,7 @@
     "verify:api-security:live": "node scripts/verify-api-security.js --live",
     "verify:assistant-rag": "node scripts/verify-assistant-rag.js",
     "verify:assistant-orchestrator": "node scripts/verify-assistant-orchestrator.js",
+    "verify:assistant-scope": "node scripts/verify-assistant-scope.js",
     "verify:assistant-actions": "node scripts/verify-assistant-actions.js",
     "verify:assistant-history": "node scripts/verify-assistant-history.js",
     "verify:profile": "node scripts/verify-profile.js",

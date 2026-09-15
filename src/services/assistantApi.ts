@@ -2,6 +2,17 @@ import { requestApi } from './apiClient';
 
 export type AssistantLanguage = 'en' | 'zh';
 export type AssistantRiskLevel = 'danger' | 'info' | 'warning';
+export type AssistantScopeDecision = 'in_scope' | 'mixed' | 'out_of_scope';
+export type AssistantRejectedRequestType =
+  | 'code_generation'
+  | 'creative_writing'
+  | 'general_knowledge'
+  | 'other'
+  | 'privileged_instruction'
+  | 'roleplay'
+  | 'translation'
+  | 'unrelated_advice'
+  | 'unrelated_calculation';
 export type AssistantActionType =
   | 'adjust_quantity'
   | 'archive_batch'
@@ -36,7 +47,9 @@ export type AssistantAnswer = {
   batchReferences: string[];
   citations: AssistantCitation[];
   requiresConfirmation: boolean;
+  rejectedRequestTypes?: AssistantRejectedRequestType[];
   riskLevel: AssistantRiskLevel;
+  scopeDecision?: AssistantScopeDecision;
 };
 
 export type AssistantPendingAction = {

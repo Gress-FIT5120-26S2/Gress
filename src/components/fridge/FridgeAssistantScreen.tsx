@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
@@ -186,6 +187,15 @@ export function FridgeAssistantScreen({
   const scrollToLatest = useCallback(() => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   }, []);
+
+  // Arthur: NarIyirm
+  // 中文：键盘出现时列表与输入区一起缩短，并在系统完成键盘布局后再次滚到底部，让上一轮对话保持可见。
+  // EN: When the keyboard appears, the list shrinks with the composer and scrolls again after the native keyboard layout so the latest context stays visible.
+  useEffect(() => {
+    if (!visible || isHistoryVisible) return undefined;
+    const subscription = Keyboard.addListener('keyboardDidShow', scrollToLatest);
+    return () => subscription.remove();
+  }, [isHistoryVisible, scrollToLatest, visible]);
 
   // Arthur: NarIyirm
   // 中文：快捷问题和自由输入在这里汇合成同一种会话 turn；串行请求确保同一个 conversationUid 的上下文顺序稳定。
@@ -375,7 +385,7 @@ export function FridgeAssistantScreen({
 
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
-      <EdgeSwipeBackView onBack={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.screen}>
+      <EdgeSwipeBackView onBack={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
         <View style={styles.header}>
           <View style={styles.headerSide}>
             <Pressable accessibilityLabel={isHistoryVisible ? copy.backToChat : copy.back} accessibilityRole="button" hitSlop={8} onPress={isHistoryVisible ? () => setIsHistoryVisible(false) : onClose} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
@@ -425,81 +435,142 @@ export function FridgeAssistantScreen({
         ) : (
           <>
             <FlatList
-          contentContainerStyle={styles.content}
-          data={conversation}
-          keyboardDismissMode="interactive"
-          keyboardShouldPersistTaps="handled"
-          keyExtractor={(item) => item.id}
-          ListFooterComponent={batches.length === 0 ? (
-            <Pressable accessibilityRole="button" onPress={addItem} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
-              <Ionicons color="#FFFFFF" name="add" size={20} />
-              <Text style={styles.addButtonText}>{copy.addItem}</Text>
-            </Pressable>
-          ) : null}
-          ListHeaderComponent={(
-            <View style={styles.introSection}>
-              <AssistantMessage message={copy.intro} />
-              {isRestoring ? <AssistantMessage loading message={copy.restoringConversation} /> : null}
-              {historyError && conversation.length === 0 && !isRestoring ? (
-                <Text style={styles.restoreWarning}>{copy.restoreUnavailable}</Text>
-              ) : null}
-              <View style={styles.questionSection}>
-                <Text style={styles.questionHeading}>{copy.quickQuestions}</Text>
-                <View style={styles.questionGrid}>
-                  {QUESTION_ORDER.map((intent) => (
-                    <Pressable
-                      accessibilityRole="button"
-                      disabled={isBusy}
-                      key={intent}
-                      onPress={() => { void askQuestion(questions[intent]); }}
-                      style={({ pressed }) => [styles.questionButton, isBusy && styles.disabled, pressed && !isBusy && styles.pressed]}
-                    >
-                      <Text style={styles.questionText}>{questions[intent]}</Text>
-                      <Ionicons color="#B96327" name="arrow-forward" size={16} />
+              contentContainerStyle={styles.content}
+              data={conversation}
+              keyboardDismissMode="interactive"
+              keyboardShouldPersistTaps="handled"
+              keyExtractor={(item) => item.id}
+              ListFooterComponent={(
+                <View style={styles.conversationFooter}>
+                  {batches.length === 0 ? (
+                    <Pressable accessibilityRole="button" onPress={addItem} style={({ pressed }) => [styles.addButton, pressed && styles.pressed]}>
+                      <Ionicons color="#FFFFFF" name="add" size={20} />
+                      <Text style={styles.addButtonText}>{copy.addItem}</Text>
                     </Pressable>
-                  ))}
+                  ) : null}
+                  <View style={styles.ruleNote}>
+                    <Ionicons color="#60766E" name="information-circle-outline" size={16} />
+                    <Text style={styles.ruleNoteText}>{copy.aiNote}</Text>
+                  </View>
                 </View>
-              </View>
-            </View>
-          )}
-          onContentSizeChange={scrollToLatest}
-          ref={listRef}
-          renderItem={renderTurn}
-          showsVerticalScrollIndicator={false}
+              )}
+              ListHeaderComponent={(
+                <View style={styles.introSection}>
+                  <AssistantMessage message={copy.intro} />
+                  {isRestoring ? <AssistantMessage loading message={copy.restoringConversation} /> : null}
+                  {historyError && conversation.length === 0 && !isRestoring ? (
+                    <Text style={styles.restoreWarning}>{copy.restoreUnavailable}</Text>
+                  ) : null}
+                  {conversation.length === 0 ? (
+                    <QuickQuestionPicker
+                      disabled={isBusy}
+                      onSelect={(question) => { void askQuestion(question); }}
+                      questions={questions}
+                      title={copy.quickQuestions}
+                    />
+                  ) : null}
+                </View>
+              )}
+              onContentSizeChange={scrollToLatest}
+              ref={listRef}
+              renderItem={renderTurn}
+              showsVerticalScrollIndicator={false}
+              style={styles.conversationList}
             />
 
             <View style={styles.composerArea}>
-          <View style={styles.ruleNote}>
-            <Ionicons color="#6A7E77" name="shield-checkmark-outline" size={15} />
-            <Text style={styles.ruleNoteText}>{copy.aiNote}</Text>
-          </View>
-          <View style={styles.composer}>
-            <TextInput
-              accessibilityLabel={copy.inputA11y}
-              editable={!isBusy}
-              maxLength={MAX_MESSAGE_LENGTH}
-              multiline
-              onChangeText={setDraft}
-              placeholder={copy.inputPlaceholder}
-              placeholderTextColor="#73857F"
-              style={styles.input}
-              value={draft}
-            />
-            <Pressable
-              accessibilityLabel={copy.send}
-              accessibilityRole="button"
-              disabled={isBusy || draft.trim().length === 0}
-              onPress={submitDraft}
-              style={({ pressed }) => [styles.sendButton, (isBusy || draft.trim().length === 0) && styles.sendButtonDisabled, pressed && !isBusy && styles.pressed]}
-            >
-              {isBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={21} />}
-            </Pressable>
-          </View>
+              {conversation.length > 0 ? (
+                <QuickQuestionPicker
+                  compact
+                  disabled={isBusy}
+                  onSelect={(question) => { void askQuestion(question); }}
+                  questions={questions}
+                  title={copy.quickQuestions}
+                />
+              ) : null}
+              <View style={styles.composer}>
+                <TextInput
+                  accessibilityLabel={copy.inputA11y}
+                  editable={!isBusy}
+                  maxLength={MAX_MESSAGE_LENGTH}
+                  multiline
+                  onChangeText={setDraft}
+                  onFocus={scrollToLatest}
+                  placeholder={copy.inputPlaceholder}
+                  placeholderTextColor="#73857F"
+                  style={styles.input}
+                  value={draft}
+                />
+                <Pressable
+                  accessibilityLabel={copy.send}
+                  accessibilityRole="button"
+                  disabled={isBusy || draft.trim().length === 0}
+                  onPress={submitDraft}
+                  style={({ pressed }) => [styles.sendButton, (isBusy || draft.trim().length === 0) && styles.sendButtonDisabled, pressed && !isBusy && styles.pressed]}
+                >
+                  {isBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Ionicons color="#FFFFFF" name="arrow-up" size={21} />}
+                </Pressable>
+              </View>
             </View>
           </>
         )}
       </KeyboardAvoidingView></EdgeSwipeBackView>
     </Modal>
+  );
+}
+
+function QuickQuestionPicker({ compact = false, disabled, onSelect, questions, title }: {
+  compact?: boolean;
+  disabled: boolean;
+  onSelect: (question: string) => void;
+  questions: Record<FridgeAssistantIntent, string>;
+  title: string;
+}) {
+  if (compact) {
+    return (
+      <View style={styles.compactQuestionSection}>
+        <Text style={styles.compactQuestionHeading}>{title}</Text>
+        <ScrollView
+          contentContainerStyle={styles.compactQuestionContent}
+          horizontal
+          keyboardShouldPersistTaps="handled"
+          showsHorizontalScrollIndicator={false}
+        >
+          {QUESTION_ORDER.map((intent) => (
+            <Pressable
+              accessibilityRole="button"
+              disabled={disabled}
+              hitSlop={{ bottom: 4, top: 4 }}
+              key={intent}
+              onPress={() => onSelect(questions[intent])}
+              style={({ pressed }) => [styles.compactQuestionButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+            >
+              <Text numberOfLines={1} style={styles.compactQuestionText}>{questions[intent]}</Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.questionSection}>
+      <Text style={styles.questionHeading}>{title}</Text>
+      <View style={styles.questionGrid}>
+        {QUESTION_ORDER.map((intent) => (
+          <Pressable
+            accessibilityRole="button"
+            disabled={disabled}
+            key={intent}
+            onPress={() => onSelect(questions[intent])}
+            style={({ pressed }) => [styles.questionButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+          >
+            <Text style={styles.questionText}>{questions[intent]}</Text>
+            <Ionicons color="#B96327" name="arrow-forward" size={16} />
+          </Pressable>
+        ))}
+      </View>
+    </View>
   );
 }
 
@@ -730,6 +801,7 @@ const styles = StyleSheet.create({
   backButton: { minWidth: 74, minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 2, paddingHorizontal: 10, borderRadius: 21, backgroundColor: '#E7F0ED' },
   backText: { color: '#255043', fontSize: 15, fontWeight: '800' },
   title: { flex: 1, color: '#173D31', fontSize: 19, fontWeight: '900', textAlign: 'center' },
+  conversationList: { flex: 1 },
   content: { gap: 18, paddingHorizontal: 18, paddingTop: 20, paddingBottom: 24 },
   restoreWarning: { marginLeft: 51, color: '#94612D', fontSize: 12.5, fontWeight: '700', lineHeight: 18 },
   historyContent: { flexGrow: 1, gap: 10, paddingHorizontal: 18, paddingTop: 20, paddingBottom: 32 },
@@ -773,6 +845,11 @@ const styles = StyleSheet.create({
   questionGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 9 },
   questionButton: { width: '48.5%', minHeight: 72, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 6, paddingHorizontal: 13, paddingVertical: 11, borderRadius: 14, backgroundColor: '#FCEFE5' },
   questionText: { flex: 1, color: '#9E4F1C', fontSize: 13, fontWeight: '800', lineHeight: 18 },
+  compactQuestionSection: { gap: 6 },
+  compactQuestionHeading: { paddingHorizontal: 4, color: '#60746D', fontSize: 11, fontWeight: '800' },
+  compactQuestionContent: { gap: 7, paddingHorizontal: 1 },
+  compactQuestionButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 19, backgroundColor: '#F6E6D9' },
+  compactQuestionText: { maxWidth: 190, color: '#914A1D', fontSize: 12, fontWeight: '800' },
   batchReference: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, marginLeft: 51, borderWidth: 1, borderColor: '#DCE5E1', borderRadius: 14, backgroundColor: '#FFFFFF' },
   foodIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#F2F6F4' },
   batchCopy: { flex: 1, minWidth: 0, gap: 4 },
@@ -807,9 +884,10 @@ const styles = StyleSheet.create({
   retryText: { color: '#963743', fontSize: 12.5, fontWeight: '900' },
   addButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, marginTop: 6, borderRadius: 14, backgroundColor: '#188AA0' },
   addButtonText: { color: '#FFFFFF', fontSize: 15, fontWeight: '900' },
-  composerArea: { gap: 7, paddingHorizontal: 14, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CFDCD7', backgroundColor: '#F8FBFA' },
-  ruleNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingHorizontal: 5 },
-  ruleNoteText: { flex: 1, color: '#6A7E77', fontSize: 11, lineHeight: 15, fontWeight: '600' },
+  conversationFooter: { gap: 12, paddingTop: 4 },
+  composerArea: { gap: 8, paddingHorizontal: 14, paddingTop: 8, paddingBottom: Platform.OS === 'ios' ? 24 : 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: '#CFDCD7', backgroundColor: '#F8FBFA' },
+  ruleNote: { flexDirection: 'row', alignItems: 'flex-start', gap: 7, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 12, backgroundColor: '#E7EFEC' },
+  ruleNoteText: { flex: 1, color: '#526A61', fontSize: 11, lineHeight: 16, fontWeight: '600' },
   composer: { flexDirection: 'row', alignItems: 'flex-end', gap: 9 },
   input: { flex: 1, maxHeight: 112, minHeight: 48, paddingHorizontal: 15, paddingTop: 13, paddingBottom: 12, borderWidth: 1, borderColor: '#C9D8D3', borderRadius: 18, backgroundColor: '#FFFFFF', color: '#173D31', fontSize: 15, lineHeight: 20 },
   sendButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: '#D9782D' },
