@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { memo } from 'react';
+import { memo, useEffect, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 type FridgeCategoryButtonProps = {
@@ -19,6 +19,10 @@ type FridgeCategoryButtonProps = {
 // 中文：分类按钮封装重复的选中样式，选中哪个分类仍由冰箱页面控制。
 // EN: The category button owns repeated selected styling while the fridge screen controls selection state.
 export const FridgeCategoryButton = memo(function FridgeCategoryButton({ collapsed = false, count, icon, iconUrl, label, onPress, selected, tint, tone }: FridgeCategoryButtonProps) {
+  const [iconFailed, setIconFailed] = useState(false);
+
+  useEffect(() => setIconFailed(false), [iconUrl]);
+
   return (
     <Pressable
       accessibilityLabel={`${label}, ${count}`}
@@ -28,8 +32,22 @@ export const FridgeCategoryButton = memo(function FridgeCategoryButton({ collaps
       style={({ pressed }) => [styles.item, collapsed ? styles.itemCollapsed : null, { backgroundColor: selected ? tint : '#FBFDFC' }, pressed ? styles.pressed : null]}
     >
       <View style={styles.iconWrap}>
-        <Ionicons color={tone} name={icon} size={collapsed ? 22 : 21} />
-        {iconUrl ? <Image cachePolicy="memory-disk" contentFit="contain" source={iconUrl} style={styles.image} transition={120} /> : null}
+        {/* Arthur: NarIyirm */}
+        {/* 中文：远程图标与分类 fallback 互斥显示，避免透明 PNG 透出底层的“其他”立方体；加载失败时再安全回退。 */}
+        {/* EN: Render the remote icon and category fallback exclusively so transparent PNGs cannot reveal the underlying "other" cube; fall back only after a load failure. */}
+        {iconUrl && !iconFailed ? (
+          <Image
+            cachePolicy="memory-disk"
+            contentFit="contain"
+            onError={() => setIconFailed(true)}
+            recyclingKey={iconUrl}
+            source={{ uri: iconUrl }}
+            style={styles.image}
+            transition={120}
+          />
+        ) : (
+          <Ionicons color={tone} name={icon} size={collapsed ? 22 : 21} />
+        )}
       </View>
       {!collapsed ? (
         <Text adjustsFontSizeToFit minimumFontScale={0.68} numberOfLines={1} style={[styles.label, { color: selected ? tone : '#435D54' }]}>
@@ -47,7 +65,7 @@ const styles = StyleSheet.create({
   item: { position: 'relative', width: 68, minHeight: 58, alignItems: 'center', justifyContent: 'center', gap: 3, paddingTop: 7, paddingHorizontal: 3, paddingBottom: 4, borderRadius: 13, borderCurve: 'continuous' },
   itemCollapsed: { width: 44, height: 48, justifyContent: 'center', paddingHorizontal: 0 },
   iconWrap: { width: 23, height: 23, alignItems: 'center', justifyContent: 'center' },
-  image: { position: 'absolute', width: 23, height: 23 },
+  image: { width: 23, height: 23 },
   label: { width: '100%', color: '#435D54', fontSize: 10, fontWeight: '800', textAlign: 'center' },
   countBadge: { position: 'absolute', top: 2, right: 2, minWidth: 16, height: 16, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, borderRadius: 8 },
   countBadgeCollapsed: { top: 3, right: 2, minWidth: 15, height: 15 },
