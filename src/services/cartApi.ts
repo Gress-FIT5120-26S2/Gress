@@ -53,9 +53,8 @@ export const updateCartQuantity = (id: string, quantity: number) =>
     body: JSON.stringify({ quantity }),
   });
 
-// Arthur: NarIyirm
-// 中文：点开购物车某一行时复用加入购物车的表单来编辑；这里一次性提交名称/数量/单位里改动过的字段。
-// EN: Tapping a cart row reopens the add-to-cart form to edit it; this submits whichever of name/quantity/unit changed, in one call.
+// 中文：编辑购物项，一次性提交改动过的字段。
+// EN: Edits a cart item, submitting whichever fields changed in one call.
 export const updateCartItem = (
   id: string,
   patch: Partial<{ name: string; quantity: number; unit: string }>,

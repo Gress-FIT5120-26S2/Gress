@@ -38,8 +38,8 @@ type NotificationInboxProps = {
   initialNotificationId?: string | null;
   onBack: () => void;
   onCountsChange?: (badgeCount: number, unreadCount: number) => void;
-  // 中文：补货提醒详情里的"去购物车"按钮；未传时按钮不显示（保持这个组件在其他挂载点可选）。
-  // EN: Powers the "Go to cart" button on a restock notification's detail sheet; omitted callers simply don't get the button.
+  // 中文：补货详情里"去购物车"按钮的回调；不传就不显示。
+  // EN: Powers the restock detail's "go to cart" button; omitted callers just don't get it.
   onGoToRestock?: () => void;
 };
 
@@ -160,8 +160,8 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
               <Text style={styles.detailTitle}>{selectedCopy.title}</Text>
               <Text style={styles.detailBody}>{selectedCopy.detail}</Text>
               <Text style={styles.detailTime}>{selectedTime}</Text>
-              {/* 中文：补货提醒直达购物车的"建议购物"页，省得用户自己切 tab 找。 */}
-              {/* EN: A restock notification jumps straight to the cart's suggested-buys tab instead of leaving the user to switch tabs themselves. */}
+              {/* 中文：补货提醒直达购物车的"建议购物"页。 */}
+              {/* EN: Jumps straight to the cart's suggested-buys tab. */}
               {selected.type === 'restock' && onGoToRestock ? (
                 <Pressable
                   accessibilityRole="button"

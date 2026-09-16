@@ -1,13 +1,7 @@
--- Arthur: NarIyirm
--- 中文：购物车之前只对数量做了 > 0 的检查，名称长度和单位都没有边界；这里补上跟
---       inventory_batches 一致的护栏（名称长度、按单位缩放的数量上限、单位白名单），
---       防止异常商品名或超量数字把前端撑爆或写进坏数据。NOT VALID 保留任何历史异常行，
---       让用户仍能把旧数据改回安全范围，而不是直接报错卡住。
--- EN: The cart previously only checked quantity > 0, with no bound on name length or
---     unit. This adds the same guardrails as inventory_batches (name length, unit-aware
---     quantity ceiling, unit allowlist) so a pathological item name or an oversized
---     number can't blow up the client or land in the table. NOT VALID keeps any existing
---     outliers usable so users can correct them instead of hitting a hard failure.
+-- 中文：给购物车补上跟 inventory_batches 一致的护栏（名称长度、按单位缩放的数量上限、单位白名单）。
+--       NOT VALID 保留历史异常行，让用户能改回安全范围而不是直接报错。
+-- EN: Adds the same guardrails as inventory_batches (name length, unit-aware quantity
+--     ceiling, unit allowlist). NOT VALID keeps existing outliers correctable.
 
 alter table public.shopping_cart_items
   add constraint shopping_cart_items_name_length_guard

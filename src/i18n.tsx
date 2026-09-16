@@ -407,6 +407,17 @@ const zh = {
       storageAdvice: '包装储存说明',
       rescan: '重新扫描',
       reviewDetails: '核对并编辑',
+      // 中文：购物车场景下这个页面不会再打开日期/价格表单，直接把商品加入购物车，
+      //       所以文案不能再提"下一步确认日期/价格"或"进入表单"，要跟这里的按钮行为一致。
+      // EN: In the cart flow this screen adds straight to the cart with no follow-up date/price
+      //     form, so the copy can't promise "confirm next" or "opens a form" -- it must match what actually happens here.
+      cart: {
+        editableHint: '轻点任一项，确认数量和单位后加入购物车',
+        confirmMissing: '条码没有提供有效期和价格，这些信息会留到加入库存时再确认。',
+        confirmAiEstimate: (days: number) => `AI 已补全分类、储存方式和约 ${days} 天的参考保质期，仅供购物车预填数量和单位参考。`,
+        confirmPresetEstimate: (days: number) => `已从现有食品参考库补全分类、储存方式和约 ${days} 天的参考保质期，仅供购物车预填数量和单位参考。`,
+        reviewDetails: '确认并加入购物车',
+      },
     },
     manualEntry: {
       title: '录入冰箱食材',
@@ -1474,6 +1485,13 @@ const en: Translation = {
       storageAdvice: 'Package storage advice',
       rescan: 'Scan again',
       reviewDetails: 'Review and edit',
+      cart: {
+        editableHint: 'Tap any detail to confirm the quantity and unit before adding it to the cart',
+        confirmMissing: "The barcode doesn't include an expiry date or price -- you'll confirm those when it's added to inventory.",
+        confirmAiEstimate: (days: number) => `AI filled in the category, storage, and an estimated ${days}-day shelf life, just as a reference for the cart's quantity and unit.`,
+        confirmPresetEstimate: (days: number) => `The existing reference library filled in the category, storage, and an estimated ${days}-day shelf life, just as a reference for the cart's quantity and unit.`,
+        reviewDetails: 'Confirm and add to cart',
+      },
     },
     manualEntry: {
       title: 'Add fridge item',

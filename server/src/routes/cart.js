@@ -10,11 +10,8 @@ const router = express.Router();
 const MAX_NAME_LENGTH = 120;
 const UNIT_ALLOWLIST = ['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box'];
 
-// Arthur: NarIyirm
-// 中文：跟 inventory_batches 的护栏保持一致（见 supabase/migrations/20260914010000_shopping_cart_input_guardrails.sql），
-//       在这里先拦一次，返回好懂的错误码，而不是让异常输入一路撞到数据库的 CHECK 约束报 500。
-// EN: Mirrors the inventory_batches guardrails (see supabase/migrations/20260914010000_shopping_cart_input_guardrails.sql);
-//     catching it here returns a clear error code instead of letting bad input fall through to a raw DB constraint 500.
+// 中文：跟 inventory_batches 的护栏保持一致，先拦一次给出清楚的错误码。
+// EN: Mirrors the inventory_batches guardrails, catching bad input with a clear error code.
 function validateName(rawName) {
   if (typeof rawName !== 'string') return { error: 'name_required' };
   const name = rawName.trim();
@@ -148,9 +145,8 @@ router.patch('/cart/:id/quantity', requireFridge, async (req, res) => {
 });
 
 // PATCH /api/cart/:id -- edit name/quantity/unit together (tap a row to reopen the add-to-cart form)
-// Arthur: NarIyirm
-// 中文：只更新请求里出现的字段，方便前端复用同一张表单单独改名称、数量或单位。
-// EN: Only fields present in the body are updated, so the frontend can reuse one form to change name, quantity, or unit independently.
+// 中文：只更新请求里出现的字段。
+// EN: Only updates the fields present in the body.
 router.patch('/cart/:id', requireFridge, async (req, res) => {
   const patch = {};
   if (req.body?.name !== undefined) {
