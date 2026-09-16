@@ -1,7 +1,8 @@
 // src/components/shopping/ShoppingScreen.tsx
-// Shopping Mode (Epic E5). Two tabs:
+// Shopping Mode (Epic E5). Two tabs, swipeable horizontally:
 //   - 'restock': suggested buys (需补货), derived from restock rules + stock
 //   - 'cart':    the editable shopping cart (shopping_cart_items)
+// Tap the segmented control or swipe the pager to switch; both panes stay mounted.
 // Cart items support quantity edit (−/＋ and tap-to-type), delete, and tap-to-edit
 // (reopens the add-to-cart form). The old checkbox "confirm" step (US5.2) was
 // removed by request -- the whole cart goes to checkout review (US5.4) and
@@ -23,6 +24,7 @@ import {
   Platform,
   UIManager,
   Modal,
+  ScrollView,
 } from 'react-native';
 
 // 中文：安卓的旧架构默认不开 LayoutAnimation；这行只在支持的平台生效，包一层 try 防止某些安卓版本报错。
@@ -124,31 +126,50 @@ export function ShoppingScreen() {
   const screen = t.screens.shopping;
   const [tab, setTab] = useState<Tab>('restock');
 
-  // 中文：分段控件的白色滑块用 0/1 两个位置做动画，切到哪个 tab 就滑过去。
-  //       宽度要等 onLayout 量出容器实际像素才能算，量到之前先不渲染滑块。
-  // EN: The segmented control's white pill animates between position 0 and 1 for the two tabs.
-  //     Its width depends on the container's measured pixel width from onLayout, so it isn't
-  //     rendered until that's known.
+  // Arthur: NarIyirm
+  // 中文：Suggested / Cart 用横向分页滑动切换；顶部分段仍可点按，滑块跟手移动。
+  // EN: Suggested and Cart switch by horizontal paging; the segmented control stays tappable and the pill tracks the finger.
   const [toggleWidth, setToggleWidth] = useState(0);
-  const indicatorX = useRef(new Animated.Value(0)).current;
-  useEffect(() => {
-    Animated.timing(indicatorX, {
-      toValue: tab === 'restock' ? 0 : 1,
-      duration: 240,
-      easing: Easing.out(Easing.cubic),
-      useNativeDriver: true,
-    }).start();
-  }, [tab, indicatorX]);
-
-  // 中文：切换 tab 时内容做一次淡入，而不是硬切；新内容挂载的瞬间从透明变不透明。
-  // EN: Switching tabs fades the new content in instead of a hard cut -- opacity goes from 0 to 1 the moment the new content mounts.
-  const contentOpacity = useRef(new Animated.Value(1)).current;
-  useEffect(() => {
-    contentOpacity.setValue(0);
-    Animated.timing(contentOpacity, { toValue: 1, duration: 200, easing: Easing.out(Easing.quad), useNativeDriver: true }).start();
-  }, [tab, contentOpacity]);
+  const [pageSize, setPageSize] = useState({ width: 0, height: 0 });
+  const pagerRef = useRef<ScrollView>(null);
+  const scrollX = useRef(new Animated.Value(0)).current;
+  const pageWidthRef = useRef(0);
 
   const pillWidth = toggleWidth > 8 ? (toggleWidth - 8) / 2 : 0;
+  const pageWidth = pageSize.width;
+
+  const selectTab = useCallback((next: Tab) => {
+    setTab(next);
+    const width = pageWidthRef.current;
+    if (width <= 0) return;
+    pagerRef.current?.scrollTo({ x: next === 'restock' ? 0 : width, animated: true });
+  }, []);
+
+  const handlePagerLayout = useCallback((width: number, height: number) => {
+    if (width <= 0 || height <= 0) return;
+    const widthChanged = Math.abs(width - pageWidthRef.current) >= 1;
+    pageWidthRef.current = width;
+    setPageSize((current) => (
+      Math.abs(current.width - width) < 1 && Math.abs(current.height - height) < 1
+        ? current
+        : { width, height }
+    ));
+    // Arthur: NarIyirm
+    // 中文：宽度变化（旋转/安全区）后按当前 tab 重新对齐页，避免停在两页中间。
+    // EN: After a width change from rotation or safe-area shifts, re-align to the active tab so the pager does not stop between pages.
+    if (widthChanged) {
+      requestAnimationFrame(() => {
+        pagerRef.current?.scrollTo({ x: tab === 'restock' ? 0 : width, animated: false });
+      });
+    }
+  }, [tab]);
+
+  const handlePagerScrollEnd = useCallback((offsetX: number) => {
+    const width = pageWidthRef.current;
+    if (width <= 0) return;
+    const next: Tab = Math.round(offsetX / width) >= 1 ? 'cart' : 'restock';
+    setTab((current) => (current === next ? current : next));
+  }, []);
 
   return (
     <View style={styles.container}>
@@ -157,15 +178,29 @@ export function ShoppingScreen() {
       <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
 
       <View style={[styles.toggle, styles.toggleNoTitle]} onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}>
-        {pillWidth > 0 ? (
+        {pillWidth > 0 && pageWidth > 0 ? (
           <Animated.View
             pointerEvents="none"
             style={[
               styles.toggleIndicator,
               {
                 width: pillWidth,
-                transform: [{ translateX: indicatorX.interpolate({ inputRange: [0, 1], outputRange: [0, pillWidth] }) }],
+                transform: [{
+                  translateX: scrollX.interpolate({
+                    inputRange: [0, pageWidth],
+                    outputRange: [0, pillWidth],
+                    extrapolate: 'clamp',
+                  }),
+                }],
               },
+            ]}
+          />
+        ) : pillWidth > 0 ? (
+          <View
+            pointerEvents="none"
+            style={[
+              styles.toggleIndicator,
+              { width: pillWidth, transform: [{ translateX: tab === 'cart' ? pillWidth : 0 }] },
             ]}
           />
         ) : null}
@@ -173,7 +208,7 @@ export function ShoppingScreen() {
           <Pressable
             key={v}
             style={({ pressed }) => [styles.toggleBtn, pressed && styles.pressedDim]}
-            onPress={() => setTab(v)}
+            onPress={() => selectTab(v)}
           >
             <Text style={[styles.toggleText, tab === v && styles.toggleTextActive]}>
               {v === 'restock' ? t.shopping.restockTab : t.shopping.cartTab}
@@ -182,9 +217,36 @@ export function ShoppingScreen() {
         ))}
       </View>
 
-      <Animated.View style={[styles.grow, { opacity: contentOpacity }]}>
-        {tab === 'restock' ? <RestockView /> : <CartView />}
-      </Animated.View>
+      <View
+        style={styles.grow}
+        onLayout={(e) => handlePagerLayout(e.nativeEvent.layout.width, e.nativeEvent.layout.height)}
+      >
+        {pageSize.width > 0 && pageSize.height > 0 ? (
+          <Animated.ScrollView
+            ref={pagerRef}
+            horizontal
+            pagingEnabled
+            bounces={false}
+            decelerationRate="fast"
+            showsHorizontalScrollIndicator={false}
+            keyboardShouldPersistTaps="handled"
+            scrollEventThrottle={16}
+            style={styles.pager}
+            onScroll={Animated.event(
+              [{ nativeEvent: { contentOffset: { x: scrollX } } }],
+              { useNativeDriver: true },
+            )}
+            onMomentumScrollEnd={(event) => handlePagerScrollEnd(event.nativeEvent.contentOffset.x)}
+          >
+            <View style={{ width: pageSize.width, height: pageSize.height }}>
+              <RestockView />
+            </View>
+            <View style={{ width: pageSize.width, height: pageSize.height }}>
+              <CartView />
+            </View>
+          </Animated.ScrollView>
+        ) : null}
+      </View>
     </View>
   );
 }
@@ -822,6 +884,7 @@ const styles = StyleSheet.create({
   container: { flex: 1 },
   spinner: { marginTop: 24 },
   grow: { flex: 1 },
+  pager: { flex: 1 },
   eyebrow: { color: '#D47B21', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
   toggle: {
     flexDirection: 'row',

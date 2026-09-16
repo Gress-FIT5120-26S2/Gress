@@ -5,6 +5,10 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 type FridgeFilterChipProps = {
   badgeColor?: string | null;
   badgeCount?: number;
+  // Arthur: NarIyirm
+  // 中文：全部芯片只需色点提醒临期/过期，不显示数字，避免和旁边库存计数重复。
+  // EN: The All chip only needs a coloured cue for expiry status; hide the digit so it does not compete with the stock count.
+  badgeShowCount?: boolean;
   count: number;
   expanded?: boolean;
   icon: keyof typeof Ionicons.glyphMap;
@@ -21,6 +25,7 @@ type FridgeFilterChipProps = {
 export const FridgeFilterChip = memo(function FridgeFilterChip({
   badgeColor = null,
   badgeCount = 0,
+  badgeShowCount = true,
   count,
   expanded = false,
   icon,
@@ -50,8 +55,13 @@ export const FridgeFilterChip = memo(function FridgeFilterChip({
       <View style={styles.iconWrap}>
         <Ionicons name={icon} size={17} color={foreground} />
         {showBadge ? (
-          <View style={[styles.statusBadge, { backgroundColor: badgeColor!, borderColor: selected ? tone : '#FFFFFF' }]}>
-            <Text style={styles.statusBadgeText}>{badgeLabel}</Text>
+          <View
+            style={[
+              badgeShowCount ? styles.statusBadge : styles.statusDot,
+              { backgroundColor: badgeColor!, borderColor: selected ? tone : '#FFFFFF' },
+            ]}
+          >
+            {badgeShowCount ? <Text style={styles.statusBadgeText}>{badgeLabel}</Text> : null}
           </View>
         ) : null}
       </View>
@@ -79,6 +89,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 3,
     borderRadius: 7,
+    borderWidth: 1.5,
+  },
+  statusDot: {
+    position: 'absolute',
+    top: -4,
+    right: -5,
+    width: 9,
+    height: 9,
+    borderRadius: 5,
     borderWidth: 1.5,
   },
   statusBadgeText: { color: '#FFFFFF', fontSize: 8, fontWeight: '900', lineHeight: 10 },

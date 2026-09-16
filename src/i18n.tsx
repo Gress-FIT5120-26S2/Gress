@@ -87,7 +87,7 @@ const zh = {
     filters: { all: '全部', chilled: '冷藏', frozen: '冷冻', pantry: '常温', expired: '已过期', expiring: '快过期', restock: '需补货' },
     filterRail: { expand: '展开储存筛选', collapse: '收起储存筛选' },
     filterSwipeHint: '向左滑查看更多',
-    categories: { all: '全部', meat: '肉蛋', vegetables: '蔬菜', fruit: '水果', staples: '主食', condiments: '调料', drinks: '饮品', other: '其他' },
+    categories: { all: '分类', meat: '肉蛋', vegetables: '蔬菜', fruit: '水果', staples: '主食', condiments: '调料', drinks: '饮品', other: '其他' },
     categoryHeading: '分类',
     categoryRail: { add: '新增自定义分类', addShort: '新增', hideEmpty: '收起零库存分类', showEmpty: '展开零库存分类' },
     customCategory: {
@@ -1154,7 +1154,7 @@ const en: Translation = {
     filters: { all: 'All', chilled: 'Chilled', frozen: 'Frozen', pantry: 'Pantry', expired: 'Expired', expiring: 'Expiring', restock: 'Restock' },
     filterRail: { expand: 'Expand storage filters', collapse: 'Collapse storage filters' },
     filterSwipeHint: 'Swipe for more',
-    categories: { all: 'All', meat: 'Meat & eggs', vegetables: 'Vegetables', fruit: 'Fruit', staples: 'Staples', condiments: 'Condiments', drinks: 'Drinks', other: 'Other' },
+    categories: { all: 'Types', meat: 'Meat & eggs', vegetables: 'Vegetables', fruit: 'Fruit', staples: 'Staples', condiments: 'Condiments', drinks: 'Drinks', other: 'Other' },
     categoryHeading: 'Categories',
     categoryRail: { add: 'Add custom category', addShort: 'Add', hideEmpty: 'Hide empty categories', showEmpty: 'Show empty categories' },
     customCategory: {
