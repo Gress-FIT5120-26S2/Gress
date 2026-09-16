@@ -697,6 +697,7 @@ export function FridgeScreen({
           <FridgeFilterChip
             badgeColor={allFilterBadgeColor}
             badgeCount={allFilterBadgeCount}
+            badgeShowCount={false}
             count={inventory.length}
             expanded={filtersExpanded}
             icon="apps-outline"
