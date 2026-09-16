@@ -20,6 +20,9 @@ type BarcodeResultReviewProps = {
   onContinue: (draft: BarcodeDraft) => void;
   onRescan: () => void;
   visible: boolean;
+  // 中文：'cart' 时继续直接加入购物车，不会再打开日期/价格表单，文案要换成对应的说法。
+  // EN: 'cart' continues straight into the cart with no follow-up date/price form, so the copy needs to match.
+  context?: 'inventory' | 'cart';
 };
 
 function formatLocalDate(date: Date) {
@@ -44,9 +47,10 @@ export function buildBarcodeInitialValues(product: BarcodeProduct, suggestion: F
 // Arthur: NarIyirm
 // 中文：条码查询成功后沿用图片识别的“结果核对→共用表单”节奏；包装资料只用于预填，价格与日期继续由用户确认。
 // EN: A successful barcode lookup follows the photo flow's review-to-shared-form rhythm; packaging data only prefills while price and dates remain user-confirmed.
-export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visible }: BarcodeResultReviewProps) {
+export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visible, context = 'inventory' }: BarcodeResultReviewProps) {
   const { t } = useI18n();
   const copy = t.fridge.barcodeRecognition;
+  const isCart = context === 'cart';
   if (!draft) return null;
   const { enrichmentSource, product, suggestion } = draft;
   const displayImage = product.imageUrl ?? suggestion?.iconUrl ?? null;
@@ -100,16 +104,16 @@ export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visi
             <Text style={styles.noticeText}>
               {suggestion
                 ? enrichmentSource === 'ai'
-                  ? copy.confirmAiEstimate(suggestion.shelfLifeDays)
-                  : copy.confirmPresetEstimate(suggestion.shelfLifeDays)
-                : copy.confirmMissing}
+                  ? (isCart ? copy.cart.confirmAiEstimate : copy.confirmAiEstimate)(suggestion.shelfLifeDays)
+                  : (isCart ? copy.cart.confirmPresetEstimate : copy.confirmPresetEstimate)(suggestion.shelfLifeDays)
+                : isCart ? copy.cart.confirmMissing : copy.confirmMissing}
             </Text>
           </View>
 
           <View style={styles.summaryHeader}>
             <View>
               <Text style={styles.summaryTitle}>{copy.fieldsTitle}</Text>
-              <Text style={styles.summarySubtitle}>{copy.editableHint}</Text>
+              <Text style={styles.summarySubtitle}>{isCart ? copy.cart.editableHint : copy.editableHint}</Text>
             </View>
             <Ionicons color="#9AA9A3" name="create-outline" size={18} />
           </View>
@@ -143,7 +147,7 @@ export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visi
             <Text style={styles.rescanText}>{copy.rescan}</Text>
           </Pressable>
           <Pressable accessibilityRole="button" onPress={() => onContinue(draft)} style={({ pressed }) => [styles.continueButton, pressed ? styles.pressed : null]}>
-            <Text style={styles.continueText}>{copy.reviewDetails}</Text>
+            <Text style={styles.continueText}>{isCart ? copy.cart.reviewDetails : copy.reviewDetails}</Text>
             <Ionicons color="#FFFFFF" name="arrow-forward" size={20} />
           </Pressable>
         </View>

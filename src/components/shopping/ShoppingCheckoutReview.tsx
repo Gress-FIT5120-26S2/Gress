@@ -26,8 +26,8 @@ import type { CartItem } from '../../services/cartApi';
 
 const DEFAULT_SHELF_LIFE_DAYS = 7;
 
-// 中文：一键入库时用同一个预设/AI 补全服务猜品类、储存方式和保质期，跟条码/拍照识别走的是同一条路。
-// EN: One-tap stocking reuses the same preset/AI enrichment service as barcode/photo recognition to guess category, storage, and shelf life.
+// 中文：一键入库复用条码/拍照识别那套预设/AI 补全服务，猜品类、储存方式和保质期。
+// EN: One-tap stocking reuses the same preset/AI enrichment as barcode/photo recognition.
 async function suggestFor(name: string): Promise<FoodPresetSuggestion | null> {
   try {
     const presetResult = await getFoodPresetSuggestion(name);
@@ -105,11 +105,8 @@ export function ShoppingCheckoutReview({
     }
   };
 
-  // 中文：一键把所有未入库的确认项自动写入库存——分类/储存位置来自预设建议，
-  //       保质期缺省 7 天，价格留空；用户之后仍可在冰箱页里逐条编辑修正。
-  // EN: Stock every not-yet-done confirmed item in one tap -- category/storage
-  //     come from the preset suggestion, shelf life defaults to 7 days, price
-  //     is left blank; users can still edit each batch from the fridge screen after.
+  // 中文：一键把所有未入库项写入库存，分类/储存来自建议，保质期缺省 7 天，价格留空。
+  // EN: Stock every not-yet-done item in one tap; category/storage from the suggestion, shelf life defaults to 7 days.
   const handleAutoStockAll = async () => {
     setBusy(true);
     try {
@@ -227,8 +224,8 @@ export function ShoppingCheckoutReview({
           initialValues={{
             name: editing.name,
             quantity: editing.quantity ? String(editing.quantity) : '1',
-            // 中文：把购物车里选好的单位带进库存录入表单，否则会退回默认的 "item"。
-            // EN: Carry the unit chosen in the cart into the inventory form; otherwise it falls back to the default "item".
+            // 中文：带上购物车里选好的单位，不然会退回默认的 "item"。
+            // EN: Carry over the cart's unit, or it falls back to the default "item".
             ...(editing.unit ? { unit: editing.unit as InventoryUnit } : {}),
           }}
           onClose={() => setEditing(null)}

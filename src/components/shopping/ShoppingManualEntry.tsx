@@ -28,8 +28,8 @@ import { MAX_INVENTORY_NAME_LENGTH, getMaxInventoryQuantity } from '../../utils/
 
 const UNIT_OPTIONS = ['item', 'g', 'kg', 'ml', 'L', 'bag', 'bottle', 'box'] as const;
 const QTY_ACCESSORY_ID = 'shoppingQtyDone';
-// 中文：数量输入框的字符上限，防止贴入超长数字字符串（跟真正的数量上限是两道独立的防线）。
-// EN: A character cap on the quantity field so an absurdly long pasted digit string can't even be typed; a separate line of defense from the numeric ceiling below.
+// 中文：数量框的字符上限，跟下面的数值上限是两道独立防线。
+// EN: Character cap on the quantity field; a separate line of defense from the numeric ceiling below.
 const MAX_QUANTITY_DIGITS = 9;
 
 type ShoppingManualEntryProps = {
@@ -38,9 +38,16 @@ type ShoppingManualEntryProps = {
   inventoryByName: Map<string, InventoryBatch[]>;
   onClose: () => void;
   onSubmit: (item: { name: string; quantity: number; unit: string }) => void | Promise<void>;
-  // 中文：非空即编辑模式——打开时按这份值预填，标题/按钮换成"编辑/保存"文案。
-  // EN: Non-null puts the sheet in edit mode -- it prefills from this on open and swaps the title/button copy to "edit/save".
+  // 中文：非空就预填这些值；是否显示"编辑"文案由下面的 mode 决定，不是看这个有没有值
+  //       （条码扫描也会预填，但那仍然是"新增"，不是在编辑已有的购物项）。
+  // EN: Non-null prefills these values; whether the copy reads "edit" is controlled by `mode`
+  //     below, not by this alone (barcode scanning also prefills, but that's still "adding", not editing an existing row).
   initialValues?: { name: string; quantity: number; unit: string } | null;
+  // 中文：不传时按老规矩——有 initialValues 就当编辑。购物车行编辑走这条路；
+  //       条码扫描要显式传 'add'，因为它也带 initialValues 但语义上是新增。
+  // EN: Defaults to the old rule -- edit mode whenever initialValues is set (the cart row edit
+  //     flow). Barcode scanning passes 'add' explicitly since it also carries initialValues but means "add".
+  mode?: 'add' | 'edit';
 };
 
 export function ShoppingManualEntry({
@@ -50,10 +57,11 @@ export function ShoppingManualEntry({
   onClose,
   onSubmit,
   initialValues = null,
+  mode,
 }: ShoppingManualEntryProps) {
   const { t } = useI18n();
   const copy = t.shopping.manual;
-  const isEditing = initialValues !== null;
+  const isEditing = (mode ?? (initialValues !== null ? 'edit' : 'add')) === 'edit';
   const [name, setName] = useState('');
   const [quantity, setQuantity] = useState('1');
   const [unit, setUnit] = useState<string>('item');
@@ -61,17 +69,10 @@ export function ShoppingManualEntry({
   const [dupExpanded, setDupExpanded] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  // 中文：只在"关闭→打开"这一刻重新填表，而不是只要 initialValues 引用变了就填。
-  //       调用方（ShoppingScreen）每次自己重新渲染都会 new 出一个新的 initialValues 对象，
-  //       如果这里把它放进依赖数组里、每次引用变化都重置，就会在用户打字打到一半时被
-  //       悄悄拉回最初的值——正好跟"清空后打不进去/输入被打断"的现象对上。
-  //       用 justOpened 记录上一次的 visible，只有从 false 变 true 那一刻才重填。
-  // EN: Only re-seed at the closed→open transition, not whenever the initialValues reference
-  //     changes. The caller (ShoppingScreen) creates a new initialValues object literal on every
-  //     one of its own re-renders, so keying this effect on that reference and resetting every
-  //     time would silently snap the field back to its original value mid-keystroke -- exactly
-  //     matching the "can't type after clearing / input gets interrupted" symptom. justOpened
-  //     tracks the previous visible so the reset only fires on the actual false-to-true edge.
+  // 中文：只在"关闭→打开"那一刻重填，不跟着 initialValues 的引用变化重填，
+  //       不然打字打到一半会被悄悄拉回原值。
+  // EN: Re-seed only on the closed→open edge, not on every initialValues reference change,
+  //     or typing gets reset mid-keystroke.
   const justOpened = useRef(false);
   useEffect(() => {
     if (visible && !justOpened.current) {
@@ -106,10 +107,8 @@ export function ShoppingManualEntry({
     return copy.dupDaysLeft(days);
   };
 
-  // 中文：跟服务端 cart.js 的护栏对齐（名称长度、按单位缩放的数量上限），先在本地拦一次，
-  //       输入异常时马上给出提示，而不是等一次网络往返才报错。
-  // EN: Mirrors server-side cart.js guardrails (name length, unit-aware quantity ceiling) so
-  //     abnormal input is caught locally with an immediate message instead of waiting on a round trip.
+  // 中文：跟服务端 cart.js 的护栏对齐，先本地拦一次给出即时提示。
+  // EN: Mirrors server-side cart.js guardrails, catching bad input locally with an immediate message.
   const handleSubmit = async () => {
     const trimmed = name.trim();
     if (!trimmed) {

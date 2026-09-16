@@ -1,12 +1,11 @@
 // src/components/shopping/ShoppingAddSheet.tsx
 // The "add to cart" entry point. Reuses the shared AddItemMethodSheet picker.
 // "manual" opens ShoppingManualEntry; "camera" opens PhotoRecognitionCamera and,
-// on success (Plan A), adds the recognised food straight to the cart.
-// Barcode scanning reuses the same camera + review pieces FridgeScreen uses for
-// inventory (US-parity with barcodeEnabled): the difference here is US5.2 only
-// needs name/quantity/unit for the cart, so BarcodeResultReview's "continue"
-// adds to the cart directly instead of opening the full InventoryEntryFlow.
-import React, { useState } from 'react';
+// on success, adds the recognised food straight to the cart. Barcode scanning
+// reuses FridgeScreen's camera + review pieces, but "continue" opens
+// ShoppingManualEntry pre-filled (not the full InventoryEntryFlow, and not a
+// direct add) so the user confirms quantity/unit before it lands in the cart.
+import React, { useEffect, useRef, useState } from 'react';
 import { AddItemMethodSheet, type AddItemMethod } from '../AddItemMethodSheet';
 import { PhotoRecognitionCamera } from '../inventory-entry/PhotoRecognitionCamera';
 import { BarcodeResultReview, buildBarcodeInitialValues, type BarcodeDraft } from '../inventory-entry/BarcodeResultReview';
@@ -46,10 +45,22 @@ export function ShoppingAddSheet({
   const [manualVisible, setManualVisible] = useState(false);
   const [cameraVisible, setCameraVisible] = useState(false);
   const [barcodeDraft, setBarcodeDraft] = useState<BarcodeDraft | null>(null);
+  // 中文：条码"继续"之前是直接扣进购物车，但核对页看着像能编辑（有图标+箭头的格子），
+  //       点一下却直接加入没有中间步骤，会显得很奇怪。改成打开这张表单预填，
+  //       让"看起来能编辑"名副其实，用户确认/改完数量单位再真正加入购物车。
+  // EN: "Continue" used to add straight to the cart, but the review screen looks editable
+  //     (rows with an icon + chevron) -- tapping one and having it just add with no in-between
+  //     step read as broken. This now opens this form pre-filled instead, so the "looks editable"
+  //     affordance is real: the user confirms/adjusts quantity and unit before it actually lands in the cart.
+  const [manualInitialValues, setManualInitialValues] = useState<{ name: string; quantity: number; unit: string } | null>(null);
 
   const handleSelect = (method: AddItemMethod) => {
-    if (method === 'manual') setManualVisible(true);
-    else setCameraVisible(true);
+    if (method === 'manual') {
+      setManualInitialValues(null);
+      setManualVisible(true);
+    } else {
+      setCameraVisible(true);
+    }
   };
 
   const handleRecognised = async (result: PhotoRecognitionResult) => {
@@ -63,8 +74,8 @@ export function ShoppingAddSheet({
     }
   };
 
-  // 中文：条码识别复用 FridgeScreen 的预设/AI 补全逻辑，得到品类和参考单位。
-  // EN: Barcode lookup reuses FridgeScreen's preset/AI enrichment to derive category and package unit.
+  // 中文：复用 FridgeScreen 的预设/AI 补全逻辑，得到品类和参考单位。
+  // EN: Reuses FridgeScreen's preset/AI enrichment to derive category and unit.
   const handleBarcodeProduct = async (product: BarcodeProduct) => {
     let suggestion = null;
     let enrichmentSource: BarcodeDraft['enrichmentSource'] = null;
@@ -85,19 +96,31 @@ export function ShoppingAddSheet({
     setCameraVisible(false);
   };
 
-  // 中文：购物车只需要名称/数量/单位，条码核对页确认后直接加入购物车，不必打开完整的库存表单。
-  // EN: The cart only needs name/quantity/unit, so confirming the barcode review adds to the cart directly instead of opening the full inventory form.
-  const handleBarcodeContinue = async (draft: BarcodeDraft) => {
+  // 中文：AddItemMethodSheet 会等自己的关闭动画真正播完（Animated.timing 的 finished 回调）
+  //       才调用 onSelect，就是为了不让一个原生 Modal 在另一个还没关完时就开始打开——
+  //       两个 <Modal> 在同一帧内一开一关，在 iOS 上会崩溃。BarcodeResultReview 没有这层
+  //       保护，onContinue 是直接从按钮点击同步触发的，所以这里手动补一个延迟，等它关闭
+  //       动画播完再打开下一个 Modal。
+  // EN: AddItemMethodSheet waits for its own close animation to actually finish (the
+  //     Animated.timing "finished" callback) before calling onSelect, specifically so one
+  //     native Modal never starts presenting while another is still dismissing -- two <Modal>s
+  //     transitioning in the same frame crashes on iOS. BarcodeResultReview has no such
+  //     protection; onContinue fires synchronously from the button press. This adds the same
+  //     kind of delay by hand, waiting for its close animation before opening the next Modal.
+  const pendingManualTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (pendingManualTimer.current) clearTimeout(pendingManualTimer.current); }, []);
+  const handleBarcodeContinue = (draft: BarcodeDraft) => {
     setBarcodeDraft(null);
-    try {
-      await onAdd({
-        name: draft.product.name,
-        quantity: Number(draft.initialValues.quantity) || 1,
-        unit: draft.initialValues.unit ?? 'item',
-      });
-    } catch {
-      // duplicate or network error -- ignore, matching the photo-recognition path above
-    }
+    const values = {
+      name: draft.product.name,
+      quantity: Number(draft.initialValues.quantity) || 1,
+      unit: draft.initialValues.unit ?? 'item',
+    };
+    if (pendingManualTimer.current) clearTimeout(pendingManualTimer.current);
+    pendingManualTimer.current = setTimeout(() => {
+      setManualInitialValues(values);
+      setManualVisible(true);
+    }, 350);
   };
 
   return (
@@ -112,7 +135,9 @@ export function ShoppingAddSheet({
         visible={manualVisible}
         inventoryNames={inventoryNames}
         inventoryByName={inventoryByName}
-        onClose={() => setManualVisible(false)}
+        initialValues={manualInitialValues}
+        mode="add"
+        onClose={() => { setManualVisible(false); setManualInitialValues(null); }}
         onSubmit={onAdd}
       />
       <PhotoRecognitionCamera
@@ -123,14 +148,16 @@ export function ShoppingAddSheet({
         onRecognised={handleRecognised}
         onManualFallback={() => {
           setCameraVisible(false);
+          setManualInitialValues(null);
           setManualVisible(true);
         }}
       />
       <BarcodeResultReview
+        context="cart"
         draft={barcodeDraft}
         visible={barcodeDraft !== null}
         onClose={() => setBarcodeDraft(null)}
-        onContinue={(draft) => { void handleBarcodeContinue(draft); }}
+        onContinue={handleBarcodeContinue}
         onRescan={() => {
           setBarcodeDraft(null);
           setCameraVisible(true);
