@@ -20,7 +20,10 @@ const port = Number(process.env.PORT ?? 3001);
 
 app.use(...createCorsPolicy());
 app.use(express.json());
-app.use('/api', databaseRateLimit(rateLimitPolicies.global, getClientIp));
+// Arthur: NarIyirm
+// 中文：公网 IP 只承担宽松的外围防洪；鉴权后的日常额度在下方按设备隔离，避免同一 Wi-Fi 的用户相互限流。
+// EN: IPs provide only a generous perimeter flood guard; authenticated traffic is isolated per device below so users on one Wi-Fi do not throttle each other.
+app.use('/api', databaseRateLimit(rateLimitPolicies.perimeter, getClientIp));
 
 app.get('/api/health', async (_request, response) => {
   // Arthur: NarIyirm
@@ -48,6 +51,7 @@ app.post(
   recoverDeviceRoute,
 );
 app.use('/api', requireDevice);
+app.use('/api', databaseRateLimit(rateLimitPolicies.global, (request) => request.deviceId));
 app.use(
   '/api/photo-recognition',
   databaseRateLimit(rateLimitPolicies.photoRecognition, (request) => request.deviceId),
