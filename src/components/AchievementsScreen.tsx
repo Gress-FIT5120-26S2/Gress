@@ -43,7 +43,6 @@ export function AchievementsScreen() {
   const copy = t.wins;
   const [heroTailColor, setHeroTailColor] = useState('#60C7F5');
   const [heldAchievement, setHeldAchievement] = useState<AchievementDashboard['achievements'][number] | null>(null);
-  const [badgeScrollEnabled, setBadgeScrollEnabled] = useState(true);
   const [rerollingAssignmentUid, setRerollingAssignmentUid] = useState<string | null>(null);
   const [rerollError, setRerollError] = useState<string | null>(null);
   const [journeyRoute, setJourneyRoute] = useState<'journey' | 'medals' | null>(null);
@@ -63,8 +62,8 @@ export function AchievementsScreen() {
   }, [dashboard?.recentXpEvents]);
 
   // Arthur: NarIyirm
-  // 中文：点击或长按打开 Modal；按下时暂停 ScrollView，避免滚动抢手势。松手不关，点遮罩才关。
-  // EN: Tap or long-press opens the Modal; pause ScrollView while pressing so scroll cannot steal the gesture. Dismiss only via scrim tap.
+  // 中文：点击或长按打开 Modal；不锁定外层 ScrollView，从徽章上起手的拖动仍可由原生滚动手势接管。
+  // EN: Tap or long-press opens the Modal without locking the outer ScrollView, so a drag starting on a badge can still become a native scroll gesture.
   const showHeldAchievement = (achievement: AchievementDashboard['achievements'][number]) => {
     setHeldAchievement(achievement);
     void Haptics.selectionAsync().catch(() => undefined);
@@ -72,7 +71,6 @@ export function AchievementsScreen() {
 
   const dismissHeldAchievement = () => {
     setHeldAchievement(null);
-    setBadgeScrollEnabled(true);
   };
 
   const handleReroll = async (assignment: FridgeQuestAssignment) => {
@@ -126,7 +124,6 @@ export function AchievementsScreen() {
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={styles.content}
         overScrollMode="never"
-        scrollEnabled={badgeScrollEnabled}
         showsVerticalScrollIndicator={false}
       >
         <AchievementMountainHero copy={copy} dashboard={dashboard} key={dashboard.level.code} language={language} onTailColorChange={setHeroTailColor} rescuedValue={money(dashboard.metrics.rescuedValue)} />
@@ -185,10 +182,6 @@ export function AchievementsScreen() {
                   key={achievement.code}
                   onLongPress={() => showHeldAchievement(achievement)}
                   onPress={() => showHeldAchievement(achievement)}
-                  onPressIn={() => setBadgeScrollEnabled(false)}
-                  onPressOut={() => {
-                    if (heldAchievement === null) setBadgeScrollEnabled(true);
-                  }}
                   style={({ pressed }) => [
                     styles.badgeCard,
                     status === 'unlocked' && styles.badgeCardUnlocked,
