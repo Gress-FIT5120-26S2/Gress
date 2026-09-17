@@ -5,7 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
-import { getApiHealth, subscribeToApiActivity } from './src/services/apiClient';
+import { getApiHealth } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { SPOONIE_MODEL_ASSET } from './src/assets/spoonieModel';
@@ -73,8 +73,6 @@ function KitchMemoApp() {
   const [canMountKitchen, setCanMountKitchen] = useState(false);
   const [canRevealKitchen, setCanRevealKitchen] = useState(false);
   const [connectionState, setConnectionState] = useState<ConnectionState>('connecting');
-  const [activeApiRequests, setActiveApiRequests] = useState(0);
-  const [showApiActivity, setShowApiActivity] = useState(false);
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(0);
   const [notificationBadgeCount, setNotificationBadgeCount] = useState(0);
   const [expiringCount, setExpiringCount] = useState(0);
@@ -109,20 +107,6 @@ function KitchMemoApp() {
   const screen = t.screens[activeTab];
   const status = t.status[connectionState];
   const isFirstUseJourneyVisible = !isOpening && firstUseJourneyState === 'pending';
-
-  useEffect(() => subscribeToApiActivity(setActiveApiRequests), []);
-
-  useEffect(() => {
-    // Arthur: NarIyirm
-    // 中文：短于 220ms 的请求不闪烁全局提示，较慢请求则持续显示到所有并发请求完成。
-    // EN: Requests under 220ms avoid flashing global feedback, while slower work stays visible until every concurrent request completes.
-    if (activeApiRequests === 0) {
-      setShowApiActivity(false);
-      return;
-    }
-    const timer = setTimeout(() => setShowApiActivity(true), 220);
-    return () => clearTimeout(timer);
-  }, [activeApiRequests]);
 
   useEffect(() => {
     let mounted = true;
@@ -601,12 +585,6 @@ function KitchMemoApp() {
           style={[styles.transitionOverlay, { backgroundColor: transitionTone, opacity: transitionOverlayOpacity }]}
         />
       ) : null}
-      {showApiActivity && !isOpening ? (
-        <View accessibilityLabel={t.status.connecting} accessibilityLiveRegion="polite" pointerEvents="none" style={styles.apiActivity}>
-          <ActivityIndicator color="#168ACB" size="small" />
-          <Text style={styles.apiActivityText}>{t.status.connecting}</Text>
-        </View>
-      ) : null}
       <FridgeAssistantScreen
         batches={assistantSnapshot?.batches ?? []}
         fridgeUid={assistantSnapshot?.fridge.uid ?? null}
@@ -672,8 +650,6 @@ const styles = StyleSheet.create({
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
   chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
   transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },
-  apiActivity: { position: 'absolute', top: 54, alignSelf: 'center', zIndex: 30, minHeight: 38, flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, borderRadius: 19, backgroundColor: '#F7FBFA', boxShadow: '0 3px 8px rgba(23, 61, 49, 0.16)' },
-  apiActivityText: { color: '#315F54', fontSize: 12, fontWeight: '700' },
   glow: { position: 'absolute', top: -120, right: -70, width: 310, height: 310, borderRadius: 180, backgroundColor: '#F6CC83', opacity: 0.5 },
   glowCool: { backgroundColor: '#9FD7D7' },
   greeting: { color: '#6C786F', fontSize: 11, fontWeight: '700', letterSpacing: 1.5 },
