@@ -51,7 +51,6 @@ app.post(
   recoverDeviceRoute,
 );
 app.use('/api', requireDevice);
-app.use('/api', databaseRateLimit(rateLimitPolicies.global, (request) => request.deviceId));
 app.use(
   '/api/photo-recognition',
   databaseRateLimit(rateLimitPolicies.photoRecognition, (request) => request.deviceId),
