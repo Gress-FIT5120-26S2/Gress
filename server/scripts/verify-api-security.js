@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { createCorsPolicy } from '../src/middleware/corsPolicy.js';
 import { consumeRateLimit, rateLimitPolicies } from '../src/middleware/rateLimit.js';
+import { normalizeAssistantActionProposal } from '../src/routes/assistant.js';
 import { supabase } from '../src/supabase.js';
 
 function createResponse() {
@@ -50,6 +51,12 @@ for (const [origin, expectedStatus, expectedNextCalls] of [
 assert.notEqual(rateLimitPolicies.perimeter.scope, rateLimitPolicies.assistant.scope);
 assert.notEqual(rateLimitPolicies.assistant.scope, rateLimitPolicies.assistantMutation.scope);
 assert.ok(rateLimitPolicies.assistant.windowSeconds < rateLimitPolicies.assistantMutation.windowSeconds);
+
+// Arthur: NarIyirm
+// 中文：模型若为整批食用回填当前数量，服务端仍规范化为数据库契约要求的归零动作。
+// EN: If the model echoes the current quantity for full consumption, the server still normalizes it to the database's zeroing contract.
+assert.equal(normalizeAssistantActionProposal({ actionType: 'mark_consumed', quantity: 4 }).quantity, 0);
+assert.equal(normalizeAssistantActionProposal({ actionType: 'adjust_quantity', quantity: 4 }).quantity, 4);
 
 const policy = { limit: 2, scope: 'verification', windowSeconds: 60 };
 let receivedArguments;

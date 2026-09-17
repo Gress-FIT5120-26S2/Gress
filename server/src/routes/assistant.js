@@ -27,6 +27,13 @@ function finiteNumber(value, minimum = 0) {
   return typeof value === 'number' && Number.isFinite(value) && value >= minimum;
 }
 
+// Arthur: NarIyirm
+// 中文：整批“已食用”在数据库中始终归零；忽略模型偶尔回填的原数量，避免等价动作因非权威冗余字段返回 503。
+// EN: Full consumption always resolves the batch to zero in the database; discard any model-supplied quantity so an equivalent action cannot fail on a non-authoritative redundant field.
+export function normalizeAssistantActionProposal(action) {
+  return action?.actionType === 'mark_consumed' ? { ...action, quantity: 0 } : action;
+}
+
 function validateActionProposal(action) {
   if (!action || !presentString(action.summary, 300)) throw new Error('assistant_action_invalid');
   const needsTarget = ['archive_batch', 'discard_batch', 'adjust_quantity', 'mark_consumed', 'edit_use_by'].includes(action.actionType);
@@ -285,6 +292,7 @@ async function readConversationContext(conversationUid) {
 
 async function stageAction(action, conversationUid, request) {
   if (!action) return null;
+  action = normalizeAssistantActionProposal(action);
   // Arthur: NarIyirm
   // 中文：结构化输出只保证 JSON 形状；真正入库前仍按动作语义验证必填字段、数值范围和目标类型。
   // EN: Structured output guarantees JSON shape only; semantic requirements, ranges, and target rules are revalidated before persistence.

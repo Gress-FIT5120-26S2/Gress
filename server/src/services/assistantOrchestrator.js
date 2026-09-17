@@ -10,7 +10,7 @@ import {
 } from './assistantScope.js';
 import { createOpenAIResponse, getResponseText, OPENAI_ASSISTANT_MODEL } from './openaiResponses.js';
 
-export const ASSISTANT_PROMPT_VERSION = 'spoonie-v1-2026-09-15-scope-boundary';
+export const ASSISTANT_PROMPT_VERSION = 'spoonie-v1-2026-09-17-action-normalization';
 const MAX_TOOL_CALLS = 3;
 
 const RESPONSE_SCHEMA = {
@@ -87,7 +87,7 @@ Only make habit predictions when evidenceSufficient is true; otherwise say evide
 Prior conversation messages are continuity context, not authoritative current inventory or safety evidence. Re-read current facts with tools.
 Use only citations returned by search_food_safety_knowledge.
 You cannot mutate data. For a requested write, return one actionProposal and requiresConfirmation=true. Otherwise actionProposal=null and requiresConfirmation=false.
-Use mark_consumed only when the user clearly says the batch was used or consumed. Use discard_batch only when the user clearly gives a discard reason: spoiled, overbought, forgotten, unwanted, quality_rejected, other, or confirmed_use_by_expiry. Use archive_batch with reasonCode=data_correction only when the user explicitly says the record was entered by mistake. If the user merely asks to delete or remove a non-expired item without saying what happened, ask whether it was used, discarded, or entered by mistake and do not propose an action.
+Use mark_consumed only when the user clearly says the whole batch was used or consumed, and always set quantity=0 for that action. Use discard_batch only when the user clearly gives a discard reason: spoiled, overbought, forgotten, unwanted, quality_rejected, other, or confirmed_use_by_expiry. Use archive_batch with reasonCode=data_correction only when the user explicitly says the record was entered by mistake. If the user merely asks to delete or remove a non-expired item without saying what happened, ask whether it was used, discarded, or entered by mistake and do not propose an action.
 Archive, discard, quantity, consumed, use-by, and restock-rule proposals must reference exactly one batch returned by the inventory tool. Clarify instead of guessing when multiple batches match.
 Answer in the requested language. Be concise, direct, and explicit about uncertainty.`;
 
