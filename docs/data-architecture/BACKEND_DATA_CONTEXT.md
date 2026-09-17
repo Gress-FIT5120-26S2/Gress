@@ -77,7 +77,7 @@ Express API
 - 本地 Express 默认读取 `server/.env.development`；当 `NODE_ENV=production` 时读取 `server/.env.production`。部署平台直接提供的环境变量优先于文件。
 - Express 可用 `FOOD_RECOGNITION_API_URL` 覆盖视觉模型地址；该配置只存在于服务端，App 不直接调用模型。
 - Express 默认拒绝所有带 `Origin` 的浏览器请求；需要网页客户端时必须在 `CORS_ALLOWED_ORIGINS` 中逐项配置完整来源。原生 App 不发送 `Origin`，不受该白名单影响。
-- 所有 `/api` 请求先通过 `claim_api_rate_limit` 使用跨 Vercel 实例共享的宽松公网 IP 外围固定窗口；设备鉴权后的普通业务请求再使用独立的设备级固定窗口，避免同一 Wi-Fi/NAT 下的多台设备相互耗尽额度。恢复、邀请码加入、图片识别和 AI 生成继续使用更严格的独立 scope。限流键在 Express 中以服务端密钥 HMAC 后再保存，响应包含 `RateLimit-*`，拒绝时返回 `429` 与 `Retry-After`。
+- 所有 `/api` 请求先通过 `claim_api_rate_limit` 使用跨 Vercel 实例共享的宽松公网 IP 外围固定窗口；设备鉴权后的普通业务请求再使用独立的设备级固定窗口，避免同一 Wi-Fi/NAT 下的多台设备相互耗尽额度。恢复、邀请码加入、图片识别和 AI 生成继续使用更严格的独立 scope。助手模型生成默认每设备每 15 分钟 30 次；不调用模型的反馈、确认和取消使用独立的每小时 120 次 mutation scope，避免这些交互占用生成额度。限流键在 Express 中以服务端密钥 HMAC 后再保存，响应包含 `RateLimit-*`，拒绝时返回 `429` 与 `Retry-After`。
 - AI 预设生成只从 Express 读取 `GEMINI_API_KEY`、`GEMINI_PRESET_MODEL`、`CLOUDFLARE_ACCOUNT_ID`、`CLOUDFLARE_AI_API_TOKEN` 和 `CLOUDFLARE_ICON_MODEL`。当前默认文本模型为稳定版 `gemini-3.5-flash-lite`，继续通过受支持的 GenerateContent API 请求结构化输出；这些值不得使用 `EXPO_PUBLIC_` 前缀，App 只调用已鉴权的 Express 接口。
 - Expo Push Token 只由 App 在系统授权后交给 Express，并只保存在 `device_push_tokens`。启用 Expo Push Access Token 安全时，`EXPO_ACCESS_TOKEN` 只配置在 Express；不得返回给 App、成员接口或日志。
 - `server/.env` 仅作为旧开发机兼容回退。新配置请使用按环境命名的文件，所有真实 `.env` 文件都不得提交 Git。
