@@ -767,6 +767,8 @@ POST /api/assistant/actions/:actionUid/cancel
 
 消息接口接受 `message`、`language` 和可选的 `conversationUid`，返回 `conversationUid`、`messageUid`、结构化 `answer`、可选 `pendingAction` 与 `fallback`。会话只对创建设备可见；共享冰箱成员可以通过工具读取其有权访问的共享数据，但不能读取其他成员的助手会话。Expo 关闭助手或进入库存详情时保留内存会话，App 重启后使用按冰箱保存的 UID 从详情接口恢复；历史页可以切换 30 天内的会话，“新对话”不删除旧历史。确认请求必须发送 `{ "confirm": true }`；取消不执行任何业务写入。原子 RPC 支持购物项、软归档、数量调整、标记用完、use-by 修改和补货规则，并复用现有库存 RPC 保持流水、乐观锁和同步版本语义。
 
+`mark_consumed` 表示整批已经食用，确认 RPC 始终把剩余数量归零。Express 在动作入库前会把模型可能回填的冗余 `quantity` 统一规范化为 `0`，不能因为该非权威字段与模型输出波动而向 App 返回 `503`；部分食用仍必须使用明确的数量调整动作。
+
 打开列表会调用 `sync_fridge_notifications`。通知正文用 `message_key` 加 payload，不在数据库存中英句子。共享库存 mutation 通过 `record_shared_inventory_notification` 生成站内事件，再由 Express 按成员偏好投递 Expo Push；Expo ticket 只表示 Push Service 已接收，后续可继续补充 receipt 轮询。个人页的“通知与提醒”进入设备级设置页，支持提醒总开关、首页角标、系统通知、免打扰起止时间、临期/过期、补货、共享动态与系统提醒分类；“查看通知记录”是设置页内的独立入口。App 会为最早 32 个有效到期批次按各自保存的 `expiry_warning_days` 安排本地原生提醒，并在日期、提前天数、库存或设置变化后精确重排；每次活跃使用还会重排 7 天后的本地召回提醒。系统卡片布局由 iOS/Android 控制，App 只设置图标、标题、正文、声音、角标和点击目标。SDK 53+ 的 Android Expo Go 已移除远程 Push：`src/services/systemNotifications.ts` 不得从 `expo-notifications` 入口导入（入口加载时会红屏），只从子模块调度本地提醒，并跳过 `getExpoPushTokenAsync` 与 `setNotificationChannelAsync`（Channel 原生 provider 为空会 NPE）。本地提醒走系统默认频道。远程 Push 仍须用 EAS development/preview/production build。
 ### 已完成：库存批次详情与修改
 
