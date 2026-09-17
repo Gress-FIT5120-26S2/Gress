@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createClient } from '@supabase/supabase-js';
 import { createCorsPolicy } from '../src/middleware/corsPolicy.js';
-import { consumeRateLimit } from '../src/middleware/rateLimit.js';
+import { consumeRateLimit, rateLimitPolicies } from '../src/middleware/rateLimit.js';
 import { supabase } from '../src/supabase.js';
 
 function createResponse() {
@@ -43,6 +43,12 @@ for (const [origin, expectedStatus, expectedNextCalls] of [
   assert.equal(response.statusCode, expectedStatus);
   assert.equal(nextCalls, expectedNextCalls);
 }
+
+// Arthur: NarIyirm
+// 中文：外围 IP 桶必须比设备业务桶宽松且使用不同 scope，防止共享公网 IP 再次成为正常启动流量的瓶颈。
+// EN: The perimeter IP bucket must be broader than and separate from the device business bucket so shared public IPs cannot bottleneck normal startup traffic.
+assert.notEqual(rateLimitPolicies.perimeter.scope, rateLimitPolicies.global.scope);
+assert.ok(rateLimitPolicies.perimeter.limit > rateLimitPolicies.global.limit);
 
 const policy = { limit: 2, scope: 'verification', windowSeconds: 60 };
 let receivedArguments;

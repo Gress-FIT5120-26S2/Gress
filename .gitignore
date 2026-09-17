@@ -77,3 +77,4 @@ server/.env.production
 /docs/**/*.doc
 /docs/**/*.docx
 /docs/**/*.pdf
+.env*

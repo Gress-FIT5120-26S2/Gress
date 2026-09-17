@@ -36,6 +36,9 @@ server/.env
 /CLAUDE.md
 /LICENSE
 
-# Preserve the GLB asset referenced by app.json while omitting the Blender source file.
+# Arthur: NarIyirm
+# 中文：保留应用运行时引用的两个 GLB，并继续排除 Blender 源文件及其他本地模型。
+# EN: Preserve both runtime GLBs while excluding Blender sources and other local models.
 /models/*
 !/models/Kitchen-Home-rebuilt-lighting.glb
+!/models/Spoonie-Character-v2.glb

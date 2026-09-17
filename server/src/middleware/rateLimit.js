@@ -7,9 +7,14 @@ function positiveInteger(value, fallback) {
 }
 
 export const rateLimitPolicies = Object.freeze({
+  perimeter: {
+    limit: positiveInteger(process.env.API_IP_RATE_LIMIT_MAX, 1_200),
+    scope: 'api-perimeter-ip',
+    windowSeconds: positiveInteger(process.env.API_IP_RATE_LIMIT_WINDOW_SECONDS, 60),
+  },
   global: {
     limit: positiveInteger(process.env.API_RATE_LIMIT_MAX, 180),
-    scope: 'api-global-ip',
+    scope: 'api-global-device',
     windowSeconds: positiveInteger(process.env.API_RATE_LIMIT_WINDOW_SECONDS, 60),
   },
   recovery: {
