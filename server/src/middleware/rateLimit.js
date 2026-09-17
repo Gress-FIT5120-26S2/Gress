@@ -34,8 +34,13 @@ export const rateLimitPolicies = Object.freeze({
   },
   assistant: {
     limit: positiveInteger(process.env.ASSISTANT_RATE_LIMIT_MAX, 30),
-    scope: 'assistant-device',
-    windowSeconds: positiveInteger(process.env.ASSISTANT_RATE_LIMIT_WINDOW_SECONDS, 60 * 60),
+    scope: 'assistant-generation-device-v2',
+    windowSeconds: positiveInteger(process.env.ASSISTANT_RATE_LIMIT_WINDOW_SECONDS, 15 * 60),
+  },
+  assistantMutation: {
+    limit: positiveInteger(process.env.ASSISTANT_MUTATION_RATE_LIMIT_MAX, 120),
+    scope: 'assistant-mutation-device',
+    windowSeconds: positiveInteger(process.env.ASSISTANT_MUTATION_RATE_LIMIT_WINDOW_SECONDS, 60 * 60),
   },
   barcodeLookup: {
     limit: positiveInteger(process.env.BARCODE_LOOKUP_RATE_LIMIT_MAX, 60),

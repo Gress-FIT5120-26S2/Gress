@@ -451,7 +451,10 @@ assistantRouter.post('/assistant/messages/:messageUid/feedback', async (request,
   if (!UUID_PATTERN.test(messageUid) || !['up', 'down'].includes(rating)) return response.status(400).json({ error: 'assistant_feedback_invalid' });
   if (reasonCode !== null && (typeof reasonCode !== 'string' || reasonCode.length > 80)) return response.status(400).json({ error: 'assistant_feedback_invalid' });
   if (comment !== null && (typeof comment !== 'string' || comment.length > 1000)) return response.status(400).json({ error: 'assistant_feedback_invalid' });
-  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistant })) return undefined;
+  // Arthur: NarIyirm
+  // 中文：反馈和动作确认不调用模型，使用独立额度，避免低成本交互耗尽 AI 生成次数。
+  // EN: Feedback and action confirmation do not invoke the model, so a separate allowance prevents low-cost interactions from exhausting generation capacity.
+  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistantMutation })) return undefined;
 
   try {
     const { data: message, error: messageError } = await supabase
@@ -491,7 +494,7 @@ function sendAssistantActionStatus(response, result) {
 assistantRouter.post('/assistant/actions/:actionUid/confirm', async (request, response) => {
   const { actionUid } = request.params;
   if (!UUID_PATTERN.test(actionUid) || request.body?.confirm !== true) return response.status(400).json({ error: 'assistant_confirmation_invalid' });
-  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistant })) return undefined;
+  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistantMutation })) return undefined;
 
   try {
     // Arthur: NarIyirm
@@ -519,7 +522,7 @@ assistantRouter.post('/assistant/actions/:actionUid/confirm', async (request, re
 assistantRouter.post('/assistant/actions/:actionUid/cancel', async (request, response) => {
   const { actionUid } = request.params;
   if (!UUID_PATTERN.test(actionUid)) return response.status(400).json({ error: 'assistant_action_invalid' });
-  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistant })) return undefined;
+  if (!await consumeRateLimit({ request, response, identifier: request.deviceId, policy: rateLimitPolicies.assistantMutation })) return undefined;
 
   try {
     const { data, error } = await supabase.rpc('cancel_assistant_pending_action', {

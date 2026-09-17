@@ -49,6 +49,8 @@ for (const [origin, expectedStatus, expectedNextCalls] of [
 // EN: The perimeter IP bucket must be broader than and separate from the device business bucket so shared public IPs cannot bottleneck normal startup traffic.
 assert.notEqual(rateLimitPolicies.perimeter.scope, rateLimitPolicies.global.scope);
 assert.ok(rateLimitPolicies.perimeter.limit > rateLimitPolicies.global.limit);
+assert.notEqual(rateLimitPolicies.assistant.scope, rateLimitPolicies.assistantMutation.scope);
+assert.ok(rateLimitPolicies.assistant.windowSeconds < rateLimitPolicies.assistantMutation.windowSeconds);
 
 const policy = { limit: 2, scope: 'verification', windowSeconds: 60 };
 let receivedArguments;
