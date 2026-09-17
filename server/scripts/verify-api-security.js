@@ -45,10 +45,9 @@ for (const [origin, expectedStatus, expectedNextCalls] of [
 }
 
 // Arthur: NarIyirm
-// 中文：外围 IP 桶必须比设备业务桶宽松且使用不同 scope，防止共享公网 IP 再次成为正常启动流量的瓶颈。
-// EN: The perimeter IP bucket must be broader than and separate from the device business bucket so shared public IPs cannot bottleneck normal startup traffic.
-assert.notEqual(rateLimitPolicies.perimeter.scope, rateLimitPolicies.global.scope);
-assert.ok(rateLimitPolicies.perimeter.limit > rateLimitPolicies.global.limit);
+// 中文：普通鉴权业务不再使用统一设备桶；只验证外围防洪和高成本助手操作仍由不同 scope 隔离。
+// EN: Ordinary authenticated traffic no longer uses a shared device bucket; verify that perimeter flood control and costly assistant operations remain isolated.
+assert.notEqual(rateLimitPolicies.perimeter.scope, rateLimitPolicies.assistant.scope);
 assert.notEqual(rateLimitPolicies.assistant.scope, rateLimitPolicies.assistantMutation.scope);
 assert.ok(rateLimitPolicies.assistant.windowSeconds < rateLimitPolicies.assistantMutation.windowSeconds);
 

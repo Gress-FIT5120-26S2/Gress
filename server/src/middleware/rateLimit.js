@@ -12,11 +12,6 @@ export const rateLimitPolicies = Object.freeze({
     scope: 'api-perimeter-ip',
     windowSeconds: positiveInteger(process.env.API_IP_RATE_LIMIT_WINDOW_SECONDS, 60),
   },
-  global: {
-    limit: positiveInteger(process.env.API_RATE_LIMIT_MAX, 180),
-    scope: 'api-global-device',
-    windowSeconds: positiveInteger(process.env.API_RATE_LIMIT_WINDOW_SECONDS, 60),
-  },
   recovery: {
     limit: positiveInteger(process.env.RECOVERY_RATE_LIMIT_MAX, 5),
     scope: 'device-recovery-ip-device',
