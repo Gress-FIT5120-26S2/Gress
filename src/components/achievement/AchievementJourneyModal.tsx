@@ -9,6 +9,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { AchievementCode, AchievementDashboard } from '../../services/achievementApi';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
+import { FirstItemMedal3D } from './FirstItemMedal3D';
 
 // Arthur: NarIyirm
 // 中文：每项成就绑定独立的自然浮雕奖牌资源，避免奖牌馆退化为通用线性图标。
@@ -243,15 +244,22 @@ export function MedalRevealDetail({achievement,badgeCopy,blurTarget,onClose}:{ac
         <Pressable accessibilityRole="button" hitSlop={12} onPress={close} style={({pressed})=>[revealStyles.closeButton,pressed&&styles.pressed]}><Ionicons color="#36564B" name="close" size={22}/></Pressable>
       </View>
       <View pointerEvents="box-none" style={revealStyles.content}>
-        <View {...rotateResponder.panHandlers} accessibilityHint={badgeCopy.rotateHint} accessibilityLabel={`${badgeCopy.items[achievement.code]}. ${side==='front'?badgeCopy.frontSide:badgeCopy.backSide}`} accessibilityRole="adjustable" style={revealStyles.medalStage}>
-        <Animated.View style={[revealStyles.halo,haloStyle]}/>
-        <Animated.View style={[revealStyles.medalEntrance,medalStyle]}>
-          <Animated.View style={[revealStyles.medalFace,{transform:[{perspective:1200},{rotateY:frontRotate}]}]}><Medal code={achievement.code} earned={achievement.status==='unlocked'} size={236}/></Animated.View>
-          <Animated.View style={[revealStyles.medalFace,revealStyles.medalBackFace,{transform:[{perspective:1200},{rotateY:backRotate}]}]}>
-            <View style={revealStyles.medalBackOuter}><View style={revealStyles.medalBackInner}><Ionicons color="#537A68" name="leaf-outline" size={38}/><Text style={revealStyles.medalBackBrand}>KITCHMEMO</Text><Text style={revealStyles.medalBackMark}>ECO MILESTONE</Text></View></View>
+        {achievement.code==='first_item' ? (
+          <Animated.View accessibilityHint={badgeCopy.rotateHint} accessibilityLabel={`${badgeCopy.items[achievement.code]}. ${badgeCopy.rotateHint}`} accessibilityRole="adjustable" style={[revealStyles.medalStage,revealStyles.medalStage3D,medalStyle]}>
+            <Animated.View pointerEvents="none" style={[revealStyles.halo,haloStyle]}/>
+            <FirstItemMedal3D earned={achievement.status==='unlocked'} />
           </Animated.View>
-        </Animated.View>
-        </View>
+        ) : (
+          <View {...rotateResponder.panHandlers} accessibilityHint={badgeCopy.rotateHint} accessibilityLabel={`${badgeCopy.items[achievement.code]}. ${side==='front'?badgeCopy.frontSide:badgeCopy.backSide}`} accessibilityRole="adjustable" style={revealStyles.medalStage}>
+            <Animated.View style={[revealStyles.halo,haloStyle]}/>
+            <Animated.View style={[revealStyles.medalEntrance,medalStyle]}>
+              <Animated.View style={[revealStyles.medalFace,{transform:[{perspective:1200},{rotateY:frontRotate}]}]}><Medal code={achievement.code} earned={achievement.status==='unlocked'} size={236}/></Animated.View>
+              <Animated.View style={[revealStyles.medalFace,revealStyles.medalBackFace,{transform:[{perspective:1200},{rotateY:backRotate}]}]}>
+                <View style={revealStyles.medalBackOuter}><View style={revealStyles.medalBackInner}><Ionicons color="#537A68" name="leaf-outline" size={38}/><Text style={revealStyles.medalBackBrand}>KITCHMEMO</Text><Text style={revealStyles.medalBackMark}>ECO MILESTONE</Text></View></View>
+              </Animated.View>
+            </Animated.View>
+          </View>
+        )}
         <Animated.View style={[revealStyles.sidePill,copyStyle]}><Ionicons color="#AFC1B9" name="swap-horizontal" size={15}/><Text style={revealStyles.sideText}>{badgeCopy.rotateHint}</Text></Animated.View>
         <Animated.View style={[revealStyles.copy,copyStyle]}>
           <Text style={revealStyles.detailTitle}>{badgeCopy.items[achievement.code]}</Text>
@@ -271,6 +279,7 @@ const revealStyles=StyleSheet.create({
   closeButton:{width:46,height:46,alignItems:'center',justifyContent:'center',borderRadius:23,backgroundColor:'rgba(248,251,249,.9)',shadowColor:'#10271F',shadowOffset:{width:0,height:6},shadowOpacity:.2,shadowRadius:12,elevation:7},
   content:{flex:1,alignItems:'center',justifyContent:'center',paddingHorizontal:28,paddingTop:76,paddingBottom:30},
   medalStage:{width:276,height:276,alignItems:'center',justifyContent:'center'},
+  medalStage3D:{width:292,height:292},
   medalEntrance:{width:236,height:236},
   medalFace:{position:'absolute',top:0,right:0,bottom:0,left:0,alignItems:'center',justifyContent:'center',backfaceVisibility:'hidden'},
   medalBackFace:{transform:[{rotateY:'180deg'}]},

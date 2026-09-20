@@ -34,7 +34,8 @@
         "expo-asset",
         {
           "assets": [
-            "./models/Kitchen-Home-rebuilt-lighting.glb"
+            "./models/Kitchen-Home-rebuilt-lighting.glb",
+            "./models/achievements/first-item.glb"
           ]
         }
       ],

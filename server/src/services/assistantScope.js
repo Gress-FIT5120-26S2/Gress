@@ -72,6 +72,7 @@ export function buildScopeRefusal(language, scopeDecision, rejectedRequestTypes)
     riskLevel: 'info',
     batchReferences: [],
     citations: [],
+    suggestedActions: [],
     requiresConfirmation: false,
     actionProposal: null,
     scopeDecision,

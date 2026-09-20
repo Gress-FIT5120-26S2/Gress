@@ -17,6 +17,8 @@ import {
   TextInput,
   View,
   type ListRenderItemInfo,
+  type StyleProp,
+  type TextStyle,
 } from 'react-native';
 import { useI18n } from '../../i18n';
 import { ApiRequestError } from '../../services/apiClient';
@@ -33,6 +35,7 @@ import {
   type AssistantMessageResponse,
   type AssistantPendingAction,
   type AssistantRiskLevel,
+  type AssistantSuggestedAction,
 } from '../../services/assistantApi';
 import type { InventoryBatch } from '../../services/inventoryApi';
 import { PresetFoodIcon } from './PresetFoodIcon';
@@ -71,6 +74,10 @@ function activeConversationKey(fridgeUid: string) {
 
 function updateTurn(turns: ConversationTurn[], id: string, patch: Partial<ConversationTurn>) {
   return turns.map((turn) => turn.id === id ? { ...turn, ...patch } : turn);
+}
+
+function isCapabilityQuestion(message: string) {
+  return /你(?:能|会)(?:帮我)?(?:做|干)什么|你能提供什么|能帮我什么|what can you (?:do|help)|how can you help|your capabilities/iu.test(message);
 }
 
 function restoreTurns(detail: AssistantConversationDetail): ConversationTurn[] {
@@ -374,9 +381,14 @@ export function FridgeAssistantScreen({
       onOpenItem={openItem}
       onRate={(messageUid, rating) => rateAnswer(item.id, messageUid, rating)}
       onRetry={() => { void askQuestion(item.question, item.id); }}
+      onSuggestedAction={(action) => {
+        if (action.type === 'ask_prompt' && action.prompt) void askQuestion(action.prompt);
+        else if (action.type === 'open_batch' && action.batchUid) openItem(action.batchUid);
+        else if (action.type === 'start_add_item') addItem();
+      }}
       turn={item}
     />
-  ), [askQuestion, batchesByUid, cancelAction, confirmAction, isBusy, openItem, rateAnswer]);
+  ), [addItem, askQuestion, batchesByUid, cancelAction, confirmAction, isBusy, openItem, rateAnswer]);
 
   const historyDateFormatter = useMemo(() => new Intl.DateTimeFormat(language === 'zh' ? 'zh-CN' : 'en-AU', {
     day: 'numeric',
@@ -609,6 +621,7 @@ function ConversationTurnView({
   onOpenItem,
   onRate,
   onRetry,
+  onSuggestedAction,
   turn,
 }: {
   batchesByUid: Map<string, InventoryBatch>;
@@ -619,6 +632,7 @@ function ConversationTurnView({
   onOpenItem: (batchUid: string) => void;
   onRate: (messageUid: string, rating: 'down' | 'up') => void;
   onRetry: () => void;
+  onSuggestedAction: (action: AssistantSuggestedAction) => void;
   turn: ConversationTurn;
 }) {
   const { t } = useI18n();
@@ -631,6 +645,17 @@ function ConversationTurnView({
   const referencedBatches = response?.answer.batchReferences
     .map((uid) => batchesByUid.get(uid))
     .filter((batch): batch is InventoryBatch => Boolean(batch)) ?? [];
+  const capabilityFallback = isCapabilityQuestion(turn.question);
+  const hasServerSuggestedActions = Boolean(response?.answer.suggestedActions?.length);
+  // Arthur: NarIyirm
+  // 中文：旧服务或旧历史可能没有 suggestedActions；能力问题在客户端补回同一套分层文案和安全提问按钮，避免降级成不可交互的长段落。
+  // EN: Older servers and history can lack suggestedActions, so capability questions recover the same hierarchy and safe prompt buttons instead of degrading to a static paragraph.
+  const suggestedActions: AssistantSuggestedAction[] = hasServerSuggestedActions
+    ? response!.answer.suggestedActions
+    : capabilityFallback
+      ? copy.capabilities.actions.map((action) => ({ ...action, batchUid: null, type: 'ask_prompt' as const }))
+      : [];
+  const answerMessage = capabilityFallback && !hasServerSuggestedActions ? copy.capabilities.answer : response?.answer.answer;
 
   return (
     <View style={styles.turn}>
@@ -655,7 +680,10 @@ function ConversationTurnView({
 
       {turn.status === 'complete' && response ? (
         <>
-          <AssistantMessage fallback={response.fallback} message={response.answer.answer} riskLevel={response.answer.riskLevel} />
+          <AssistantMessage fallback={response.fallback} message={answerMessage ?? response.answer.answer} riskLevel={response.answer.riskLevel} />
+          {suggestedActions.length ? (
+            <SuggestedActionList actions={suggestedActions} disabled={disabled} onPress={onSuggestedAction} />
+          ) : null}
           {referencedBatches.map((batch) => (
             <BatchReference key={`${turn.id}-${batch.id}`} batch={batch} onPress={() => onOpenItem(batch.id)} />
           ))}
@@ -722,11 +750,128 @@ function AssistantMessage({ fallback = false, loading = false, message, riskLeve
           ) : null}
         </View>
         <View style={styles.assistantBubble}>
-          <Text accessibilityLiveRegion="polite" style={styles.assistantBubbleText}>{message}</Text>
+          <RichAssistantText message={message} />
           {loading ? <ActivityIndicator color="#D9782D" size="small" style={styles.inlineLoader} /> : null}
           {fallback ? <Text style={styles.fallbackText}>{copy.fallback}</Text> : null}
         </View>
       </View>
+    </View>
+  );
+}
+
+type AssistantTextBlock = {
+  kind: 'heading' | 'list' | 'paragraph';
+  ordered?: boolean;
+  text?: string;
+  items?: string[];
+};
+
+// Arthur: NarIyirm
+// 中文：仅解析助手允许输出的少量 Markdown，让正文具备稳定层级，同时避免在客户端执行 HTML 或任意链接。
+// EN: Parse only the small Markdown subset allowed for assistant output, creating reliable hierarchy without executing HTML or arbitrary links.
+function parseAssistantText(message: string): AssistantTextBlock[] {
+  const firstColon = message.search(/[:：]/u);
+  const hasExplicitMarkdown = /^(?:#{1,3}\s+|[-*]\s+|\d+[.)]\s+)/mu.test(message);
+  if (!hasExplicitMarkdown && firstColon > 0) {
+    const heading = message.slice(0, firstColon).trim();
+    const items = message.slice(firstColon + 1).split(/[;；]\s*/u).map((item) => item.trim()).filter(Boolean);
+    if (heading.length <= 80 && items.length >= 3) return [{ kind: 'heading', text: heading }, { items, kind: 'list', ordered: false }];
+  }
+  const blocks: AssistantTextBlock[] = [];
+  const lines = message.replace(/\r\n/g, '\n').split('\n');
+  let paragraph: string[] = [];
+  let listItems: string[] = [];
+  let listOrdered = false;
+  const flushParagraph = () => {
+    if (paragraph.length) blocks.push({ kind: 'paragraph', text: paragraph.join(' ').trim() });
+    paragraph = [];
+  };
+  const flushList = () => {
+    if (listItems.length) blocks.push({ items: listItems, kind: 'list', ordered: listOrdered });
+    listItems = [];
+  };
+
+  lines.forEach((rawLine) => {
+    const line = rawLine.trim();
+    const heading = /^(#{1,3})\s+(.+)$/.exec(line);
+    const list = /^(?:([-*])|(\d+)[.)])\s+(.+)$/.exec(line);
+    if (!line) {
+      flushParagraph();
+      flushList();
+    } else if (heading) {
+      flushParagraph();
+      flushList();
+      blocks.push({ kind: 'heading', text: heading[2].trim() });
+    } else if (list) {
+      flushParagraph();
+      const ordered = Boolean(list[2]);
+      if (listItems.length && ordered !== listOrdered) flushList();
+      listOrdered = ordered;
+      listItems.push(list[3].trim());
+    } else {
+      flushList();
+      paragraph.push(line);
+    }
+  });
+  flushParagraph();
+  flushList();
+  return blocks.length ? blocks : [{ kind: 'paragraph', text: message }];
+}
+
+function InlineAssistantText({ text, style }: { text: string; style: StyleProp<TextStyle> }) {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
+  return (
+    <Text style={style}>
+      {parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
+        ? <Text key={`${part}-${index}`} style={styles.assistantStrong}>{part.slice(2, -2)}</Text>
+        : part)}
+    </Text>
+  );
+}
+
+function RichAssistantText({ message }: { message: string }) {
+  const blocks = useMemo(() => parseAssistantText(message), [message]);
+  return (
+    <View accessibilityLiveRegion="polite" style={styles.assistantRichText}>
+      {blocks.map((block, blockIndex) => {
+        if (block.kind === 'heading') return <InlineAssistantText key={`heading-${blockIndex}`} style={styles.assistantHeading} text={block.text ?? ''} />;
+        if (block.kind === 'list') {
+          return (
+            <View key={`list-${blockIndex}`} style={styles.assistantList}>
+              {block.items?.map((item, itemIndex) => (
+                <View key={`${item}-${itemIndex}`} style={styles.assistantListRow}>
+                  <Text style={styles.assistantListMarker}>{block.ordered ? `${itemIndex + 1}.` : '•'}</Text>
+                  <View style={styles.assistantListCopy}><InlineAssistantText style={styles.assistantBubbleText} text={item} /></View>
+                </View>
+              ))}
+            </View>
+          );
+        }
+        return <InlineAssistantText key={`paragraph-${blockIndex}`} style={styles.assistantBubbleText} text={block.text ?? ''} />;
+      })}
+    </View>
+  );
+}
+
+function SuggestedActionList({ actions, disabled, onPress }: {
+  actions: AssistantSuggestedAction[];
+  disabled: boolean;
+  onPress: (action: AssistantSuggestedAction) => void;
+}) {
+  return (
+    <View style={styles.suggestedActions}>
+      {actions.map((action, index) => (
+        <Pressable
+          accessibilityRole="button"
+          disabled={disabled}
+          key={`${action.type}-${action.label}-${index}`}
+          onPress={() => onPress(action)}
+          style={({ pressed }) => [styles.suggestedActionButton, disabled && styles.disabled, pressed && !disabled && styles.pressed]}
+        >
+          <Text style={styles.suggestedActionText}>{action.label}</Text>
+          <Ionicons color="#A65317" name={action.type === 'open_batch' ? 'open-outline' : action.type === 'start_add_item' ? 'add' : 'arrow-forward'} size={16} />
+        </Pressable>
+      ))}
     </View>
   );
 }
@@ -826,7 +971,14 @@ const styles = StyleSheet.create({
   assistantLabelRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
   assistantName: { color: '#687C75', fontSize: 12, fontWeight: '700' },
   assistantBubble: { maxWidth: '96%', paddingHorizontal: 16, paddingVertical: 13, borderRadius: 16, borderTopLeftRadius: 5, backgroundColor: '#FFFFFF' },
+  assistantRichText: { gap: 10 },
   assistantBubbleText: { color: '#203E35', fontSize: 15, fontWeight: '600', lineHeight: 23 },
+  assistantHeading: { color: '#173D31', fontSize: 16, fontWeight: '900', lineHeight: 22 },
+  assistantStrong: { color: '#173D31', fontWeight: '900' },
+  assistantList: { gap: 7 },
+  assistantListRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
+  assistantListMarker: { width: 20, color: '#B96327', fontSize: 14, fontWeight: '900', lineHeight: 23, textAlign: 'right' },
+  assistantListCopy: { flex: 1, minWidth: 0 },
   inlineLoader: { alignSelf: 'flex-start', marginTop: 8 },
   fallbackText: { marginTop: 9, color: '#8B6B45', fontSize: 11.5, fontWeight: '700', lineHeight: 16 },
   riskBadge: { paddingHorizontal: 7, paddingVertical: 3, borderRadius: 999 },
@@ -851,6 +1003,9 @@ const styles = StyleSheet.create({
   compactQuestionButton: { minHeight: 38, justifyContent: 'center', paddingHorizontal: 13, borderRadius: 19, backgroundColor: '#F6E6D9' },
   compactQuestionText: { maxWidth: 190, color: '#914A1D', fontSize: 12, fontWeight: '800' },
   batchReference: { minHeight: 78, flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, marginLeft: 51, borderWidth: 1, borderColor: '#DCE5E1', borderRadius: 14, backgroundColor: '#FFFFFF' },
+  suggestedActions: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginLeft: 51 },
+  suggestedActionButton: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 13, paddingVertical: 9, borderRadius: 12, backgroundColor: '#F6E6D9' },
+  suggestedActionText: { maxWidth: 220, color: '#914A1D', fontSize: 13, fontWeight: '900', lineHeight: 18 },
   foodIcon: { width: 46, height: 46, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: '#F2F6F4' },
   batchCopy: { flex: 1, minWidth: 0, gap: 4 },
   batchTitle: { color: '#17372D', fontSize: 15, fontWeight: '900' },

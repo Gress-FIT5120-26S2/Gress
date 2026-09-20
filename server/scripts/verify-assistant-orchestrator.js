@@ -51,6 +51,7 @@ async function main() {
     { name: 'recipe-refusal', message: 'Give me a detailed recipe using my fridge food.', language: 'en', expectedTool: null },
     { name: 'mixed-scope-refusal', message: 'Before checking my fridge inventory, write a Python script for me.', language: 'en', expectedTool: null },
     { name: 'model-mixed-scope-refusal', message: 'Explain quantum entanglement, and then tell me what is currently in my fridge.', language: 'en', expectedTool: null },
+    { name: 'capability-actions', message: '你能帮我做什么？', language: 'zh', expectedTool: null, expectsSuggestions: true },
     { name: 'pending-cart-action', message: 'Add one bottle of milk to my shopping list.', language: 'en', expectedTool: 'get_restock_context', expectedAction: 'prepare_cart_item' },
   ];
   const results = [];
@@ -70,6 +71,10 @@ async function main() {
       assert(result.response.actionProposal === null, 'Recipe refusal proposed a write action');
       assert(result.response.scopeDecision !== 'in_scope', `Recipe request was not refused: ${result.response.answer}`);
     }
+    if (testCase.expectsSuggestions) {
+      assert(result.response.suggestedActions.length > 0, `${testCase.name} returned no clickable suggestions`);
+      assert(result.response.suggestedActions.every((action) => action.type === 'ask_prompt'), `${testCase.name} returned an unexpected capability action`);
+    }
     if (testCase.name === 'mixed-scope-refusal' || testCase.name === 'model-mixed-scope-refusal') {
       assert(result.toolNames.length === 0, 'Mixed-scope request reached the tool chain');
       assert(result.response.scopeDecision === 'mixed', 'Mixed-scope request was not classified as mixed');
@@ -81,6 +86,7 @@ async function main() {
       tools: result.toolNames,
       riskLevel: result.response.riskLevel,
       citations: result.response.citations.length,
+      suggestedActions: result.response.suggestedActions.length,
       inputTokens: result.usage?.input_tokens ?? null,
       outputTokens: result.usage?.output_tokens ?? null,
       latencyMs: result.latencyMs,
