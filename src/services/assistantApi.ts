@@ -27,6 +27,13 @@ export type AssistantCitation = {
   sourceUrl: string;
 };
 
+export type AssistantSuggestedAction = {
+  batchUid: string | null;
+  label: string;
+  prompt: string | null;
+  type: 'ask_prompt' | 'open_batch' | 'start_add_item';
+};
+
 export type AssistantActionProposal = {
   actionType: AssistantActionType;
   enabled: boolean | null;
@@ -46,6 +53,7 @@ export type AssistantAnswer = {
   answer: string;
   batchReferences: string[];
   citations: AssistantCitation[];
+  suggestedActions: AssistantSuggestedAction[];
   requiresConfirmation: boolean;
   rejectedRequestTypes?: AssistantRejectedRequestType[];
   riskLevel: AssistantRiskLevel;

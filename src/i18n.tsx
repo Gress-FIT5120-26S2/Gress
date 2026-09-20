@@ -164,6 +164,14 @@ const zh = {
       addItem: '添加食材',
       openItem: '打开食材详情',
       missingDate: '未记录日期',
+      capabilities: {
+        answer: '## 我能帮你管理冰箱\n\n- **查看库存**：查询食材、数量和存放区域\n- **关注日期**：检查 use-by、新鲜度和缺失信息\n- **补货与购物**：查看补货建议，并准备购物清单\n- **处理库存**：在你确认后，调整数量、标记用完或丢弃\n\n选择下面一项，我会继续帮你处理。',
+        actions: [
+          { label: '查看优先使用', prompt: '我应该先用哪些食材？' },
+          { label: '检查过期食材', prompt: '哪些食材需要检查过期情况？' },
+          { label: '查看补货建议', prompt: '最近哪些食材需要补货？' },
+        ],
+      },
       questions: {
         useFirst: '我应该先用哪些食材？',
         expired: '哪些食材需要检查过期情况？',
@@ -1242,6 +1250,14 @@ const en: Translation = {
       addItem: 'Add food',
       openItem: 'Open food details',
       missingDate: 'No date recorded',
+      capabilities: {
+        answer: '## What I can help with\n\n- **Check inventory**: review food, quantities, and storage zones\n- **Track dates**: check use-by dates, freshness, and missing information\n- **Restock and shop**: review restock suggestions and prepare shopping-list items\n- **Update inventory**: after you confirm, adjust quantities or mark food as used or discarded\n\nChoose an option below and I will continue from there.',
+        actions: [
+          { label: 'Check what to use first', prompt: 'Which food should I use first?' },
+          { label: 'Check expired food', prompt: 'Which food needs an expiry check?' },
+          { label: 'View restock suggestions', prompt: 'Which food needs restocking?' },
+        ],
+      },
       questions: {
         useFirst: 'Which food should I use first?',
         expired: 'Which food needs an expiry check?',

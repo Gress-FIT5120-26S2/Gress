@@ -39,6 +39,10 @@ The full-screen chat now avoids the software keyboard on both iOS and Android, k
 
 The screen renders real assistant answers, risk levels, cited sources, linked inventory batches, retry states, and thumbs-up/down feedback. Write-like requests render a ten-minute confirmation card and call the dedicated confirm or cancel endpoint only after the user presses the corresponding button. Successful confirmation triggers the existing inventory reconciliation and shared sync; the existing inventory intake button and entry flow were not changed. Closing the assistant or opening an inventory detail no longer clears the in-memory conversation. AsyncStorage persists only the active conversation UID per fridge; app restart restoration and the history picker re-fetch private content through authenticated `GET /api/assistant/conversations` and `GET /api/assistant/conversations/:conversationUid`. A new-conversation sentinel prevents an explicitly blank conversation from silently reopening old history after restart. Do not confuse this assistant path with the separate AI food-preset path, which uses Gemini and Cloudflare Workers AI.
 
+Assistant replies now use a restricted Markdown presentation contract for short paragraphs, headings, ordered or unordered lists, and bold emphasis. The App parses only this subset and never executes model-authored HTML or arbitrary links. The structured response also includes up to four `suggestedActions`, limited to `ask_prompt`, `open_batch`, and `start_add_item`. Express validates prompt shape and revalidates every `open_batch` target against tool evidence before the App renders a button. These navigation and follow-up suggestions are distinct from confirmation-gated `actionProposal` mutations. Historical payloads without `suggestedActions` restore with an empty array, so no database migration is required.
+
+Capability questions such as “你会干什么” are a deterministic product response rather than a model-styling choice: Express returns a fixed Markdown capability summary plus three safe follow-up actions without spending a model call. Expo carries the same bilingual fallback for old servers and old history, and converts legacy colon-plus-semicolon enumerations into a heading and bullet list. This prevents capability help from regressing to one static paragraph during staggered App/API deployments.
+
 Scope hardening added on 2026-09-15 defines an exhaustive capability allowlist instead of enumerating forbidden topics. Obvious mixed or out-of-scope requests are rejected before Luna or any tool runs. All remaining model responses must classify the current request as `in_scope`, `mixed`, or `out_of_scope`; for the latter two, Express discards model-authored prose, citations, references, and actions and returns a server-owned bilingual refusal. Mixed requests fail closed and ask the user to resend only the fridge-related part. This preserves the one-user-request/one-Luna-orchestration decision and adds no separate intent-classification model.
 
 The assistant entry is now app-level. `App.tsx` owns the single `FridgeAssistantScreen` instance so the fixed fridge entry and the movable mascot share the same in-memory conversation. Home intentionally has no Spoonie entry. The fridge keeps `FridgeAssistantButton` fixed in the existing toolbar with only a low-frequency two-pixel idle movement. Shopping, Achievements, and Profile render `src/components/assistant/SpooniePetEntry.tsx`, which reuses the canonical `assets/kitchmemo-assistant.png`, supports UI-thread dragging, left/right edge snapping, a short greeting before opening, light snap haptics, safe-area and tab-bar bounds, reduced-motion behaviour, and device-local position persistence. Native modals naturally cover the pet, so camera, entry, and settings flows are not obstructed. Inventory-card and empty-inventory actions from the global assistant close it, navigate to Fridge, and hand off to the existing detail or add flow.
@@ -150,28 +154,28 @@ Body:
   inventoryVersion?: string
 ```
 
-Recommended final model schema:
+Current response-shape summary (the code schema remains authoritative):
 
 ```json
 {
   "answer": "string",
-  "referencedItems": [
-    { "batchUid": "string", "reason": "string" }
-  ],
+  "riskLevel": "info | warning | danger",
+  "batchReferences": ["batchUid"],
   "citations": [
     { "chunkUid": "string", "claim": "string" }
   ],
   "suggestedActions": [
     {
-      "type": "open_item | start_add_item | prepare_cart_item | review_expired_item | edit_missing_information",
-      "batchUid": "optional string",
+      "type": "ask_prompt | open_batch | start_add_item",
       "label": "string",
-      "requiresConfirmation": true
+      "prompt": "string or null",
+      "batchUid": "string or null"
     }
   ],
-  "confidence": "high | medium | low",
-  "safetyLevel": "general | health_sensitive",
-  "insufficientInformation": false
+  "requiresConfirmation": false,
+  "actionProposal": null,
+  "scopeDecision": "in_scope | mixed | out_of_scope",
+  "rejectedRequestTypes": []
 }
 ```
 

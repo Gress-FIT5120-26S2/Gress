@@ -70,6 +70,12 @@ server/.env.production
 !/models/Spoonie-Character-v2.blend
 
 # Arthur: NarIyirm
+# 中文：成就奖牌的 Blender 源文件、移动端 GLB 与验证预览需要随代码版本化，确保模型可重建和跨环境打包。
+# EN: Version achievement medal Blender sources, mobile GLBs, and verification previews so models remain reproducible and bundle across environments.
+!/models/achievements/
+!/models/achievements/**
+
+# Arthur: NarIyirm
 # 中文：docs 中保留可审阅的文本资料，忽略不适合版本控制的二进制办公文档。
 # EN: Keep reviewable text documentation in docs while excluding binary office artifacts.
 /docs/**/*.ppt
