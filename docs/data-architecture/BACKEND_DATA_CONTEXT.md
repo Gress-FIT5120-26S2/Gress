@@ -18,6 +18,7 @@
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
 - `20260913170000_assistant_inventory_outcomes.sql` 将助手的整批使用、明确丢弃和录入纠错统一接入 `resolve_inventory_batch`：使用写 `consume/used`，丢弃写带稳定原因的 `discard`，只有明确录入错误才写 `adjust/data_correction`。这些权威流水会被现有成就、XP、环境指标和挑战聚合直接消费；模糊的非过期“删除”请求必须先澄清结果类型。
+- `20260922010000_fix_shared_join_assistant_scope.sql` 修复已有助手会话时加入家庭冰箱会被复合外键阻断的问题：合并前将该设备的私有会话与审计范围迁入目标冰箱，让依赖旧库存版本的待确认/已确认动作失效并解除旧批次绑定，再执行库存与分类迁移。
 
 实际实现的权威来源：
 
@@ -520,7 +521,7 @@ meat, vegetables, fruit, staples, condiments, drinks, other
 
 ### 7.21 助手会话与动作
 
-`assistant_conversations` 和 `assistant_messages` 保存创建设备私有、默认 30 天有效的对话；共享冰箱成员权限不会自动授予其他成员的会话读取权。`assistant_feedback` 按消息和设备保存一份评价。`assistant_pending_actions.assistant_message_uid` 通过可空外键精确指向产生动作草案的助手消息，并由部分唯一索引保证每条回答最多一个动作；旧迁移产生的历史动作允许保持空值。Expo 的 AsyncStorage 只保存按 `fridge_uid` 分区的当前 `conversation_uid`，不保存对话正文，恢复时必须重新经过 Express 鉴权。
+`assistant_conversations` 和 `assistant_messages` 保存创建设备私有、默认 30 天有效的对话；共享冰箱成员权限不会自动授予其他成员的会话读取权。设备从个人冰箱加入家庭冰箱时，其私有会话与脱敏审计范围随设备迁入目标冰箱，但不会变为其他成员可读；依赖合并前库存版本的待确认/已确认动作会变为 `expired` 并解除批次绑定。`assistant_feedback` 按消息和设备保存一份评价。`assistant_pending_actions.assistant_message_uid` 通过可空外键精确指向产生动作草案的助手消息，并由部分唯一索引保证每条回答最多一个动作；旧迁移产生的历史动作允许保持空值。Expo 的 AsyncStorage 只保存按 `fridge_uid` 分区的当前 `conversation_uid`，不保存对话正文，恢复时必须重新经过 Express 鉴权。
 
 ## 8. 派生状态
 
