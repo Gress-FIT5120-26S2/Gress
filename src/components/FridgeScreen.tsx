@@ -203,6 +203,7 @@ export function FridgeScreen({
   const [sharingContext, setSharingContext] = useState<FridgeAccessContext | null>(null);
   const [isSharingContextLoading, setIsSharingContextLoading] = useState(false);
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
+  const sharingContextLoadRef = useRef<Promise<void> | null>(null);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
   const [saveConfirmationVisible, setSaveConfirmationVisible] = useState(false);
   const [showFilterSwipeHint, setShowFilterSwipeHint] = useState(false);
@@ -266,26 +267,40 @@ export function FridgeScreen({
     void loadInventory('background').catch(() => undefined);
   }), [loadInventory]);
 
-  const loadSharingContext = useCallback(async () => {
-    setIsSharingContextLoading(true);
-    setHasSharingContextError(false);
+  const loadSharingContext = useCallback(async (showLoading = false) => {
+    if (showLoading) setIsSharingContextLoading(true);
     try {
-      setSharingContext(await getFridgeAccessContext());
-    } catch {
-      setHasSharingContextError(true);
+      // Arthur: NarIyirm
+      // 中文：首次打开才显示加载态；同步事件复用同一个在途请求并静默替换数据，避免弹层内容反复消失而无法点击。
+      // EN: Only the first open shows loading; sync events reuse one in-flight request and replace data silently so the menu never vanishes under a tap.
+      if (!sharingContextLoadRef.current) {
+        sharingContextLoadRef.current = getFridgeAccessContext()
+          .then((nextContext) => {
+            setSharingContext(nextContext);
+            setHasSharingContextError(false);
+          })
+          .catch((error) => {
+            setHasSharingContextError(true);
+            throw error;
+          })
+          .finally(() => {
+            sharingContextLoadRef.current = null;
+          });
+      }
+      await sharingContextLoadRef.current;
     } finally {
-      setIsSharingContextLoading(false);
+      if (showLoading) setIsSharingContextLoading(false);
     }
   }, []);
 
   useEffect(() => subscribeToSync(['fridge', 'members'], () => {
-    void loadSharingContext();
+    void loadSharingContext(false).catch(() => undefined);
   }), [loadSharingContext]);
 
   const openSpaceMenu = useCallback(() => {
     setIsSpaceMenuVisible(true);
-    void loadSharingContext();
-  }, [loadSharingContext]);
+    void loadSharingContext(sharingContext === null).catch(() => undefined);
+  }, [loadSharingContext, sharingContext]);
 
   const openSharingFlow = useCallback((screen: SharedFridgeFlowScreen) => {
     setIsSpaceMenuVisible(false);
@@ -907,7 +922,7 @@ export function FridgeScreen({
         onCreate={() => openSharingFlow('create')}
         onJoin={() => openSharingFlow('join')}
         onManage={() => openSharingFlow('manage')}
-        onRetry={() => { void loadSharingContext(); }}
+        onRetry={() => { void loadSharingContext(true).catch(() => undefined); }}
         visible={isSpaceMenuVisible}
       />
       <SharedFridgeFlowModal

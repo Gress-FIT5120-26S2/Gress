@@ -70,7 +70,10 @@ async function cleanup() {
   const fridgeUids = (fridges ?? []).map((fridge) => fridge.fridge_uid);
 
   if (fridgeUids.length > 0) {
-    for (const table of ['notifications', 'shopping_cart_items', 'inventory_events', 'inventory_batches', 'restock_rules', 'food_categories', 'fridge_achievements', 'fridge_invites', 'fridge_members']) {
+    // Arthur: NarIyirm
+    // 中文：删除会话会级联清理消息和反馈；待确认动作因批次范围外键限制库存删除，必须优先清理。
+    // EN: Deleting conversations cascades through messages and feedback; pending actions must go first because their batch-scope foreign key restricts inventory deletion.
+    for (const table of ['assistant_pending_actions', 'assistant_request_audit', 'assistant_conversations', 'notifications', 'shopping_cart_items', 'inventory_events', 'inventory_batches', 'restock_rules', 'food_categories', 'fridge_achievements', 'fridge_invites', 'fridge_members']) {
       const { error } = await supabase.from(table).delete().in('fridge_uid', fridgeUids);
       if (error) throw error;
     }
@@ -92,6 +95,43 @@ try {
   await api(1, '/fridges/context');
   await addBatch(0, `Owner A ${runId}`);
   await addBatch(1, `Owner B ${runId}`);
+
+  // Arthur: NarIyirm
+  // 中文：在加入方个人冰箱中放入真实助手会话和待确认动作，覆盖曾被复合外键阻断的合并路径。
+  // EN: Seed a real conversation and pending action in the joining personal fridge to cover the composite-FK merge path that previously blocked joins.
+  const { data: joiningMembership, error: membershipError } = await supabase
+    .from('fridge_members')
+    .select('fridge_uid')
+    .eq('device_id', devices[1])
+    .single();
+  if (membershipError) throw membershipError;
+  const { data: joiningBatch, error: joiningBatchError } = await supabase
+    .from('inventory_batches')
+    .select('batch_uid, version')
+    .eq('fridge_uid', joiningMembership.fridge_uid)
+    .eq('name', `Owner B ${runId}`)
+    .single();
+  if (joiningBatchError) throw joiningBatchError;
+  const { data: conversation, error: conversationError } = await supabase
+    .from('assistant_conversations')
+    .insert({ creator_device_id: devices[1], fridge_uid: joiningMembership.fridge_uid, language: 'en' })
+    .select('conversation_uid')
+    .single();
+  if (conversationError) throw conversationError;
+  const { data: pendingAction, error: pendingActionError } = await supabase
+    .from('assistant_pending_actions')
+    .insert({
+      action_payload: { batchUid: joiningBatch.batch_uid },
+      action_type: 'archive_batch',
+      conversation_uid: conversation.conversation_uid,
+      creator_device_id: devices[1],
+      expected_batch_version: joiningBatch.version,
+      fridge_uid: joiningMembership.fridge_uid,
+      target_batch_uid: joiningBatch.batch_uid,
+    })
+    .select('action_uid')
+    .single();
+  if (pendingActionError) throw pendingActionError;
 
   const enabled = await api(0, '/fridges/share', {
     body: JSON.stringify({ name: `Family ${runId}` }),
@@ -143,6 +183,14 @@ try {
     method: 'POST',
   });
   assert(joined.fridge.mode === 'shared' && joined.fridge.memberCount === 2 && joined.members.length === 2, 'Join did not create a two-device shared fridge.');
+  const [{ data: movedConversation, error: movedConversationError }, { data: invalidatedAction, error: invalidatedActionError }] = await Promise.all([
+    supabase.from('assistant_conversations').select('fridge_uid').eq('conversation_uid', conversation.conversation_uid).single(),
+    supabase.from('assistant_pending_actions').select('fridge_uid, status, target_batch_uid').eq('action_uid', pendingAction.action_uid).single(),
+  ]);
+  if (movedConversationError || invalidatedActionError) throw movedConversationError ?? invalidatedActionError;
+  assert(movedConversation.fridge_uid === joined.fridge.uid, 'Joining did not move creator-private assistant history into the target scope.');
+  assert(invalidatedAction.fridge_uid === joined.fridge.uid && invalidatedAction.status === 'expired' && invalidatedAction.target_batch_uid === null,
+    'Joining did not invalidate the old-scope assistant action before moving inventory.');
   await expectApiError(1, '/fridges/join', {
     body: JSON.stringify({ code: rotated.activeInvite.code }),
     method: 'POST',
@@ -175,7 +223,7 @@ try {
   });
   assert(oldDeviceResponse.status === 401, 'Old device credential remained active after recovery.');
 
-  console.log(JSON.stringify({ status: 'ok', verified: ['enable-sharing', 'invite-error-states', 'invite-rotation', 'rename', 'join', 'ownership', 'leave', 'recovery', 'old-device-revocation'] }));
+  console.log(JSON.stringify({ status: 'ok', verified: ['enable-sharing', 'invite-error-states', 'invite-rotation', 'rename', 'join', 'assistant-scope-merge', 'ownership', 'leave', 'recovery', 'old-device-revocation'] }));
 } finally {
   await cleanup();
 }
