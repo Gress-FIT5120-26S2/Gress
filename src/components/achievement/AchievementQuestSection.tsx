@@ -14,13 +14,14 @@ type Props = {
   copy: QuestCopy; daily: FridgeQuestAssignment[]; weekly: FridgeQuestAssignment[];
   dailyRerollsRemaining: number; weeklyRerollsRemaining: number; rerollingAssignmentUid: string | null;
   onReroll: (assignment: FridgeQuestAssignment) => void; formatEndsAt: (iso: string) => string;
+  initialQuestUid?: string | null;
 };
 
 // Arthur: NarIyirm
-// 中文：挑战首页只保留任务、进度和奖励；说明与更换操作下沉到详情弹层，降低文字噪音。
-// EN: The overview keeps task, progress, and reward; explanations and rerolls move into a detail sheet to reduce text noise.
-export function AchievementQuestSection({ copy, daily, weekly, dailyRerollsRemaining, weeklyRerollsRemaining, rerollingAssignmentUid, onReroll, formatEndsAt }: Props) {
-  const [selected, setSelected] = useState<FridgeQuestAssignment | null>(null);
+// 中文：完整挑战列表保留任务、进度和奖励；首页焦点任务可直接打开对应详情，说明与更换操作仍在弹层中。
+// EN: The full challenge list keeps task, progress, and reward; the overview's focus task can open its detail directly, while explanations and rerolls stay in the sheet.
+export function AchievementQuestSection({ copy, daily, weekly, dailyRerollsRemaining, weeklyRerollsRemaining, rerollingAssignmentUid, onReroll, formatEndsAt, initialQuestUid }: Props) {
+  const [selected, setSelected] = useState<FridgeQuestAssignment | null>(() => [...daily, ...weekly].find((item) => item.assignmentUid === initialQuestUid) ?? null);
   const [confirming, setConfirming] = useState(false);
   const all = [...daily, ...weekly];
   const completed = all.filter((item) => item.status === 'completed').length;

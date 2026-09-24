@@ -25,6 +25,7 @@ import type { AppTab } from './FloatingTabBar';
 import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather } from './KitchenAmbientDetails';
 import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
 import { KitchenShoppingCart, SHOPPING_CART_POSITION } from './KitchenShoppingCart';
+import { KitchenStoryBoard, KITCHEN_STORY_BOARD_POSITION } from './KitchenStoryBoard';
 import { SpoonieWorldCharacter } from './SpoonieWorldCharacter';
 import {
   KitchenTimeEnvironment,
@@ -41,6 +42,7 @@ type Kitchen3DPrototypeProps = {
   onInteractionStart?: () => void;
   onNavigate: (tab: AppTab) => void;
   onOpenAssistant: () => void;
+  onOpenStory: () => void;
   onReady?: () => void;
   unreadNotificationCount?: number;
   weather?: KitchenWeather;
@@ -55,7 +57,7 @@ type FeatureHotspotProps = {
   selected?: boolean;
 };
 
-type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox';
+type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox' | 'story';
 type KitchenNavigationFeature = Extract<KitchenFeature, 'fridge' | 'shopping' | 'mailbox'>;
 type KitchenInteraction = KitchenNavigationFeature | null;
 type LoadedKitchen = { scene: Object3D; animations: AnimationClip[] };
@@ -432,6 +434,18 @@ function KitchenModel({
       <primitive object={scene} />
 
       {/* Arthur: NarIyirm
+          中文：小黑板挂在后墙台面上方；独立热区沿用厨房里其他物件的点击与提示方式。
+          EN: The story board sits above the back counter, with the same tap target and marker used by other kitchen objects. */}
+      {activeInteraction === null ? (
+        <group position={KITCHEN_STORY_BOARD_POSITION}>
+          <KitchenStoryBoard />
+          <group position={[0, 0, 0.18]}>
+            <FeatureHotspot hitboxSize={[1.12, 0.91, 0.28]} markerOffset={[0.38, 0.49, 0.04]} onPress={() => onSelectFeature('story')} reduceMotion={reduceMotion} selected={pressedFeature === 'story'} />
+          </group>
+        </group>
+      ) : null}
+
+      {/* Arthur: NarIyirm
           中文：Portal 把动效和生活细节变成模型锚点的真实子节点，转动镜头或打开冰箱门后仍会留在正确位置。
           EN: Portals make motion and lived-in details true children of model anchors, keeping them aligned after camera rotation or door movement. */}
       {weather === 'rain' && anchors.windowLight ? createPortal(
@@ -765,7 +779,7 @@ function KitchenScene({ active, activeInteraction, activitySignal, batches, came
   );
 }
 
-export function Kitchen3DPrototype({ active = true, batches = [], expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onOpenAssistant, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
+export function Kitchen3DPrototype({ active = true, batches = [], expiringCount = 0, inventoryFillRatio = 0, lighting, onExplore, onInteractionStart, onNavigate, onOpenAssistant, onOpenStory, onReady, unreadNotificationCount = 0, weather = 'clear' }: Kitchen3DPrototypeProps) {
   const { language, t } = useI18n();
   const { active: isLoading, progress } = useProgress();
   const [activeInteraction, setActiveInteraction] = useState<KitchenInteraction>(null);
@@ -861,6 +875,13 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
       return;
     }
 
+    if (feature === 'story') {
+      onExplore?.();
+      onOpenStory();
+      markerFeedbackTimerRef.current = setTimeout(() => setPressedFeature(null), 240);
+      return;
+    }
+
     if (interactionRef.current) return;
 
     // Arthur: NarIyirm
@@ -869,7 +890,7 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
     interactionRef.current = feature;
     onInteractionStart?.();
     setActiveInteraction(feature);
-  }, [onExplore, onInteractionStart, registerCameraActivity]);
+  }, [onExplore, onInteractionStart, onOpenStory, registerCameraActivity]);
 
   const handleEffectCue = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current === feature) setEffectInteraction(feature);
@@ -887,7 +908,18 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
   }, [onNavigate]);
 
   return (
-    <View style={styles.container} accessibilityLabel={t.kitchen.accessibility} onTouchStart={registerCameraActivity}>
+    <View
+      accessibilityActions={[{ name: 'watchStory', label: t.kitchen.storyBoard }]}
+      accessibilityLabel={t.kitchen.accessibility}
+      onAccessibilityAction={(event) => {
+        // Arthur: NarIyirm
+        // 中文：读屏用户可从厨房的自定义操作进入故事，避免只能点击 3D 热区。
+        // EN: The kitchen exposes the story as a screen-reader action so it does not depend on tapping a 3D hitbox.
+        if (event.nativeEvent.actionName === 'watchStory') onOpenStory();
+      }}
+      onTouchStart={registerCameraActivity}
+      style={styles.container}
+    >
       {/* Arthur: NarIyirm
           中文：新 GLB 使用真实米制大小和中心原点，不再通过补偿缩放与偏移猜测画面位置。
           EN: The rebuilt GLB uses real scale and a centered origin, removing guessed scale and position compensation. */}

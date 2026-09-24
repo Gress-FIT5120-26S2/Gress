@@ -35,7 +35,9 @@ type AchievementMountainHeroProps = {
   dashboard: AchievementDashboard;
   language: Language;
   onTailColorChange?: (color: string) => void;
+  onOpenXpHistory?: () => void;
   rescuedValue: string;
+  xpHistoryLabel?: string;
 };
 
 type LevelVisual = {
@@ -62,7 +64,7 @@ const CLOUD_FRONT = require('../../assets/achievements/cloud-front.png');
 // Arthur: NarIyirm
 // 中文：山峰、路线和数据文案分层渲染；本地预览只切换服务端目录中的视觉定义，不改变权威等级或重新计算规则。
 // EN: Mountain art, route, and data copy render as separate layers; local preview only swaps visual definitions from the server catalog without changing the authoritative level or recalculating rules.
-export function AchievementMountainHero({ copy, dashboard, language, onTailColorChange, rescuedValue }: AchievementMountainHeroProps) {
+export function AchievementMountainHero({ copy, dashboard, language, onOpenXpHistory, onTailColorChange, rescuedValue, xpHistoryLabel }: AchievementMountainHeroProps) {
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
   const reducedMotion = usePrefersReducedMotion();
@@ -89,8 +91,11 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
   const previousLevel = viewedLevel > 1 ? viewedLevel - 1 : null;
   const nextLevel = viewedLevel < dashboard.levelCatalog.length ? viewedLevel + 1 : null;
   const heroWidth = Math.min(width, HERO_MAX_WIDTH);
-  const heroHeight = Math.max(430, Math.min(476, heroWidth * 1.14));
   const headingTop = Math.max(insets.top, 12) + 6;
+  // Arthur: NarIyirm
+  // 中文：缩短常规屏幕上的山峰区，为下一步行动留出空间；字体放大时仍按标题实际高度扩展。
+  // EN: Shorten the mountain on regular screens to expose the next action, while growing it when larger text needs room.
+  const heroHeight = Math.max(350, Math.min(430, heroWidth * 0.96), headingTop + Math.max(headingHeight, HEADING_HEIGHT_FALLBACK) + 190);
   const mountainLabelTop = headingTop + Math.max(headingHeight, HEADING_HEIGHT_FALLBACK) + 12;
 
   // Arthur: NarIyirm
@@ -189,13 +194,19 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
 
   return (
     <View
-      onTouchCancel={() => { swipeStart.current = null; }}
-      onTouchEnd={finishSwipe}
-      onTouchStart={rememberSwipeStart}
       style={[styles.heroFrame, { height: heroHeight }]}
     >
       <LinearGradient colors={levelVisual.colors} end={{ x: 0.5, y: 1 }} locations={[0, 0.58, 1]} start={{ x: 0.5, y: 0 }} style={StyleSheet.absoluteFill} />
 
+      {/* Arthur: NarIyirm
+          中文：天空铺满宽屏，山峰与交互层保持在居中的设计宽度内，避免两侧露出页面背景。
+          EN: Fill wide screens with sky while keeping the mountain and interactive layers centered at their designed width. */}
+      <View
+        onTouchCancel={() => { swipeStart.current = null; }}
+        onTouchEnd={finishSwipe}
+        onTouchStart={rememberSwipeStart}
+        style={styles.heroStage}
+      >
       <Animated.View
         accessibilityLabel={`${copy.title}. ${copy.subtitle}. ${copy.hero.accessibilitySummary(viewedLevel, dashboard.level.current, levelName, dashboard.level.totalXp, dashboard.metrics.rescuedBatchCount, rescuedValue)}`}
         accessible
@@ -262,13 +273,14 @@ export function AchievementMountainHero({ copy, dashboard, language, onTailColor
         ) : null}
       </Animated.View>
 
-      <Animated.View pointerEvents="none" style={[styles.metrics, contentStyle]}>
-        <HeroMetric label={copy.level.xp} value={dashboard.level.totalXp.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-AU')} />
+      <Animated.View pointerEvents="box-none" style={[styles.metrics, contentStyle]}>
+        <HeroMetric actionLabel={xpHistoryLabel} label={copy.level.xp} onPress={onOpenXpHistory} value={dashboard.level.totalXp.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-AU')} />
         <View style={styles.metricDivider} />
         <HeroMetric label={copy.level.rescues} value={dashboard.metrics.rescuedBatchCount.toLocaleString(language === 'zh' ? 'zh-CN' : 'en-AU')} />
         <View style={styles.metricDivider} />
         <HeroMetric label={copy.hero.rescuedValue} value={rescuedValue} />
       </Animated.View>
+      </View>
     </View>
   );
 }
@@ -355,17 +367,21 @@ function LevelNode({ accessibilityLabel, current = false, label, onPress, positi
   );
 }
 
-function HeroMetric({ label, value }: { label: string; value: string }) {
-  return (
-    <View style={styles.metric}>
+function HeroMetric({ actionLabel, label, onPress, value }: { actionLabel?: string; label: string; onPress?: () => void; value: string }) {
+  const content = (
+    <>
       <Text adjustsFontSizeToFit minimumFontScale={0.72} numberOfLines={1} style={styles.metricValue}>{value}</Text>
-      <Text numberOfLines={1} style={styles.metricLabel}>{label}</Text>
-    </View>
+      <Text numberOfLines={1} style={styles.metricLabel}>{label}{onPress ? ' ›' : ''}</Text>
+    </>
   );
+  return onPress
+    ? <Pressable accessibilityLabel={`${label} ${value}. ${actionLabel ?? ''}`} accessibilityRole="button" onPress={onPress} style={styles.metric}>{content}</Pressable>
+    : <View style={styles.metric}>{content}</View>;
 }
 
 const styles = StyleSheet.create({
-  heroFrame: { alignSelf: 'center', width: '100%', maxWidth: HERO_MAX_WIDTH, overflow: 'hidden', backgroundColor: '#2798E7' },
+  heroFrame: { width: '100%', overflow: 'hidden', backgroundColor: '#2798E7' },
+  heroStage: { alignSelf: 'center', width: '100%', maxWidth: HERO_MAX_WIDTH, height: '100%' },
   heading: { position: 'absolute', zIndex: 5, right: 22, left: 22, alignItems: 'center' },
   pageTitle: { color: 'rgba(255,255,255,0.92)', fontSize: 13, fontWeight: '800', letterSpacing: 0.6, textAlign: 'center', textTransform: 'uppercase' },
   pageSubtitle: { marginTop: 3, marginBottom: 10, color: 'rgba(255,255,255,0.82)', fontSize: 12, fontWeight: '600', textAlign: 'center' },
@@ -377,11 +393,11 @@ const styles = StyleSheet.create({
   mountainLabel: { position: 'absolute', zIndex: 6, left: 20, maxWidth: 142 },
   mountainName: { color: '#FFFFFF', fontSize: 13, fontWeight: '700', textShadowColor: 'rgba(13,62,104,0.25)', textShadowOffset: { width: 0, height: 1 }, textShadowRadius: 3 },
   mountainElevation: { marginTop: 4, color: 'rgba(255,255,255,0.86)', fontSize: 12, fontWeight: '600' },
-  cloudBackLayer: { position: 'absolute', zIndex: 1, top: 156, right: -34, left: -34, height: 126, overflow: 'hidden' },
-  cloudFrontLayer: { position: 'absolute', zIndex: 3, top: 226, right: -46, left: -46, height: 142, overflow: 'hidden' },
+  cloudBackLayer: { position: 'absolute', zIndex: 1, top: '35%', right: -34, left: -34, height: '27%', overflow: 'hidden' },
+  cloudFrontLayer: { position: 'absolute', zIndex: 3, top: '49%', right: -46, left: -46, height: '29%', overflow: 'hidden' },
   cloudFill: { flex: 1 },
   cloudImage: { width: '100%', height: '100%' },
-  mountainLayer: { position: 'absolute', zIndex: 2, top: 116, right: -18, left: -18, height: 238 },
+  mountainLayer: { position: 'absolute', zIndex: 2, top: '24%', right: -18, left: -18, height: '55%' },
   mountainImage: { width: '100%', height: '100%' },
   routeLayer: { position: 'absolute', zIndex: 4, top: 0, right: 0, bottom: 0, left: 0 },
   node: { position: 'absolute', width: 50, height: 50, borderRadius: 25, shadowColor: '#164A80', shadowOpacity: 0.2, shadowRadius: 8, shadowOffset: { width: 0, height: 4 }, elevation: 4 },
@@ -392,7 +408,7 @@ const styles = StyleSheet.create({
   currentNode: { top: '63%', left: '50%', width: 64, height: 64, marginLeft: -32, borderRadius: 32, shadowOpacity: 0.28, shadowRadius: 11, elevation: 6 },
   nodeText: { color: '#27416A', fontSize: 12.5, fontWeight: '800', letterSpacing: -0.15 },
   currentNodeText: { fontSize: 15.5, fontWeight: '900' },
-  metrics: { position: 'absolute', zIndex: 7, right: 18, bottom: 22, left: 18, minHeight: 50, flexDirection: 'row', alignItems: 'center' },
+  metrics: { position: 'absolute', zIndex: 7, right: 18, bottom: 16, left: 18, minHeight: 50, flexDirection: 'row', alignItems: 'center' },
   metric: { flex: 1, minWidth: 0, alignItems: 'center', paddingHorizontal: 3 },
   metricValue: { width: '100%', color: '#FFFFFF', fontSize: 18.5, fontWeight: '800', letterSpacing: -0.35, textAlign: 'center', fontVariant: ['tabular-nums'] },
   metricLabel: { marginTop: 3, color: 'rgba(255,255,255,0.72)', fontSize: 9.5, fontWeight: '600', textAlign: 'center' },

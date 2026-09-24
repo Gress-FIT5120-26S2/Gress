@@ -664,6 +664,7 @@ GET /api/cart
 POST /api/cart
 GET /api/restock
 GET /api/achievements
+GET /api/achievements/report
 POST /api/assistant/messages
 GET  /api/assistant/conversations
 GET  /api/assistant/conversations/:conversationUid
@@ -838,6 +839,12 @@ GET /api/achievements
 `20260913160000_fridge_daily_weekly_quests.sql` 新增 `quest_definitions` 与 `fridge_quest_assignments`，以及 `get_fridge_quests` / `reroll_weekly_quest`。读取 `GET /api/achievements` 时 Express 并行调用 `get_fridge_quests`，把 `quests.daily` / `quests.weekly` / `quests.weeklyRerollsRemaining` 并入同一快照；完成与 XP（`reason_code = quest_completed`，`source_key = quest:{assignmentUid}`）只在数据库结算。购物/检查类挑战定义已入库但 `is_enabled = false`，待支撑事件落地后再打开。`POST /api/achievements/quests/reroll` 每周允许更换一次。验证脚本：`npm run verify:quests`。
 
 `20260913180000_expand_quest_library_and_slots.sql` 在不改写已部署 migration 的前提下扩展为 14 个可启用每日模板与 16 个可启用每周模板。任务按冻结资格快照分配：每日依据可用库存展示 2–3 个、每周展示 7–9 个；响应新增 `dailyAssignments` / `weeklyAssignments`、`dailyRerollsRemaining`，并保留旧 `daily` / `weekly` 首项字段用于兼容。每个周期类型可更换 3 次，`POST /api/achievements/quests/reroll` 现在必须提交 `assignmentUid`；数据库验证冰箱归属、同周期历史去重与资格，新任务沿用槽位且只从 `effectiveStartAt` 之后计算进度。旧 `reroll_weekly_quest` 仅保留给已发布客户端，新客户端使用 `reroll_quest`。
+
+`20260923120000_reserve_weekly_quest_rerolls.sql` 修复每周槽位耗尽候选池：新增 4 个无需预先有库存、但仍需实际库存事件才能完成的基础周任务；每周最多填入 `符合资格的模板数 - 3` 个活跃槽位，同时保留原先的 7–9 个上限与已分配任务。这样新周期会预留 3 个互不重复的更换候选，已经填满的本周也可从新增候选中更换。新任务与原任务一样只统计 `effective_start_at` 之后的事件，不重复发放 XP。
+`20260923121000_clean_weekly_quest_slot_reconciliation.sql` 清理上述函数在开发库 lint 中发现的循环变量遮蔽和未使用结果，不改变分配规则。
+两份 migration 已在 `Gress-development` 应用，远程 schema lint 无错误或警告；使用独立空冰箱验证本周 3 次更换得到互不重复的任务，第 4 次返回 `quest_reroll_exhausted`。生产库尚未应用。
+
+`20260924010000_achievement_stage_report.sql` 新增只授权 service role 的 `get_fridge_stage_report`。`GET /api/achievements/report` 先验证设备及当前冰箱成员，再按冰箱本地日期返回最近 30 天的阶段报告：已用完与已丢弃的去重批次数、带价格的丢弃价值与覆盖率、按七天分桶的使用/丢弃流水次数、丢弃原因与分类排行，以及未来七天有日期的有效食材（最多返回 50 条，另给总数）。报告不改变原有累计成就指标；App 仅在打开报告详情时请求，日期文案按返回的 `timeZone` 格式化。新迁移已在 `Gress-development` 应用，schema lint 无错误，空冰箱 RPC 验证通过且临时数据已回滚；生产库尚未应用。
 
 ## 15. Migration 工作流
 
