@@ -39,7 +39,11 @@ export type QuestCode =
   | 'warning_clearance_week'
   | 'low_waste_week'
   | 'shared_kitchen_relay'
-  | 'rescue_two_days';
+  | 'rescue_two_days'
+  | 'weekly_use_one'
+  | 'weekly_use_two'
+  | 'weekly_finish_one'
+  | 'weekly_two_day_rhythm';
 
 export type FridgeQuestAssignment = {
   assignmentUid: string;
@@ -139,11 +143,38 @@ export type AchievementDashboard = {
   updatedAt: string;
 };
 
+export type AchievementStageReport = {
+  periodStart: string;
+  periodEnd: string;
+  timeZone: string;
+  currency: 'AUD';
+  overview: {
+    completedBatchCount: number;
+    discardedBatchCount: number;
+    discardedValue: number;
+    pricedDiscardCount: number;
+    discardRecordCount: number;
+    priceCoverageRate: number | null;
+  };
+  trend: Array<{ startDate: string; endDate: string; usedRecords: number; discardedRecords: number }>;
+  reasons: Array<{ code: string; count: number }>;
+  categories: Array<{ categoryUid: string | null; systemCode: string | null; name: string; count: number }>;
+  upcomingCount: number;
+  upcoming: Array<{ batchUid: string; name: string; dateType: 'use_by' | 'best_before' | 'estimated_quality' | 'legacy_expiry'; deadlineAt: string }>;
+};
+
 // Arthur: NarIyirm
 // 中文：成就页只请求一个共享冰箱快照；数据库负责等级、阈值目录、进度、金额覆盖率、解锁与挑战状态，客户端仅切换预览。
 // EN: The achievement screen requests one shared-fridge snapshot; the database owns level, coverage, unlock, and quest state while the client only changes the preview.
 export function getAchievementDashboard(): Promise<AchievementDashboard> {
   return requestApi<AchievementDashboard>('/api/achievements');
+}
+
+// Arthur: NarIyirm
+// 中文：报告只在用户进入详情时加载，避免增加成就概览的首次请求负担。
+// EN: Load the report only when its detail opens so the overview stays lightweight.
+export function getAchievementStageReport(): Promise<AchievementStageReport> {
+  return requestApi<AchievementStageReport>('/api/achievements/report');
 }
 
 // Arthur: NarIyirm

@@ -17,6 +17,7 @@ import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
+import { FoodWasteStory } from './src/components/FoodWasteStory';
 import { ProfileScreen } from './src/components/ProfileScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { AchievementDataProvider } from './src/components/AchievementDataProvider';
@@ -90,6 +91,7 @@ function KitchMemoApp() {
   const [reduceMotion, setReduceMotion] = useState(false);
   const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
   const [firstUseJourneyState, setFirstUseJourneyState] = useState<FirstUseJourneyState>('checking');
+  const [storyVisible, setStoryVisible] = useState(false);
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
@@ -472,6 +474,7 @@ function KitchMemoApp() {
                   onInteractionStart={beginCinematicFocus}
                   onNavigate={handleCinematicNavigate}
                   onOpenAssistant={openAssistant}
+                  onOpenStory={() => setStoryVisible(true)}
                   onReady={markKitchenReady}
                   unreadNotificationCount={unreadNotificationCount}
                   weather={HOME_PREVIEW_WEATHER}
@@ -526,7 +529,7 @@ function KitchMemoApp() {
                   }}
                 />
               ) : activeTab === 'achievements' ? (
-                <AchievementsScreen />
+                <AchievementsScreen onAddFirstItem={handleAssistantAddItem} onOpenInventoryItem={handleAssistantOpenItem} />
               ) : (
                 <>
                   <View style={styles.glow} />
@@ -603,6 +606,7 @@ function KitchMemoApp() {
         />
       )}
       <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
+      {storyVisible ? <FoodWasteStory onClose={() => setStoryVisible(false)} /> : null}
     </View>
   );
 }

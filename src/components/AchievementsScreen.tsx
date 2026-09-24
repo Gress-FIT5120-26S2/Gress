@@ -2,43 +2,32 @@ import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
 import { getApiErrorCode } from '../services/apiClient';
-import type { AchievementCode, AchievementDashboard, FridgeQuestAssignment } from '../services/achievementApi';
+import type { AchievementDashboard, FridgeQuestAssignment } from '../services/achievementApi';
 import { rerollQuest } from '../services/achievementApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
 import { AchievementCelebration } from './achievement/AchievementCelebration';
 import { AchievementImpactCard } from './achievement/AchievementImpactCard';
-import { AchievementJourneyModal } from './achievement/AchievementJourneyModal';
+import { AchievementJourneyModal, Medal } from './achievement/AchievementJourneyModal';
 import { AchievementMountainHero } from './achievement/AchievementMountainHero';
 import { AchievementQuestSection } from './achievement/AchievementQuestSection';
-import {
-  formatBadgeProgressLabel,
-  getBadgeProgressRatio,
-  isAchievementBadgeVisible,
-  resolveVisibleBadgeStatus,
-} from './achievement/badgePresentation';
+import { AchievementStageReport } from './achievement/AchievementStageReport';
+import { getBadgeProgressRatio, isAchievementBadgeVisible, resolveVisibleBadgeStatus } from './achievement/badgePresentation';
 
-const ACHIEVEMENT_ICONS: Record<AchievementCode, keyof typeof Ionicons.glyphMap> = {
-  first_item: 'basket-outline',
-  first_rescue: 'leaf-outline',
-  waste_watcher: 'eye-outline',
-  zero_waste_week: 'calendar-outline',
-  rescue_ten: 'shield-checkmark-outline',
-  fridge_regular: 'repeat-outline',
-  shared_kitchen: 'people-outline',
-  climate_summit: 'earth-outline',
-};
-
+type DetailRoute = 'quests' | 'impact' | 'report' | 'xp' | null;
+type AchievementsScreenProps = { onAddFirstItem: () => void; onOpenInventoryItem: (batchUid: string) => void };
 const BADGE_LONG_PRESS_MS = 420;
 
 // Arthur: NarIyirm
-// 中文：页面只读取 App 级常驻成就快照；预取和后台同步由 AchievementDataProvider 负责，等级与解锁规则不在客户端复算。
-// EN: This screen only reads the app-scoped achievement snapshot; AchievementDataProvider owns prefetch and background sync without recalculating authority client-side.
-export function AchievementsScreen() {
+// 中文：首页只展示等级、下一步与成果预览；完整挑战和记录留在按需打开的详情页，权威状态仍全部来自成就快照。
+// EN: The overview shows level, next action, and impact previews; full challenges and history open on demand, with all authoritative state still coming from the achievement snapshot.
+export function AchievementsScreen({ onAddFirstItem, onOpenInventoryItem }: AchievementsScreenProps) {
   const { language, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const { dashboard, failed, loading, refresh } = useAchievementData();
   const copy = t.wins;
   const [heroTailColor, setHeroTailColor] = useState('#60C7F5');
@@ -46,12 +35,28 @@ export function AchievementsScreen() {
   const [rerollingAssignmentUid, setRerollingAssignmentUid] = useState<string | null>(null);
   const [rerollError, setRerollError] = useState<string | null>(null);
   const [journeyRoute, setJourneyRoute] = useState<'journey' | 'medals' | null>(null);
+  const [detailRoute, setDetailRoute] = useState<DetailRoute>(null);
+  const [reportReturnRoute, setReportReturnRoute] = useState<'impact' | null>(null);
+  const [initialQuestUid, setInitialQuestUid] = useState<string | null>(null);
   const [celebrationXp, setCelebrationXp] = useState<number | null>(null);
   const latestXpEventRef = useRef<string | null | undefined>(undefined);
 
   // Arthur: NarIyirm
-  // 中文：仅在当前会话观察到新的任务完成 XP 时庆祝，首次加载历史记录不会误触发动画。
-  // EN: Celebrate only a newly observed quest XP event in this session; loading historical events never triggers the animation.
+  // 中文：报告可从概览或环保里程碑打开；系统返回键回到实际来源页面。
+  // EN: The report can open from the overview or impact detail; system back returns to its actual source.
+  useEffect(() => {
+    if (!detailRoute) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      setDetailRoute(detailRoute === 'report' ? reportReturnRoute : null);
+      setInitialQuestUid(null);
+      return true;
+    });
+    return () => subscription.remove();
+  }, [detailRoute, reportReturnRoute]);
+
+  // Arthur: NarIyirm
+  // 中文：只庆祝本次会话新出现的挑战 XP，首次加载已有流水时不播放旧奖励。
+  // EN: Celebrate only quest XP newly observed in this session, never historical events on first load.
   useEffect(() => {
     const latest = dashboard?.recentXpEvents[0] ?? null;
     if (latestXpEventRef.current !== undefined && latest?.id !== latestXpEventRef.current && latest?.reasonCode === 'quest_completed') {
@@ -61,16 +66,9 @@ export function AchievementsScreen() {
     latestXpEventRef.current = latest?.id ?? null;
   }, [dashboard?.recentXpEvents]);
 
-  // Arthur: NarIyirm
-  // 中文：点击或长按打开 Modal；不锁定外层 ScrollView，从徽章上起手的拖动仍可由原生滚动手势接管。
-  // EN: Tap or long-press opens the Modal without locking the outer ScrollView, so a drag starting on a badge can still become a native scroll gesture.
   const showHeldAchievement = (achievement: AchievementDashboard['achievements'][number]) => {
     setHeldAchievement(achievement);
     void Haptics.selectionAsync().catch(() => undefined);
-  };
-
-  const dismissHeldAchievement = () => {
-    setHeldAchievement(null);
   };
 
   const handleReroll = async (assignment: FridgeQuestAssignment) => {
@@ -98,26 +96,122 @@ export function AchievementsScreen() {
   if (loading && !dashboard) {
     return <View style={styles.centerState}><ActivityIndicator color="#2A8A61" /><Text style={styles.stateText}>{copy.loading}</Text></View>;
   }
-
   if (failed && !dashboard) {
-    return (
-      <View style={styles.centerState}>
-        <Ionicons name="cloud-offline-outline" size={36} color="#70827A" />
-        <Text style={styles.stateTitle}>{copy.loadError}</Text>
-        <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.retryButton}><Text style={styles.retryText}>{copy.retry}</Text></Pressable>
-      </View>
-    );
+    return <View style={styles.centerState}>
+      <Ionicons color="#70827A" name="cloud-offline-outline" size={36} />
+      <Text style={styles.stateTitle}>{copy.loadError}</Text>
+      <Pressable accessibilityRole="button" onPress={() => void refresh()} style={styles.retryButton}><Text style={styles.retryText}>{copy.retry}</Text></Pressable>
+    </View>;
   }
-
   if (!dashboard) return null;
+
   const currency = dashboard.metrics.currency === 'AUD' ? 'A$' : dashboard.metrics.currency;
   const numberLocale = language === 'zh' ? 'zh-CN' : 'en-AU';
   const money = (value: number) => `${currency}${Number(value).toLocaleString(numberLocale, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
   const formatUnlockDate = (value: string) => new Intl.DateTimeFormat(numberLocale, { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(value));
-  const rescueMilestone = dashboard.achievements.find((achievement) => achievement.code === 'rescue_ten' && achievement.status !== 'unlocked' && achievement.status !== 'unavailable') ?? null;
+  const daily = dashboard.quests?.dailyAssignments ?? (dashboard.quests?.daily ? [dashboard.quests.daily] : []);
+  const weekly = dashboard.quests?.weeklyAssignments ?? (dashboard.quests?.weekly ? [dashboard.quests.weekly] : []);
+  const dailyDone = daily.filter((item) => item.status === 'completed').length;
+  const weeklyDone = weekly.filter((item) => item.status === 'completed').length;
+  // Arthur: NarIyirm
+  // 中文：只在已分配且未完成的挑战中选焦点，先展示今日，再按服务端进度挑最接近完成的一项。
+  // EN: Focus only on assigned unfinished challenges, prioritising today and then the closest server-reported progress.
+  const focusQuest = [...daily, ...weekly]
+    .filter((item) => item.status === 'assigned')
+    .sort((a, b) => Number(b.periodType === 'daily') - Number(a.periodType === 'daily')
+      || b.progressCurrent / Math.max(1, b.progressTarget) - a.progressCurrent / Math.max(1, a.progressTarget))[0] ?? null;
+  const firstItemUnlocked = dashboard.achievements.find((item) => item.code === 'first_item')?.status === 'unlocked';
+  const promptFirstItem = !focusQuest && daily.length + weekly.length === 0 && !firstItemUnlocked;
+  const stepTitle = focusQuest
+    ? copy.quests.items[focusQuest.questCode]
+    : promptFirstItem ? copy.overview.addFirstItem : daily.length + weekly.length > 0 ? copy.overview.allDone : copy.overview.noEligible;
+  const stepHint = focusQuest
+    ? `${copy.quests.progressOf(focusQuest.progressCurrent, focusQuest.progressTarget)} · ${copy.quests.reward(focusQuest.rewardXp)}`
+    : promptFirstItem ? copy.overview.addFirstItemHint : daily.length + weekly.length > 0 ? copy.overview.allDoneHint : copy.overview.noEligibleHint;
+  const visibleBadges = dashboard.achievements.filter(isAchievementBadgeVisible);
+  // Arthur: NarIyirm
+  // 中文：预览优先露出最近解锁的奖牌，其次是已有进度的目标；零进度时保留目录原顺序。
+  // EN: Preview recent unlocks first, then progressed goals; preserve catalog order when nothing has progress.
+  const badgePreview = visibleBadges.map((item, index) => ({ item, index })).sort((a, b) => {
+    const aStatus = resolveVisibleBadgeStatus(a.item);
+    const bStatus = resolveVisibleBadgeStatus(b.item);
+    const priority = (status: string) => status === 'unlocked' ? 0 : status === 'in_progress' ? 1 : 2;
+    return priority(aStatus) - priority(bStatus)
+      || (aStatus === 'unlocked' && bStatus === 'unlocked' ? (b.item.unlockedAt ?? '').localeCompare(a.item.unlockedAt ?? '') : 0)
+      || (aStatus === 'in_progress' && bStatus === 'in_progress' ? getBadgeProgressRatio(b.item) - getBadgeProgressRatio(a.item) : 0)
+      || a.index - b.index;
+  }).slice(0, 2).map(({ item }) => item);
+  const rescueMilestone = dashboard.achievements.find((item) => item.code === 'rescue_ten' && item.status !== 'unlocked' && item.status !== 'unavailable') ?? null;
 
-  return (
-    <View style={styles.screen}>
+  const openQuests = (questUid: string | null) => {
+    setRerollError(null);
+    setInitialQuestUid(questUid);
+    setDetailRoute('quests');
+  };
+  const closeDetail = () => {
+    setDetailRoute(detailRoute === 'report' ? reportReturnRoute : null);
+    setInitialQuestUid(null);
+  };
+  const openReport = (source: 'impact' | null) => {
+    setReportReturnRoute(source);
+    setDetailRoute('report');
+  };
+
+  return <View style={styles.screen}>
+    {detailRoute ? (
+      <View style={styles.detailPage}>
+        <View style={[styles.detailHeader, { paddingTop: Math.max(insets.top, 12) + 8 }]}>
+          <Pressable accessibilityLabel={detailRoute === 'report' && reportReturnRoute === 'impact' ? copy.report.backToImpact : copy.overview.back} accessibilityRole="button" hitSlop={10} onPress={closeDetail} style={styles.backButton}>
+            <Ionicons color="#FFFFFF" name="chevron-back" size={25} />
+          </Pressable>
+          <Text style={styles.detailTitle}>{detailRoute === 'quests' ? copy.quests.title : detailRoute === 'impact' ? copy.impact.title : detailRoute === 'report' ? copy.report.title : copy.recent.title}</Text>
+          <View style={styles.backButton} />
+        </View>
+        <ScrollView contentContainerStyle={styles.detailContent} showsVerticalScrollIndicator={false}>
+          {detailRoute === 'quests' ? <>
+            <AchievementQuestSection
+              copy={copy.quests}
+              daily={daily}
+              dailyRerollsRemaining={dashboard.quests?.dailyRerollsRemaining ?? 0}
+              formatEndsAt={(iso) => new Intl.DateTimeFormat(numberLocale, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))}
+              initialQuestUid={initialQuestUid}
+              onReroll={(assignment) => { void handleReroll(assignment); }}
+              rerollingAssignmentUid={rerollingAssignmentUid}
+              weekly={weekly}
+              weeklyRerollsRemaining={dashboard.quests?.weeklyRerollsRemaining ?? 0}
+            />
+            {rerollError ? <Text style={styles.rerollError}>{rerollError}</Text> : null}
+          </> : null}
+          {detailRoute === 'impact' ? <><AchievementImpactCard
+            copy={copy.impact}
+            metrics={dashboard.metrics}
+            milestone={rescueMilestone}
+            milestoneTitle={rescueMilestone ? copy.badges.items[rescueMilestone.code] : null}
+            money={money}
+            onOpenMilestone={() => { closeDetail(); setJourneyRoute('journey'); }}
+          />
+            <Pressable accessibilityRole="button" onPress={() => openReport('impact')} style={({ pressed }) => [styles.reportEntry, pressed && styles.pressed]}>
+              <View style={styles.reportEntryIcon}><Ionicons color="#2A8A61" name="stats-chart-outline" size={22} /></View>
+              <View style={styles.rowCopy}><Text style={styles.reportEntryTitle}>{copy.report.entryTitle}</Text><Text style={styles.reportEntryHint}>{copy.report.entryHint}</Text></View>
+              <Ionicons color="#70827A" name="chevron-forward" size={20} />
+            </Pressable>
+          </> : null}
+          {detailRoute === 'report' ? <AchievementStageReport onOpenInventoryItem={onOpenInventoryItem} /> : null}
+          {detailRoute === 'xp' ? <View style={styles.xpCard}>
+            {dashboard.recentXpEvents.length === 0 ? <Text style={styles.emptyText}>{copy.recent.empty}</Text> : dashboard.recentXpEvents.map((event, index) => (
+              <View key={event.id} style={[styles.xpRow, index === dashboard.recentXpEvents.length - 1 && styles.rowLast]}>
+                <View style={styles.xpIcon}><Ionicons color="#2A8A61" name="sparkles" size={16} /></View>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.xpReason}>{copy.recent.reasons[event.reasonCode as keyof typeof copy.recent.reasons] ?? copy.recent.fallback}</Text>
+                  <Text style={styles.xpDate}>{new Intl.DateTimeFormat(numberLocale, { dateStyle: 'medium' }).format(new Date(event.occurredAt))}</Text>
+                </View>
+                <Text style={styles.xpPoints}>{event.points > 0 ? '+' : ''}{event.points} XP</Text>
+              </View>
+            ))}
+          </View> : null}
+        </ScrollView>
+      </View>
+    ) : (
       <ScrollView
         alwaysBounceVertical={false}
         bounces={false}
@@ -126,187 +220,161 @@ export function AchievementsScreen() {
         overScrollMode="never"
         showsVerticalScrollIndicator={false}
       >
-        <AchievementMountainHero copy={copy} dashboard={dashboard} key={dashboard.level.code} language={language} onTailColorChange={setHeroTailColor} rescuedValue={money(dashboard.metrics.rescuedValue)} />
-
+        <AchievementMountainHero
+          copy={copy}
+          dashboard={dashboard}
+          key={dashboard.level.code}
+          language={language}
+          onOpenXpHistory={() => setDetailRoute('xp')}
+          onTailColorChange={setHeroTailColor}
+          rescuedValue={money(dashboard.metrics.rescuedValue)}
+          xpHistoryLabel={copy.overview.xpHistory}
+        />
         <View style={styles.sectionTransition}>
-        {/* Arthur: NarIyirm */}
-        {/* 中文：预览等级的底色从山峰组件传到内容区，在首张卡片背后继续向下渐变，形成跨组件的连续背景。 */}
-        {/* EN: The preview level's tail color flows into the content area and fades behind the first card, creating one continuous cross-component background. */}
-        <LinearGradient colors={[heroTailColor, '#F7FBFA']} end={{ x: 0.5, y: 1 }} pointerEvents="none" start={{ x: 0.5, y: 0 }} style={styles.sectionTransitionGradient} />
-        <View style={styles.sections}>
-        <AchievementImpactCard
-          copy={copy.impact}
-          metrics={dashboard.metrics}
-          milestone={rescueMilestone}
-          milestoneTitle={rescueMilestone ? copy.badges.items[rescueMilestone.code] : null}
-          money={money}
-          onOpenMilestone={() => setJourneyRoute('journey')}
-        />
+          <LinearGradient colors={[heroTailColor, '#F7FBFA']} end={{ x: 0.5, y: 1 }} pointerEvents="none" start={{ x: 0.5, y: 0 }} style={styles.sectionTransitionGradient} />
+          <View style={styles.sections}>
+            <View style={styles.nextCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardHeadingGroup}><View style={styles.headerIcon}><Ionicons color="#2A8A61" name="flag" size={20} /></View><Text style={styles.cardTitle}>{copy.overview.nextStep}</Text></View>
+                <Pressable accessibilityRole="button" onPress={() => openQuests(null)} style={styles.headerLink}><Text style={styles.headerLinkText}>{copy.overview.allChallenges}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={16} /></Pressable>
+              </View>
+              <Pressable accessibilityRole="button" onPress={promptFirstItem ? onAddFirstItem : () => openQuests(focusQuest?.assignmentUid ?? null)} style={({ pressed }) => [styles.nextAction, pressed && styles.pressed]}>
+                <View style={styles.actionIcon}><Ionicons color="#2A8A61" name={promptFirstItem ? 'basket-outline' : focusQuest ? 'leaf-outline' : 'checkmark-circle-outline'} size={25} /></View>
+                <View style={styles.actionCopy}><Text numberOfLines={2} style={styles.actionTitle}>{stepTitle}</Text><Text numberOfLines={2} style={styles.actionHint}>{stepHint}</Text></View>
+                <Ionicons color="#70827A" name="chevron-forward" size={20} />
+              </Pressable>
+              <Text style={styles.challengeCount}>{copy.overview.challengeCount(dailyDone, daily.length, weeklyDone, weekly.length)}</Text>
+            </View>
 
-        <AchievementQuestSection
-          copy={copy.quests}
-          daily={dashboard.quests?.dailyAssignments ?? (dashboard.quests?.daily ? [dashboard.quests.daily] : [])}
-          dailyRerollsRemaining={dashboard.quests?.dailyRerollsRemaining ?? 0}
-          formatEndsAt={(iso) => new Intl.DateTimeFormat(numberLocale, { weekday: 'short', hour: 'numeric', minute: '2-digit' }).format(new Date(iso))}
-          onReroll={(assignment) => { void handleReroll(assignment); }}
-          rerollingAssignmentUid={rerollingAssignmentUid}
-          weekly={dashboard.quests?.weeklyAssignments ?? (dashboard.quests?.weekly ? [dashboard.quests.weekly] : [])}
-          weeklyRerollsRemaining={dashboard.quests?.weeklyRerollsRemaining ?? 0}
-        />
-        {rerollError ? <Text style={styles.rerollError}>{rerollError}</Text> : null}
-
-        <View style={styles.card}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>🏆</Text><Text style={styles.sectionTitle}>{copy.badges.title}</Text><Pressable accessibilityRole="button" onPress={() => setJourneyRoute('medals')} style={styles.viewAll}><Text style={styles.viewAllText}>{language === 'zh' ? '查看奖牌馆' : 'View medals'}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={14} /></Pressable></View>
-          <View style={styles.badgeRow}>
-            {dashboard.achievements.filter(isAchievementBadgeVisible).map((achievement) => {
-              // Arthur: NarIyirm
-              // 中文：四态只读服务端 status + 进度分母；unavailable 已过滤，locked 展示条件而非 0 进度失败感。
-              // EN: Four states read server status plus progress denominators; unavailable is hidden and locked shows the requirement instead of failed zero progress.
-              const status = resolveVisibleBadgeStatus(achievement);
-              const progressRatio = getBadgeProgressRatio(achievement);
-              const progressLabel = formatBadgeProgressLabel(achievement, copy.badges);
-              const stateLabel = status === 'unlocked'
-                ? (achievement.unlockedAt
-                  ? copy.badges.unlockedOn(formatUnlockDate(achievement.unlockedAt))
-                  : copy.badges.unlocked)
-                : status === 'in_progress'
-                  ? progressLabel
-                  : copy.badges.descriptions[achievement.code];
-              const iconColor = status === 'unlocked' ? '#C6661C' : status === 'in_progress' ? '#A8895C' : '#8A9A93';
-              return (
-                <Pressable
-                  accessibilityHint={copy.badges.holdHint}
-                  accessibilityLabel={`${copy.badges.items[achievement.code]}. ${status === 'locked' ? copy.badges.locked : status === 'in_progress' ? copy.badges.inProgress : copy.badges.unlocked}. ${stateLabel}. ${copy.badges.descriptions[achievement.code]}`}
-                  accessibilityRole="button"
-                  delayLongPress={BADGE_LONG_PRESS_MS}
-                  key={achievement.code}
-                  onLongPress={() => showHeldAchievement(achievement)}
-                  onPress={() => showHeldAchievement(achievement)}
-                  style={({ pressed }) => [
-                    styles.badgeCard,
-                    status === 'unlocked' && styles.badgeCardUnlocked,
-                    status === 'in_progress' && styles.badgeCardInProgress,
-                    status === 'locked' && styles.badgeCardLocked,
-                    (pressed || heldAchievement?.code === achievement.code) && styles.badgeCardPressed,
-                  ]}
-                >
-                  <View style={[
-                    styles.badgeIcon,
-                    status === 'unlocked' && styles.badgeIconUnlocked,
-                    status === 'in_progress' && styles.badgeIconInProgress,
-                    status === 'locked' && styles.badgeIconLocked,
-                  ]}>
-                    <Ionicons color={iconColor} name={ACHIEVEMENT_ICONS[achievement.code]} size={22} />
-                  </View>
-                  <Text numberOfLines={2} style={[styles.badgeName, status !== 'unlocked' && styles.badgeNameMuted]}>{copy.badges.items[achievement.code]}</Text>
-                  <Text numberOfLines={2} style={[styles.badgeState, status === 'unlocked' && styles.badgeStateUnlocked, status === 'in_progress' && styles.badgeStateInProgress]}>{stateLabel}</Text>
-                  {status === 'in_progress' ? (
-                    <View style={styles.badgeProgressTrack}>
-                      <View style={[styles.badgeProgressFill, { width: `${Math.round(progressRatio * 100)}%` }]} />
-                    </View>
-                  ) : null}
-                  {status === 'locked' ? <Text style={styles.badgeReward}>{copy.badges.reward(achievement.xpReward)}</Text> : null}
+            <View style={styles.impactSummary}>
+              <View style={styles.impactSummaryHeader}>
+                <View style={styles.cardHeadingGroup}><View style={styles.headerIcon}><Ionicons color="#2A8A61" name="leaf" size={22} /></View><Text style={styles.cardTitle}>{copy.impact.title}</Text></View>
+                <Pressable accessibilityRole="button" onPress={() => openReport(null)} style={({ pressed }) => [styles.reportShortcut, pressed && styles.pressed]}>
+                  <Text style={styles.reportShortcutText}>{copy.report.shortcut}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={16} />
                 </Pressable>
-              );
-            })}
+              </View>
+              <Pressable accessibilityLabel={`${copy.impact.title} · ${copy.overview.impactSummary(dashboard.metrics.rescuedBatchCount, money(dashboard.metrics.rescuedValue))}`} accessibilityRole="button" onPress={() => setDetailRoute('impact')} style={({ pressed }) => [styles.impactSummaryBody, pressed && styles.pressed]}>
+                <View style={styles.summaryCopy}>
+                  <Text numberOfLines={1} style={styles.summaryValue}>{copy.overview.impactSummary(dashboard.metrics.rescuedBatchCount, money(dashboard.metrics.rescuedValue))}</Text>
+                  {dashboard.metrics.priceCoverageRate !== null && dashboard.metrics.priceCoverageRate < 0.8
+                    ? <Text style={styles.coverageNote}>{copy.impact.partialCoverage(Math.round(dashboard.metrics.priceCoverageRate * 100))}</Text>
+                    : null}
+                </View>
+                <Ionicons color="#70827A" name="chevron-forward" size={20} />
+              </Pressable>
+            </View>
+
+            <View style={styles.medalCard}>
+              <View style={styles.cardHeader}>
+                <View style={styles.cardHeadingGroup}><View style={styles.medalHeaderIcon}><Ionicons color="#BA741B" name="trophy" size={20} /></View><Text style={styles.cardTitle}>{copy.badges.title}</Text></View>
+                <Pressable accessibilityRole="button" onPress={() => setJourneyRoute('medals')} style={styles.headerLink}><Text style={styles.headerLinkText}>{copy.overview.medalHall}</Text><Ionicons color="#2A8A61" name="chevron-forward" size={16} /></Pressable>
+              </View>
+              <View style={styles.medalPreviewRow}>
+                {badgePreview.map((achievement) => {
+                  const status = resolveVisibleBadgeStatus(achievement);
+                  return <Pressable
+                    accessibilityLabel={`${copy.badges.items[achievement.code]}. ${status === 'unlocked' ? copy.badges.unlocked : status === 'in_progress' ? copy.badges.inProgress : copy.badges.locked}`}
+                    accessibilityRole="button"
+                    delayLongPress={BADGE_LONG_PRESS_MS}
+                    key={achievement.code}
+                    onLongPress={() => showHeldAchievement(achievement)}
+                    onPress={() => showHeldAchievement(achievement)}
+                    style={({ pressed }) => [styles.medalPreview, pressed && styles.pressed]}
+                  >
+                    <Medal code={achievement.code} earned={status === 'unlocked'} size={72} />
+                    <Text numberOfLines={1} style={styles.medalName}>{copy.badges.items[achievement.code]}</Text>
+                    <Text numberOfLines={1} style={styles.medalState}>{status === 'in_progress' ? `${Math.floor(achievement.progressCurrent)}/${Math.floor(achievement.progressTarget)}` : status === 'unlocked' ? copy.badges.unlocked : copy.badges.locked}</Text>
+                  </Pressable>;
+                })}
+              </View>
+            </View>
           </View>
         </View>
-
-        <View style={[styles.card, styles.lastCard]}>
-          <View style={styles.sectionHeader}><Text style={styles.sectionIcon}>✨</Text><Text style={styles.sectionTitle}>{copy.recent.title}</Text></View>
-          {dashboard.recentXpEvents.length === 0 ? <Text style={styles.emptyText}>{copy.recent.empty}</Text> : dashboard.recentXpEvents.slice(0, 5).map((event, index) => (
-            <View key={event.id} style={[styles.xpRow, index === Math.min(4, dashboard.recentXpEvents.length - 1) && styles.rowLast]}>
-              <View style={styles.xpIcon}><Ionicons name="sparkles" size={16} color="#2A8A61" /></View>
-              <View style={styles.rowCopy}>
-                <Text style={styles.xpReason}>{copy.recent.reasons[event.reasonCode as keyof typeof copy.recent.reasons] ?? copy.recent.fallback}</Text>
-                <Text style={styles.xpDate}>{new Intl.DateTimeFormat(numberLocale, { dateStyle: 'medium' }).format(new Date(event.occurredAt))}</Text>
-              </View>
-              <Text style={styles.xpPoints}>+{event.points} XP</Text>
-            </View>
-          ))}
-        </View>
-        </View>
-        </View>
       </ScrollView>
+    )}
 
-      <Modal
-        animationType="fade"
-        onRequestClose={dismissHeldAchievement}
-        presentationStyle="overFullScreen"
-        statusBarTranslucent
-        transparent
-        visible={heldAchievement !== null}
-      >
-        <View style={styles.modalRoot}>
-          <Pressable
-            accessibilityLabel={copy.badges.releaseHint}
-            accessibilityRole="button"
-            onPress={dismissHeldAchievement}
-            style={StyleSheet.absoluteFill}
-          />
-          {heldAchievement ? (
-            <AchievementBadgeHoldDetail
-              achievement={heldAchievement}
-              copy={copy.badges}
-              icon={ACHIEVEMENT_ICONS[heldAchievement.code]}
-              unlockDateLabel={heldAchievement.unlockedAt ? copy.badges.unlockedOn(formatUnlockDate(heldAchievement.unlockedAt)) : null}
-            />
-          ) : null}
-        </View>
-      </Modal>
-      {/* Arthur: NarIyirm
-          中文：路由值同时表达“是否打开”和“打开哪个标签”，并在关闭时卸载原生 Modal，避免首次唤起显示隐藏期间缓存的旧视图。
-          EN: One route value owns both visibility and the initial tab, while closing unmounts the native Modal so its first presentation cannot reveal a stale hidden view. */}
-      {journeyRoute ? <AchievementJourneyModal badgeCopy={copy.badges} dashboard={dashboard} initialTab={journeyRoute} language={language} onClose={() => setJourneyRoute(null)} visible /> : null}
-      {celebrationXp !== null ? <AchievementCelebration onDone={() => setCelebrationXp(null)} xp={celebrationXp} /> : null}
-    </View>
-  );
+    <Modal animationType="fade" onRequestClose={() => setHeldAchievement(null)} presentationStyle="overFullScreen" statusBarTranslucent transparent visible={heldAchievement !== null}>
+      <View style={styles.modalRoot}>
+        <Pressable accessibilityLabel={copy.badges.releaseHint} accessibilityRole="button" onPress={() => setHeldAchievement(null)} style={StyleSheet.absoluteFill} />
+        {heldAchievement ? <AchievementBadgeHoldDetail
+          achievement={heldAchievement}
+          copy={copy.badges}
+          icon={medalIcon(heldAchievement.code)}
+          unlockDateLabel={heldAchievement.unlockedAt ? copy.badges.unlockedOn(formatUnlockDate(heldAchievement.unlockedAt)) : null}
+        /> : null}
+      </View>
+    </Modal>
+    {journeyRoute ? <AchievementJourneyModal badgeCopy={copy.badges} dashboard={dashboard} initialTab={journeyRoute} language={language} onClose={() => setJourneyRoute(null)} visible /> : null}
+    {celebrationXp !== null ? <AchievementCelebration onDone={() => setCelebrationXp(null)} xp={celebrationXp} /> : null}
+  </View>;
+}
+
+function medalIcon(code: AchievementDashboard['achievements'][number]['code']): keyof typeof Ionicons.glyphMap {
+  const icons: Record<AchievementDashboard['achievements'][number]['code'], keyof typeof Ionicons.glyphMap> = {
+    first_item: 'basket-outline', first_rescue: 'leaf-outline', waste_watcher: 'eye-outline',
+    zero_waste_week: 'calendar-outline', rescue_ten: 'shield-checkmark-outline',
+    fridge_regular: 'repeat-outline', shared_kitchen: 'people-outline', climate_summit: 'earth-outline',
+  };
+  return icons[code];
 }
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FBFA' },
   content: { paddingBottom: 132 },
   sectionTransition: { position: 'relative', backgroundColor: '#F7FBFA' },
-  sectionTransitionGradient: { position: 'absolute', top: 0, right: 0, left: 0, height: 260 },
-  sections: { position: 'relative', zIndex: 1, paddingHorizontal: 18 },
+  sectionTransitionGradient: { position: 'absolute', top: 0, right: 0, left: 0, height: 220 },
+  sections: { position: 'relative', alignSelf: 'center', width: '100%', maxWidth: 760, paddingHorizontal: 18 },
+  nextCard: { marginTop: 14, padding: 16, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDECE6' },
+  cardHeader: { minHeight: 36, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 },
+  cardHeadingGroup: { flexDirection: 'row', alignItems: 'center', gap: 9, flex: 1, minWidth: 0 },
+  headerIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#EAF6F1', alignItems: 'center', justifyContent: 'center' },
+  medalHeaderIcon: { width: 34, height: 34, borderRadius: 11, backgroundColor: '#FFF3DF', alignItems: 'center', justifyContent: 'center' },
+  cardTitle: { color: '#173D31', fontSize: 17, fontWeight: '900' },
+  headerLink: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 4 },
+  headerLinkText: { color: '#2A8A61', fontSize: 11, fontWeight: '800' },
+  nextAction: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, paddingHorizontal: 12, paddingVertical: 10, borderRadius: 14, backgroundColor: '#F2FAF7' },
+  actionIcon: { width: 42, height: 42, borderRadius: 21, backgroundColor: '#E0F3EA', alignItems: 'center', justifyContent: 'center' },
+  actionCopy: { flex: 1, minWidth: 0 },
+  actionTitle: { color: '#173D31', fontSize: 15, fontWeight: '900' },
+  actionHint: { marginTop: 3, color: '#62776E', fontSize: 11.5, fontWeight: '600' },
+  challengeCount: { marginTop: 10, color: '#426658', fontSize: 11, fontWeight: '800', textAlign: 'right' },
+  impactSummary: { marginTop: 14, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 6, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDECE6' },
+  impactSummaryHeader: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  impactSummaryBody: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
+  reportShortcut: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 6 },
+  reportShortcutText: { color: '#2A8A61', fontSize: 11, fontWeight: '800' },
+  summaryCopy: { flex: 1, minWidth: 0 },
+  summaryValue: { marginTop: 4, color: '#45695A', fontSize: 12.5, fontWeight: '700' },
+  coverageNote: { marginTop: 3, color: '#70827A', fontSize: 10.5, fontWeight: '600' },
+  medalCard: { marginTop: 14, padding: 16, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDECE6' },
+  medalPreviewRow: { flexDirection: 'row', gap: 8, marginTop: 10 },
+  medalPreview: { flex: 1, minWidth: 0, alignItems: 'center', paddingVertical: 4 },
+  medalName: { marginTop: 4, color: '#173D31', fontSize: 12, fontWeight: '800' },
+  medalState: { marginTop: 3, color: '#7C8E86', fontSize: 10.5, fontWeight: '700' },
+  pressed: { opacity: 0.75 },
+  detailPage: { flex: 1, backgroundColor: '#F7FBFA' },
+  detailHeader: { minHeight: 88, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 14, paddingBottom: 12, backgroundColor: '#245C6B' },
+  backButton: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center' },
+  detailTitle: { color: '#FFFFFF', fontSize: 17, fontWeight: '900' },
+  detailContent: { alignSelf: 'center', width: '100%', maxWidth: 760, paddingHorizontal: 18, paddingBottom: 132 },
+  reportEntry: { minHeight: 74, flexDirection: 'row', alignItems: 'center', gap: 11, marginTop: 14, paddingHorizontal: 14, borderRadius: 16, borderWidth: 1, borderColor: '#DDECE6', backgroundColor: '#FFFFFF' },
+  reportEntryIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: '#EAF6F1' },
+  reportEntryTitle: { color: '#173D31', fontSize: 14, fontWeight: '900' },
+  reportEntryHint: { marginTop: 3, color: '#70827A', fontSize: 11, fontWeight: '600' },
+  xpCard: { marginTop: 18, paddingHorizontal: 16, borderRadius: 16, backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDECE6' },
+  xpRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DCE8E3' },
+  rowLast: { borderBottomWidth: 0 },
+  xpIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#EAF8EF' },
+  rowCopy: { flex: 1, minWidth: 0 },
+  xpReason: { color: '#173D31', fontSize: 13, fontWeight: '800' },
+  xpDate: { marginTop: 3, color: '#789087', fontSize: 10.5, fontWeight: '600' },
+  xpPoints: { color: '#2A8A61', fontSize: 13, fontWeight: '900' },
+  emptyText: { paddingVertical: 22, color: '#70827A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
+  rerollError: { marginTop: 8, marginHorizontal: 18, color: '#B42318', fontSize: 12, fontWeight: '700' },
+  modalRoot: { flex: 1 },
   centerState: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 28, backgroundColor: '#F7FBFA' },
   stateText: { color: '#70827A', fontSize: 14, fontWeight: '700' },
   stateTitle: { color: '#173D31', fontSize: 18, fontWeight: '800', textAlign: 'center' },
   retryButton: { minHeight: 46, justifyContent: 'center', paddingHorizontal: 20, borderRadius: 14, backgroundColor: '#2A8A61' },
   retryText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
-  card: { marginTop: 18, padding: 16, borderRadius: 18, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#E3EEE9' },
-  lastCard: { marginBottom: 8 },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 },
-  sectionIcon: { fontSize: 16 },
-  sectionTitle: { color: '#173D31', fontSize: 17, fontWeight: '900', flex: 1 },
-  viewAll: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 10 },
-  viewAllText: { color: '#2A8A61', fontSize: 11, fontWeight: '800' },
-  rowLast: { borderBottomWidth: 0 },
-  rowCopy: { flex: 1, minWidth: 0 },
-  emptyText: { color: '#70827A', fontSize: 13, fontWeight: '600', lineHeight: 19 },
-  rerollError: { marginTop: 8, marginHorizontal: 18, color: '#B42318', fontSize: 12, fontWeight: '700' },
-  badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  badgeCard: { width: '47%', minHeight: 126, flexGrow: 1, alignItems: 'center', paddingHorizontal: 8, paddingTop: 14, paddingBottom: 12, borderRadius: 16, borderCurve: 'continuous' },
-  badgeCardUnlocked: { backgroundColor: '#FFF8EF' },
-  badgeCardInProgress: { backgroundColor: '#F7F4EE' },
-  badgeCardLocked: { backgroundColor: '#F3F6F5' },
-  badgeCardPressed: { transform: [{ scale: 0.97 }], opacity: 0.92 },
-  badgeIcon: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center', borderRadius: 22 },
-  badgeIconUnlocked: { backgroundColor: '#FFE8C8' },
-  badgeIconInProgress: { backgroundColor: '#EFE6D8' },
-  badgeIconLocked: { backgroundColor: '#E4EBE8' },
-  badgeName: { marginTop: 10, color: '#173D31', fontSize: 12, fontWeight: '800', textAlign: 'center', lineHeight: 16 },
-  badgeNameMuted: { color: '#6F817A' },
-  badgeState: { marginTop: 6, color: '#8A9A93', fontSize: 10, fontWeight: '700', textAlign: 'center', lineHeight: 14 },
-  badgeStateUnlocked: { color: '#2A8A61' },
-  badgeStateInProgress: { color: '#8B6B3A' },
-  badgeProgressTrack: { alignSelf: 'stretch', marginTop: 8, height: 6, borderRadius: 999, backgroundColor: '#E7E0D4', overflow: 'hidden' },
-  badgeProgressFill: { height: '100%', borderRadius: 999, backgroundColor: '#C6661C' },
-  badgeReward: { marginTop: 6, color: '#A0AFA8', fontSize: 10, fontWeight: '700' },
-  xpRow: { minHeight: 64, flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#DCE8E3' },
-  xpIcon: { width: 34, height: 34, alignItems: 'center', justifyContent: 'center', borderRadius: 17, backgroundColor: '#EAF8EF' },
-  xpReason: { color: '#173D31', fontSize: 13, fontWeight: '800' },
-  xpDate: { marginTop: 3, color: '#789087', fontSize: 10.5, fontWeight: '600' },
-  xpPoints: { color: '#2A8A61', fontSize: 13, fontWeight: '900' },
-  modalRoot: { flex: 1 },
 });

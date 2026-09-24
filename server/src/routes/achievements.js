@@ -39,6 +39,18 @@ router.get('/achievements', requireFridge, async (request, response) => {
 });
 
 // Arthur: NarIyirm
+// 中文：阶段报告由数据库按冰箱时区汇总；沿用设备鉴权与成员校验，客户端不读取原始库存流水。
+// EN: The database aggregates the stage report in fridge time, behind the existing device and membership checks.
+router.get('/achievements/report', requireFridge, async (request, response) => {
+  const { data, error } = await supabase.rpc('get_fridge_stage_report', { p_device_id: request.deviceId });
+  if (error) {
+    console.error('Achievement stage report read failed:', error.message);
+    return response.status(503).json({ error: 'achievement_report_unavailable' });
+  }
+  return response.json(data);
+});
+
+// Arthur: NarIyirm
 // 中文：任一每日/每周任务都可按分配 ID 更换；数据库统一校验归属、次数与候选可完成性。
 // EN: Any daily or weekly slot can reroll by assignment ID; the database validates ownership, quota, and replacement eligibility.
 router.post('/achievements/quests/reroll', requireFridge, async (request, response) => {
