@@ -17,7 +17,7 @@ import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
-import { FoodWasteStory } from './src/components/FoodWasteStory';
+import { InteractiveFoodWasteStory } from './src/components/InteractiveFoodWasteStory';
 import { ProfileScreen } from './src/components/ProfileScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { AchievementDataProvider } from './src/components/AchievementDataProvider';
@@ -465,7 +465,7 @@ function KitchMemoApp() {
             {canMountKitchen ? (
               <Suspense fallback={<KitchenLoading />}>
                 <Kitchen3DPrototype
-                  active={activeTab === 'home'}
+                  active={activeTab === 'home' && !storyVisible}
                   batches={assistantSnapshot?.batches ?? []}
                   expiringCount={expiringCount}
                   inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
@@ -606,7 +606,7 @@ function KitchMemoApp() {
         />
       )}
       <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
-      {storyVisible ? <FoodWasteStory onClose={() => setStoryVisible(false)} /> : null}
+      {storyVisible ? <InteractiveFoodWasteStory onClose={() => setStoryVisible(false)} /> : null}
     </View>
   );
 }

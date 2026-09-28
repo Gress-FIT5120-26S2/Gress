@@ -70,6 +70,15 @@
           "color": "#F58220",
           "defaultChannel": "kitchmemo-reminders"
         }
+      ],
+      "expo-video",
+      [
+        "expo-audio",
+        {
+          "microphonePermission": false,
+          "recordAudioAndroid": false,
+          "enableBackgroundPlayback": false
+        }
       ]
     ]
   }
