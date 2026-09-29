@@ -157,7 +157,7 @@
 
 ## 9. 素材清单与命名
 
-建议目录：`src/assets/achievements/<mountain-key>/`
+建议目录：`assets/achievements/<mountain-key>/`
 
 每座山峰至少包含：
 

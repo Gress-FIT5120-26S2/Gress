@@ -1,14 +1,14 @@
 # 60 秒线性动画
 
-`timeline.json` 是双语屏幕文字和时间码的编辑源；`preview.html` 是可拖动的低保真 animatic。`kitchmemo-food-waste-linear-60s.mp4` 是 App 使用的无字无音母版，`poster.png` 是视频首帧加载海报。App 入口是首页 3D 厨房小黑板，播放器实现位于 `src/components/LinearFoodWasteStory.tsx`。
+`preview.html` 是可拖动的低保真 animatic。App 所需的 `timeline.json`、无字无音母版 `kitchmemo-food-waste-linear-60s.mp4` 和加载海报 `poster.png` 统一位于项目根目录的 `assets/story/food-waste/`。App 入口是首页 3D 厨房小黑板，播放器实现位于 `src/components/LinearFoodWasteStory.tsx`。本目录仅放分镜预览与生成脚本，不参与 EAS 构建上传。
 
-从 `docs/art-direction/food-waste-animation/` 运行：
+从项目根目录运行：
 
 ```powershell
 C:\Python312\python.exe -m http.server 8767
 ```
 
-然后打开 `http://127.0.0.1:8767/linear-story/preview.html`。预览支持中文／英文切换、暂停、重播和拖动。完整镜头意图与数据口径见 [`LINEAR_STORYBOARD.md`](../LINEAR_STORYBOARD.md)。
+然后打开 `http://127.0.0.1:8767/docs/art-direction/food-waste-animation/linear-story/preview.html`。预览支持中文／英文切换、暂停、重播和拖动。完整镜头意图与数据口径见 [`LINEAR_STORYBOARD.md`](../LINEAR_STORYBOARD.md)。
 
 ## 重建母版
 
@@ -19,7 +19,7 @@ C:\Python312\python.exe docs/art-direction/food-waste-animation/linear-story/ren
 & 'C:\Program Files\Blender Foundation\Blender 5.2\blender.exe' --background --python docs/art-direction/food-waste-animation/linear-story/encode_master.py
 ```
 
-第一步需要 Pillow；第二步用 Blender 内置 FFmpeg 编码。前 150 帧通过已确认的 `proof-5s/generate_proof.py` 重建并移除固定标题与时间码，其后 1650 帧由本目录脚本生成。中间帧位于被 Git 忽略的 `.frames/`，不需提交。
+第一步需要 Pillow；第二步用 Blender 内置 FFmpeg 编码。前 150 帧通过已确认的 `proof-5s/generate_proof.py` 重建并移除固定标题与时间码，其后 1650 帧由本目录脚本生成。脚本直接输出到 `assets/story/food-waste/`；中间帧位于被 Git 忽略的 `.frames/`，不需提交。
 
 ## 当前验收范围
 

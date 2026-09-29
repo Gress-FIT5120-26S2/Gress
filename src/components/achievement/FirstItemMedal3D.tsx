@@ -4,7 +4,7 @@ import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, StyleSheet, View } from 'react-native';
 import { Color, MathUtils, type Group, type Object3D } from 'three';
 
-const FIRST_ITEM_MODEL = require('../../../models/achievements/first-item.glb');
+const FIRST_ITEM_MODEL = require('../../../assets/models/achievements/first-item.glb');
 
 type Props = {
   earned: boolean;

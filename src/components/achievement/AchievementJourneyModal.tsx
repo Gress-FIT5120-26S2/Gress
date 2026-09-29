@@ -15,14 +15,14 @@ import { FirstItemMedal3D } from './FirstItemMedal3D';
 // 中文：每项成就绑定独立的自然浮雕奖牌资源，避免奖牌馆退化为通用线性图标。
 // EN: Each achievement maps to its own nature-relief medal asset so the collection never falls back to generic line icons.
 const MEDAL_ASSETS: Record<AchievementCode, number> = {
-  first_item: require('../../assets/achievements/medals/first-item.png'),
-  first_rescue: require('../../assets/achievements/medals/first-rescue.png'),
-  waste_watcher: require('../../assets/achievements/medals/waste-aware.png'),
-  zero_waste_week: require('../../assets/achievements/medals/zero-waste-week.png'),
-  rescue_ten: require('../../assets/achievements/medals/rescue-ten.png'),
-  fridge_regular: require('../../assets/achievements/medals/fridge-regular.png'),
-  shared_kitchen: require('../../assets/achievements/medals/shared-kitchen.png'),
-  climate_summit: require('../../assets/achievements/medals/climate-summit.png'),
+  first_item: require('../../../assets/achievements/medals/first-item.png'),
+  first_rescue: require('../../../assets/achievements/medals/first-rescue.png'),
+  waste_watcher: require('../../../assets/achievements/medals/waste-aware.png'),
+  zero_waste_week: require('../../../assets/achievements/medals/zero-waste-week.png'),
+  rescue_ten: require('../../../assets/achievements/medals/rescue-ten.png'),
+  fridge_regular: require('../../../assets/achievements/medals/fridge-regular.png'),
+  shared_kitchen: require('../../../assets/achievements/medals/shared-kitchen.png'),
+  climate_summit: require('../../../assets/achievements/medals/climate-summit.png'),
 };
 
 const TRAIL_STEP_HEIGHT = 148;

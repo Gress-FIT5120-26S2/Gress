@@ -8,7 +8,7 @@ import bpy
 root = Path(__file__).resolve().parent
 proof_frames = sorted((root / ".frames").glob("frame_*.png"))
 frames = sorted((root / ".frames").glob("frame_*.jpg"))
-output = root / "kitchmemo-food-waste-linear-60s.mp4"
+output = root.parents[3] / "assets" / "story" / "food-waste" / "kitchmemo-food-waste-linear-60s.mp4"
 assert len(proof_frames) == 150, f"Expected 150 text-free proof frames, found {len(proof_frames)}"
 assert len(frames) == 1650, f"Expected 1650 continuation frames, found {len(frames)}"
 
