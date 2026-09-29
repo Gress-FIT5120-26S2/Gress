@@ -1,0 +1,51 @@
+{
+  "durationSeconds": 60,
+  "sourceUrl": "https://www.ozharvest.org/australian-household-food-waste-research/",
+  "segments": [
+    {
+      "id": "opening",
+      "start": 1.7,
+      "end": 4.9,
+      "zh": { "headline": "买回家的食物，后来去了哪里？" },
+      "en": { "headline": "What happens to the food we bring home?" }
+    },
+    {
+      "id": "forgotten",
+      "start": 9,
+      "end": 15,
+      "zh": { "headline": "有些食物，只是慢慢被忘在冰箱里。" },
+      "en": { "headline": "Sometimes food simply gets lost at the back of the fridge." }
+    },
+    {
+      "id": "weight",
+      "start": 18,
+      "end": 27,
+      "source": true,
+      "zh": { "eyebrow": "澳大利亚家庭 · 年度调查估计", "number": "113 kg", "body": "有 35 岁以下成员的家庭，每年约丢弃这么多食物。", "source": "来源：OzHarvest《Half Eaten》，2025" },
+      "en": { "eyebrow": "Australian households · annual survey estimate", "number": "113 kg", "body": "Households with someone under 35 discard about this much food each year.", "source": "Source: OzHarvest, Half Eaten, 2025" }
+    },
+    {
+      "id": "cost",
+      "start": 31,
+      "end": 38.5,
+      "source": true,
+      "zh": { "eyebrow": "同一调查群体 · 年度估计", "number": "超过 A$1,500", "body": "这些被丢弃食物的估计价值。", "source": "来源：OzHarvest《Half Eaten》，2025" },
+      "en": { "eyebrow": "Same survey group · annual estimate", "number": "Over A$1,500", "body": "The estimated value of food discarded by these households.", "source": "Source: OzHarvest, Half Eaten, 2025" }
+    },
+    {
+      "id": "habits",
+      "start": 43,
+      "end": 48,
+      "zh": { "headline": "购物前没查看家里有什么，或计划改变，都可能让食物被忘记。" },
+      "en": { "headline": "Skipping a fridge check or changing plans can leave food forgotten." }
+    },
+    {
+      "id": "action",
+      "start": 51,
+      "end": 59.5,
+      "source": true,
+      "zh": { "headline": "下次购物前，先看看家里已有的食物。", "source": "查看研究来源" },
+      "en": { "headline": "Before your next shop, check what you already have.", "source": "View research source" }
+    }
+  ]
+}
