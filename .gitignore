@@ -84,3 +84,11 @@ server/.env.production
 /docs/**/*.docx
 /docs/**/*.pdf
 .env*
+
+# Arthur: NarIyirm
+# 中文：本地打包结果、渲染帧与 Python 缓存可重新生成，不属于应用源码或交付素材。
+# EN: Local exports, render frames, and Python caches are reproducible and do not belong in source control.
+/.codex-build/
+**/.frames/
+**/__pycache__/
+*.pyc

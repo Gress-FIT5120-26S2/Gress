@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <title>KitchMemo · 动画厨房交互样机</title>
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: #d8dbd2; font-family: Arial,"Microsoft YaHei",sans-serif; }
+    .scene { position: relative; width: min(100vw, 56.25dvh); aspect-ratio: 9/16; overflow: hidden; background: #efede5; box-shadow: 0 20px 70px #26332b33; }
+    .media { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+    #clip { display: none; }
+    #hub-video { display: block; }
+    .hotspot { position: absolute; z-index: 2; border: 0; background: transparent; cursor: pointer; }
+    .hotspot:focus-visible { outline: 3px solid #db7153; outline-offset: -5px; }
+    #fridge { left: 8%; top: 26%; width: 42%; height: 52%; }
+    #shelf { left: 56%; top: 30%; width: 38%; height: 49%; }
+    .legend { position: absolute; bottom: 8.5%; left: 6%; right: 6%; text-align: center; color: #27372d; pointer-events: none; font-size: clamp(12px,2.7vw,15px); }
+    .legend .labels { display: flex; justify-content: space-between; gap: 14px; margin-top: 12px; font-weight: 700; }
+    .legend .labels span { width: 48%; }
+    .detail { display: none; position: absolute; left: 7%; right: 7%; }
+    .waste { top: 59%; color: #f1eee6; }
+    .causes { top: 61%; color: #1e2923; }
+    .eyebrow { font-size: clamp(9px,2.1vw,12px); color: #c88068; text-transform: uppercase; letter-spacing: .12em; }
+    h1 { margin: 9px 0 0; font-size: clamp(20px,5vw,27px); line-height: 1.2; }
+    .number { margin-top: 8px; color: #d87553; font-weight: 900; font-size: clamp(49px,12vw,66px); letter-spacing: -.05em; }
+    .detail p { font-size: clamp(11px,2.7vw,15px); line-height: 1.45; margin: 4px 0; }
+    .cost { color: #a7c9af; font-weight: 700; }
+    .scope { opacity: .65; font-size: clamp(10px,2.2vw,12px) !important; margin-top: 12px !important; }
+    .source { color: inherit; font-size: 12px; display: inline-block; margin-top: 12px; }
+    .causes-list { display: none; position: absolute; inset: 0; pointer-events: none; }
+    .causes-list span { position: absolute; left: 32%; right: 11%; font-size: clamp(11px,2.6vw,15px); font-weight: 700; line-height: 1.25; color: #263129; }
+    .causes-list span:nth-child(1) { top: 20.4%; }
+    .causes-list span:nth-child(2) { top: 33.6%; }
+    .causes-list span:nth-child(3) { top: 46.8%; }
+    .control { position: absolute; z-index: 10; top: 8%; width: 44px; height: 44px; border-radius: 50%; border: 0; background: #eeede4df; color: #19211d; font-size: 26px; cursor: pointer; }
+    .control:focus-visible { outline: 3px solid #db7153; }
+    #back { left: 4%; display: none; }
+    #close { right: 4%; }
+    .dark .control { background: #2e3732dd; color: #f1eee6; }
+    @media (prefers-reduced-motion: reduce) { #hub-video, #clip { display: none !important; } }
+  </style>
+</head>
+<body>
+  <main class="scene" id="scene">
+    <img class="media" id="poster" src="assets/hub-poster.png" alt="An animated kitchen with a fridge and pantry shelf">
+    <video class="media" id="hub-video" src="assets/hub.mp4" autoplay muted loop playsinline></video>
+    <video class="media" id="clip" muted playsinline></video>
+    <button class="hotspot" id="fridge" type="button"></button>
+    <button class="hotspot" id="shelf" type="button"></button>
+    <div class="legend" id="legend"><span id="explore"></span><div class="labels"><span id="fridge-label"></span><span id="shelf-label"></span></div></div>
+    <section class="detail waste" id="waste-detail"><div class="eyebrow" id="waste-eyebrow"></div><h1 id="waste-title"></h1><div class="number">113 kg</div><p id="waste-label"></p><p class="cost" id="waste-cost"></p><p class="scope" id="waste-scope"></p><a class="source" id="waste-source" href="https://www.ozharvest.org/australian-household-food-waste-research/" target="_blank" rel="noopener noreferrer"></a></section>
+    <div class="causes-list" id="causes-list"><span></span><span></span><span></span></div>
+    <section class="detail causes" id="causes-detail"><div class="eyebrow" id="causes-eyebrow"></div><h1 id="causes-title"></h1><p class="scope" id="causes-scope"></p><a class="source" id="causes-source" href="https://www.ozharvest.org/australian-household-food-waste-research/" target="_blank" rel="noopener noreferrer"></a></section>
+    <button class="control" id="back" type="button" aria-label="返回厨房">←</button>
+    <button class="control" id="close" type="button" aria-label="重新开始">×</button>
+  </main>
+  <script>
+    const zh = navigator.language.toLowerCase().startsWith('zh');
+    const words = zh ? {
+      explore:'点选厨房中的物件',fridge:'冰箱 · 浪费数据',shelf:'货架 · 根因分析',back:'返回厨房',close:'重新开始',
+      wasteEyebrow:'澳大利亚 · 2025 年调查估计',wasteTitle:'被遗忘的食物，积累起来有多重？',wasteLabel:'有 35 岁以下成员的家庭，估计每年丢弃的食物',wasteCost:'估计价值超过 A$1,500',wasteScope:'调查群体估计值，不代表每个家庭的实际丢弃量。',
+      causesEyebrow:'购物与储存中的常见行为',causesTitle:'为什么食物会被遗忘？',causes:['购物前没查看家中食材','餐食安排缺少弹性','日期标签容易混淆'],causesScope:'这些是研究提到的相关行为，并非年轻家庭的原因排名。',source:'查看研究来源'
+    } : {
+      explore:'Tap an object in the kitchen',fridge:'Fridge · waste data',shelf:'Shelf · possible causes',back:'Return to kitchen',close:'Start again',
+      wasteEyebrow:'Australia · 2025 survey estimate',wasteTitle:'How much can forgotten food add up to?',wasteLabel:'estimated food discarded each year by households with someone under 35',wasteCost:'estimated value over A$1,500',wasteScope:'A survey group estimate, not the measured amount for every household.',
+      causesEyebrow:'Common shopping and storage behaviours',causesTitle:'Why does food get forgotten?',causes:['Not checking food at home before shopping','Meal plans with little flexibility','Confusion over date labels'],causesScope:'Behaviours noted in the research, not a ranking of causes for younger households.',source:'View research source'
+    };
+    for (const [id,key] of Object.entries({'explore':'explore','fridge-label':'fridge','shelf-label':'shelf','waste-eyebrow':'wasteEyebrow','waste-title':'wasteTitle','waste-label':'wasteLabel','waste-cost':'wasteCost','waste-scope':'wasteScope','causes-eyebrow':'causesEyebrow','causes-title':'causesTitle','causes-scope':'causesScope','waste-source':'source','causes-source':'source'})) document.getElementById(id).textContent=words[key];
+    document.getElementById('fridge').setAttribute('aria-label',words.fridge);
+    document.getElementById('shelf').setAttribute('aria-label',words.shelf);
+    document.getElementById('back').setAttribute('aria-label',words.back);
+    document.getElementById('close').setAttribute('aria-label',words.close);
+    [...document.querySelectorAll('#causes-list span')].forEach((item,index)=>item.textContent=words.causes[index]);
+    const scene=document.getElementById('scene'),poster=document.getElementById('poster'),hub=document.getElementById('hub-video'),clip=document.getElementById('clip');
+    const hotspots=['fridge','shelf','legend'].map(id=>document.getElementById(id));
+    const details=['waste-detail','causes-detail','causes-list'].map(id=>document.getElementById(id));
+    const back=document.getElementById('back');
+    const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
+    let state='hub',branch=null;
+    function showHub() {
+      state='hub'; branch=null; scene.classList.remove('dark'); poster.src='assets/hub-poster.png';
+      clip.pause(); clip.style.display='none'; details.forEach(x=>x.style.display='none');
+      hotspots.forEach(x=>x.style.display=''); back.style.display='none';
+      if (!reduced) { hub.style.display='block'; hub.currentTime=0; hub.play().catch(()=>{}); }
+    }
+    function showDetail() {
+      state='detail'; clip.pause(); clip.style.display='none';
+      poster.src=branch==='waste'?'assets/waste-poster.png':'assets/causes-poster.png';
+      scene.classList.toggle('dark',branch==='waste'); back.style.display='block';
+      document.getElementById(branch==='waste'?'waste-detail':'causes-detail').style.display='block';
+      if (branch==='causes') document.getElementById('causes-list').style.display='block';
+    }
+    // Arthur: NarIyirm
+    // 中文：每个交互只在上一段影片结束后解锁，返回总场景后可以重新选择另一条分支。
+    // EN: A branch unlocks after its clip ends; returning to the hub allows the other branch to be selected.
+    function playClip(name,onEnd) {
+      clip.src=`assets/${name}.mp4`; clip.onended=onEnd; clip.style.display='block';
+      clip.currentTime=0; clip.play().catch(onEnd);
+    }
+    function enter(target) {
+      if(state!=='hub')return;
+      branch=target; state='entering'; hub.pause(); hub.style.display='none';
+      hotspots.forEach(x=>x.style.display='none');
+      if(reduced)showDetail();else playClip(target==='waste'?'fridge-in':'shelf-in',showDetail);
+    }
+    function leave() {
+      if(state!=='detail')return;
+      const current=branch;state='returning'; details.forEach(x=>x.style.display='none');back.style.display='none';
+      if(reduced)showHub();else playClip(current==='waste'?'fridge-out':'shelf-out',showHub);
+    }
+    document.getElementById('fridge').onclick=()=>enter('waste');
+    document.getElementById('shelf').onclick=()=>enter('causes');
+    document.getElementById('back').addEventListener('click',leave);
+    document.getElementById('close').addEventListener('click',showHub);
+    document.onkeydown=e=>{if(e.key==='Escape'){if(state==='detail')leave();else showHub();}};
+    showHub();
+  </script>
+</body>
+</html>

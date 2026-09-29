@@ -17,7 +17,6 @@ import { useKitchenTimeLighting } from './src/components/KitchenTimeLighting';
 import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
-import { FoodWasteStory } from './src/components/FoodWasteStory';
 import { ProfileScreen } from './src/components/ProfileScreen';
 import { ProfileDataProvider } from './src/components/ProfileDataProvider';
 import { AchievementDataProvider } from './src/components/AchievementDataProvider';
@@ -35,6 +34,13 @@ import { FridgeAssistantScreen } from './src/components/fridge/FridgeAssistantSc
 // EN: Evaluate 3D code after the main opener sequence so Expo GL does not initialize during its busiest phase.
 const Kitchen3DPrototype = lazy(() =>
   import('./src/components/Kitchen3DPrototype').then((module) => ({ default: module.Kitchen3DPrototype })),
+);
+
+// Arthur: NarIyirm
+// 中文：故事播放器在用户打开小黑板后才加载，避免视频资源参与首页启动。
+// EN: Load the story player only after the blackboard opens so its video asset stays off the home startup path.
+const LinearFoodWasteStory = lazy(() =>
+  import('./src/components/LinearFoodWasteStory').then((module) => ({ default: module.LinearFoodWasteStory })),
 );
 
 const transitionTones: Record<AppTab, string> = {
@@ -465,7 +471,7 @@ function KitchMemoApp() {
             {canMountKitchen ? (
               <Suspense fallback={<KitchenLoading />}>
                 <Kitchen3DPrototype
-                  active={activeTab === 'home'}
+                  active={activeTab === 'home' && !storyVisible}
                   batches={assistantSnapshot?.batches ?? []}
                   expiringCount={expiringCount}
                   inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
@@ -606,7 +612,7 @@ function KitchMemoApp() {
         />
       )}
       <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
-      {storyVisible ? <FoodWasteStory onClose={() => setStoryVisible(false)} /> : null}
+      {storyVisible ? <Suspense fallback={null}><LinearFoodWasteStory onClose={() => setStoryVisible(false)} /></Suspense> : null}
     </View>
   );
 }

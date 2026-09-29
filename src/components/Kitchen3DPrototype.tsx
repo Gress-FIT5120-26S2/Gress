@@ -339,6 +339,10 @@ function KitchenModel({
   const { actions, mixer } = useAnimations(animations, scene);
   const hasPresentedFirstFrame = useRef(false);
   const invalidate = useThree((state) => state.invalidate);
+  // Arthur: NarIyirm
+  // 中文：故事页覆盖厨房时暂停装饰动效，避免隐藏的 WebGL 场景持续抢占视频播放所需的 GPU 帧。
+  // EN: Pause kitchen decoration while the story covers it so hidden WebGL frames do not compete with video.
+  const sceneMotionPaused = reduceMotion || !sceneVisible;
   const anchors = useMemo(() => ({
     burners: BURNER_ANCHORS.map((name) => scene.getObjectByName(name)).filter((anchor): anchor is Object3D => Boolean(anchor)),
     ceilingLight: scene.getObjectByName('Ceiling_Light_Anchor'),
@@ -419,7 +423,7 @@ function KitchenModel({
   }, [actions.Fridge_Door_Open, effectInteraction, invalidate, mixer, reduceMotion, scene]);
 
   useFrame(() => {
-    if (effectInteraction === 'fridge' && !reduceMotion) invalidate();
+    if (sceneVisible && effectInteraction === 'fridge' && !reduceMotion) invalidate();
     if (hasPresentedFirstFrame.current || !onReady) return;
 
     // Arthur: NarIyirm
@@ -440,7 +444,7 @@ function KitchenModel({
         <group position={KITCHEN_STORY_BOARD_POSITION}>
           <KitchenStoryBoard />
           <group position={[0, 0, 0.18]}>
-            <FeatureHotspot hitboxSize={[1.12, 0.91, 0.28]} markerOffset={[0.38, 0.49, 0.04]} onPress={() => onSelectFeature('story')} reduceMotion={reduceMotion} selected={pressedFeature === 'story'} />
+            <FeatureHotspot hitboxSize={[1.12, 0.91, 0.28]} markerOffset={[0.38, 0.49, 0.04]} onPress={() => onSelectFeature('story')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'story'} />
           </group>
         </group>
       ) : null}
@@ -449,11 +453,11 @@ function KitchenModel({
           中文：Portal 把动效和生活细节变成模型锚点的真实子节点，转动镜头或打开冰箱门后仍会留在正确位置。
           EN: Portals make motion and lived-in details true children of model anchors, keeping them aligned after camera rotation or door movement. */}
       {weather === 'rain' && anchors.windowLight ? createPortal(
-        <WindowRain reduceMotion={reduceMotion} />,
+        <WindowRain reduceMotion={sceneMotionPaused} />,
         anchors.windowLight,
       ) : null}
       {anchors.recipesHotspot ? createPortal(
-        <TodayRecipeScene isBookOpen={isRecipeBookOpen} reduceMotion={reduceMotion} />,
+        <TodayRecipeScene isBookOpen={isRecipeBookOpen} reduceMotion={sceneMotionPaused} />,
         anchors.recipesHotspot,
       ) : null}
       {anchors.fridgeDoor ? createPortal(
@@ -461,22 +465,22 @@ function KitchenModel({
         anchors.fridgeDoor,
       ) : null}
       <group position={SHOPPING_CART_POSITION}>
-        <KitchenShoppingCart active={effectInteraction === 'shopping'} inventoryFillRatio={inventoryFillRatio} reduceMotion={reduceMotion} />
+        <KitchenShoppingCart active={effectInteraction === 'shopping'} inventoryFillRatio={inventoryFillRatio} reduceMotion={sceneMotionPaused} />
         {activeInteraction === null || activeInteraction === 'shopping' ? (
           <group position={[0, 0.65, 0]}>
-            <FeatureHotspot hasStatus={inventoryFillRatio < 0.35} hitboxSize={[1.45, 1.3, 1.1]} markerOffset={[0, 0.77, 0]} onPress={() => onSelectFeature('shopping')} reduceMotion={reduceMotion} selected={pressedFeature === 'shopping'} />
+            <FeatureHotspot hasStatus={inventoryFillRatio < 0.35} hitboxSize={[1.45, 1.3, 1.1]} markerOffset={[0, 0.77, 0]} onPress={() => onSelectFeature('shopping')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'shopping'} />
           </group>
         ) : null}
       </group>
       <group position={KITCHEN_MAILBOX_POSITION} rotation={KITCHEN_MAILBOX_ROTATION}>
-        <KitchenMailbox active={effectInteraction === 'mailbox'} reduceMotion={reduceMotion} unreadCount={unreadNotificationCount} />
+        <KitchenMailbox active={effectInteraction === 'mailbox'} reduceMotion={sceneMotionPaused} unreadCount={unreadNotificationCount} />
         {activeInteraction === null || activeInteraction === 'mailbox' ? (
           <FeatureHotspot
             hasStatus={unreadNotificationCount > 0}
             hitboxSize={[1.05, 1.25, 0.8]}
             markerOffset={[0, 0.76, 0.18]}
             onPress={() => onSelectFeature('mailbox')}
-            reduceMotion={reduceMotion}
+            reduceMotion={sceneMotionPaused}
             selected={pressedFeature === 'mailbox'}
           />
         ) : null}
@@ -484,7 +488,7 @@ function KitchenModel({
       {anchors.burners.map((anchor) => (
         <Fragment key={anchor.uuid}>
           {createPortal(
-            <BurnerFlame active={isStoveLit} reduceMotion={reduceMotion} />,
+            <BurnerFlame active={isStoveLit} reduceMotion={sceneMotionPaused} />,
             anchor,
           )}
         </Fragment>
@@ -498,15 +502,15 @@ function KitchenModel({
         anchors.fridgeLight,
       ) : null}
       {(activeInteraction === null || activeInteraction === 'fridge') && anchors.fridgeHotspot ? createPortal(
-          <FeatureHotspot hasStatus={expiringCount > 0} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={reduceMotion} selected={pressedFeature === 'fridge'} />,
+          <FeatureHotspot hasStatus={expiringCount > 0} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'fridge'} />,
           anchors.fridgeHotspot,
         ) : null}
       {activeInteraction === null && anchors.stoveHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={reduceMotion} selected={pressedFeature === 'stove'} />,
+          <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'stove'} />,
           anchors.stoveHotspot,
         ) : null}
       {activeInteraction === null && anchors.recipesHotspot ? createPortal(
-          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={reduceMotion} selected={pressedFeature === 'recipes'} />,
+          <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'recipes'} />,
           anchors.recipesHotspot,
         ) : null}
     </>
@@ -765,6 +769,11 @@ function KitchenScene({ active, activeInteraction, activitySignal, batches, came
           reduceMotion={reduceMotion}
           sceneActive={active}
         />
+      </Suspense>
+      {/* Arthur: NarIyirm
+          中文：角色模型独立加载，让厨房先完成首帧，避免等待较大的角色 GLB 才显示主页。
+          EN: Load the character separately so the kitchen can show its first frame without waiting for the larger GLB. */}
+      <Suspense fallback={null}>
         <SpoonieWorldCharacter
           activitySignal={activitySignal}
           batches={batches}

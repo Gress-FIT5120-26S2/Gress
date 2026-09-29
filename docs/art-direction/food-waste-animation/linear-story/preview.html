@@ -1,0 +1,304 @@
+<!doctype html>
+<html lang="zh">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>KitchMemo · 60-second animatic</title>
+  <style>
+    :root { color-scheme: light; font-family: "Segoe UI", "Microsoft YaHei", sans-serif; background: #e8e8e0; color: #19221e; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; display: grid; place-items: center; padding: 20px; }
+    main { display: grid; grid-template-columns: minmax(260px, 360px) minmax(250px, 340px); align-items: center; gap: 30px; max-width: 760px; width: 100%; }
+    .screen { position: relative; width: 100%; aspect-ratio: 9 / 16; overflow: hidden; border-radius: 24px; background: #efede5; box-shadow: 0 25px 70px #2d3b2f24; }
+    canvas, #proof { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+    #proof { object-fit: fill; z-index: 1; opacity: 0; pointer-events: none; }
+    .screen.sample #proof { opacity: 1; }
+    .screen.sample .topline { opacity: 0; }
+    .topline { position: absolute; top: 5%; left: 8%; right: 8%; display: flex; justify-content: space-between; color: #69746b; font-size: 9px; letter-spacing: .16em; font-weight: 700; }
+    .copy { position: absolute; z-index: 2; left: 8%; right: 8%; top: 16%; display: flex; flex-direction: column; align-items: flex-start; gap: 9px; padding: 17px 15px 18px; color: #1b2922; background: #efede5f2; border-left: 3px solid #d87553; box-shadow: 0 10px 30px #19221e13; }
+    .copy:empty { display: none; }
+    .copy::before { content: ""; position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: #d87553; transform-origin: left; animation: ruleEnter .32s cubic-bezier(.23,1,.32,1) both; }
+    .copy.dark { color: #f2efe6; text-shadow: none; }
+    .copy.dark { background: #202825f5; border-color: #ed9a78; }
+    .copy.weight, .copy.cost { top: 17%; }
+    .copy.bottom { top: auto; bottom: 13%; }
+    .copy.opening { top: auto; bottom: 13%; }
+    .eyebrow { font-size: 12px; font-weight: 750; letter-spacing: .025em; line-height: 1.35; }
+    .number-wrap { width: 100%; overflow: hidden; padding-bottom: 4px; }
+    .number { font-size: 52px; line-height: 1.03; font-weight: 850; letter-spacing: -.055em; color: #d87553; white-space: nowrap; animation: numberEnter .42s cubic-bezier(.23,1,.32,1) both; }
+    .copy.cost .number { font-size: 37px; letter-spacing: -.05em; }
+    .copy.dark .number { color: #ef9979; }
+    .headline { font-size: 22px; line-height: 1.28; font-weight: 800; max-width: 100%; text-wrap: balance; }
+    .body { font-size: 16px; line-height: 1.42; font-weight: 600; max-width: 100%; }
+    .source { margin-top: 7px; font-size: 12px; line-height: 1.35; color: inherit; opacity: .85; }
+    .copy > :not(.number-wrap) { animation: textEnter .34s cubic-bezier(.23,1,.32,1) both; }
+    .copy > .body { animation-delay: .08s; }
+    .copy > .source { animation-delay: .14s; }
+    @keyframes numberEnter { from { opacity: 0; transform: translateY(105%); } to { opacity: 1; transform: translateY(0); } }
+    @keyframes textEnter { from { opacity: 0; transform: translateY(12px); letter-spacing: .07em; } to { opacity: 1; transform: translateY(0); letter-spacing: normal; } }
+    @keyframes ruleEnter { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+    .footer { position: absolute; z-index: 3; bottom: 4%; left: 8%; right: 8%; height: 2px; background: #59756833; }
+    .footer-fill { display: block; height: 100%; background: #d87553; width: 0; }
+    aside { display: grid; gap: 15px; }
+    .kicker { font-size: 11px; font-weight: 800; letter-spacing: .16em; color: #b66d52; }
+    h1 { font-size: 29px; line-height: 1.13; margin: 0; letter-spacing: -.04em; }
+    p { margin: 0; color: #56645a; line-height: 1.5; font-size: 14px; }
+    .controls { display: flex; gap: 8px; flex-wrap: wrap; }
+    button { border: 1px solid #96a79a; background: #f9f8f3; color: #203026; padding: 10px 14px; border-radius: 999px; min-height: 44px; font: inherit; font-weight: 700; cursor: pointer; }
+    button[aria-pressed="true"] { background: #23352a; color: #f4f1e9; border-color: #23352a; }
+    input[type="range"] { width: 100%; accent-color: #d87553; }
+    .time { font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 700; }
+    a { color: #315e45; font-size: 13px; }
+    @media (max-width: 680px) { main { grid-template-columns: minmax(0, 360px); justify-content: center; } body { padding: 12px; } .screen { border-radius: 14px; } }
+    @media (prefers-reduced-motion: reduce) { .screen { box-shadow: none; } .copy::before, .copy > *, .number { animation: none !important; } }
+  </style>
+</head>
+<body>
+  <main>
+    <div id="screen" class="screen" aria-label="KitchMemo low-fidelity animation preview">
+      <canvas id="scene" width="360" height="640"></canvas>
+      <video id="proof" muted playsinline preload="auto" src="../proof-5s/kitchmemo-motion-proof-5s.mp4"></video>
+      <div class="topline"><span>KITCHMEMO</span><span>ANIMATIC · 01 / 06</span></div>
+      <div id="copy" class="copy"></div>
+      <div class="footer"><span id="fill" class="footer-fill"></span></div>
+    </div>
+    <aside>
+      <div class="kicker">STAGE A · STORY & TIMING</div>
+      <h1>食物浪费动画<br>低保真分镜</h1>
+      <p>一条 60 秒的连续故事。这里的文字模拟 App 叠加层；最终视频将无字、无音。</p>
+      <div class="controls">
+        <button id="play">暂停</button>
+        <button id="zh" aria-pressed="true">中文</button>
+        <button id="en" aria-pressed="false">English</button>
+        <button id="restart">重播</button>
+      </div>
+      <input id="seek" aria-label="播放进度" type="range" min="0" max="60" step="0.05" value="0">
+      <div id="time" class="time">00:00 / 01:00</div>
+      <p>重点检查 18–27 秒的 113 kg 页、31–38.5 秒的金额页，以及结尾行动是否有足够阅读时间。</p>
+      <a href="../LINEAR_STORYBOARD.md">查看完整分镜与数据口径</a>
+    </aside>
+  </main>
+  <script>
+    const canvas = document.getElementById('scene');
+    const ctx = canvas.getContext('2d');
+    const proof = document.getElementById('proof');
+    const screen = document.getElementById('screen');
+    const copy = document.getElementById('copy');
+    const seek = document.getElementById('seek');
+    const fill = document.getElementById('fill');
+    const timeLabel = document.getElementById('time');
+    const playButton = document.getElementById('play');
+    let timeline;
+    let language = 'zh';
+    let currentTime = 0;
+    let playing = true;
+    let lastFrame = performance.now();
+    let currentSegment = '';
+    const cream = '#efede5', ink = '#1d2722', coral = '#d87553', mint = '#86b49b';
+
+    const clamp = value => Math.max(0, Math.min(1, value));
+    const ease = value => { const x = clamp(value); return x * x * (3 - 2 * x); };
+    const phase = (time, start, end) => ease((time - start) / (end - start));
+    const lerp = (a, b, amount) => a + (b - a) * amount;
+
+    function line(points, color = ink, width = 2) {
+      ctx.beginPath(); ctx.moveTo(...points[0]);
+      for (const point of points.slice(1)) ctx.lineTo(...point);
+      ctx.strokeStyle = color; ctx.lineWidth = width; ctx.lineJoin = 'round'; ctx.lineCap = 'round'; ctx.stroke();
+    }
+    function roundRect(x, y, w, h, radius, stroke = ink, fill = null, width = 2) {
+      ctx.beginPath(); ctx.roundRect(x, y, w, h, radius);
+      if (fill) { ctx.fillStyle = fill; ctx.fill(); }
+      if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = width; ctx.stroke(); }
+    }
+    function circle(x, y, radius, fill) {
+      ctx.beginPath(); ctx.arc(x, y, Math.max(.01, radius), 0, Math.PI * 2); ctx.fillStyle = fill; ctx.fill();
+    }
+    function tomato(x, y, radius, opacity = 1) {
+      ctx.save(); ctx.globalAlpha = clamp(opacity);
+      circle(x, y, radius, coral);
+      line([[x - radius * .35, y - radius * .85], [x, y - radius * 1.13], [x + radius * .4, y - radius * .8]], mint, Math.max(2, radius * .12));
+      circle(x - radius * .25, y - radius * .3, radius * .13, '#ffe1cf');
+      ctx.restore();
+    }
+    function fridge(x = 78, y = 166, width = 204, height = 320, color = ink) {
+      roundRect(x, y, width, height, 15, color, null, 2);
+      line([[x + 10, y + height * .37], [x + width - 10, y + height * .37]], color, 1.4);
+      line([[x + 10, y + height * .7], [x + width - 10, y + height * .7]], color, 1.4);
+      roundRect(x + width - 19, y + height * .44, 4, 58, 2, null, color);
+    }
+    function packageBox(x, y, width, height, color, alpha = 1) {
+      ctx.save(); ctx.globalAlpha = clamp(alpha); roundRect(x, y, width, height, 7, color, null, 2);
+      line([[x + 8, y + 14], [x + width - 8, y + 14]], color, 1); ctx.restore();
+    }
+    function dots(time, centerX, centerY, spread, color = coral, opacity = 1) {
+      ctx.save(); ctx.globalAlpha = clamp(opacity);
+      for (let i = 0; i < 90; i++) {
+        const angle = i * 2.3999632;
+        const radius = Math.sqrt((i + .5) / 90) * spread;
+        const drift = Math.sin(time * 1.2 + i * .7) * 2;
+        circle(centerX + Math.cos(angle) * radius + drift, centerY + Math.sin(angle) * radius, i % 7 === 0 ? 2.4 : 1.3, i % 4 ? color : mint);
+      }
+      ctx.restore();
+    }
+
+    // Arthur: NarIyirm
+    // 中文：每个画面由同一个播放时间计算，拖动进度可直接检查转场和文字同步。
+    // EN: Every scene is evaluated from one playback time so scrubbing checks transitions and copy sync directly.
+    function draw(time) {
+      ctx.clearRect(0, 0, 360, 640);
+      const dark = phase(time, 16, 16.6) * (1 - phase(time, 28.6, 29.3));
+      ctx.fillStyle = cream;
+      ctx.fillRect(0, 0, 360, 640);
+      ctx.fillStyle = `rgba(32,40,37,${dark})`;
+      ctx.fillRect(0, 0, 360, 640);
+      if (time < 5) {
+        // Arthur: NarIyirm
+        // 中文：前五秒直接使用已确认的样片，确保快节奏基准在 animatic 中真实保留。
+        // EN: The approved proof plays for the first five seconds so the animatic keeps its actual pacing baseline.
+        fridge(84, 164, 192, 339, mint);
+        tomato(143, 241, 20);
+      } else if (time < 16) {
+        const push = phase(time, 5.08, 6.18);
+        const boxOne = phase(time, 6.25, 6.85);
+        const boxTwo = phase(time, 7.05, 7.65);
+        const boxThree = phase(time, 7.78, 8.35);
+        const zoom = lerp(1, 1.28, push);
+        ctx.save(); ctx.translate(180, 330); ctx.scale(zoom, zoom); ctx.translate(-180, -330);
+        fridge(84, 164, 192, 339, mint);
+        tomato(143, 241, 20, 1 - .5 * boxTwo);
+        packageBox(lerp(330, 193, phase(time, 5.35, 5.95)), 222, 58, 50, mint, phase(time, 5.35, 5.95));
+        packageBox(lerp(387, 114, boxOne), 206, 91, 66, '#bdb7a6', boxOne);
+        packageBox(lerp(400, 184, boxTwo), 331, 80, 60, mint, boxTwo);
+        packageBox(lerp(416, 106, boxThree), 350, 86, 57, '#bdb7a6', boxThree);
+        ctx.restore();
+        const clock = phase(time, 8.45, 8.85);
+        ctx.save(); ctx.globalAlpha = clock;
+        circle(276, 154, 24, cream);
+        ctx.beginPath(); ctx.arc(276, 154, 24, 0, Math.PI * 2); ctx.strokeStyle = coral; ctx.lineWidth = 2; ctx.stroke();
+        const angle = -Math.PI / 2 + phase(time, 8.8, 9.7) * Math.PI * 3;
+        line([[276, 154], [276 + 17 * Math.cos(angle), 154 + 17 * Math.sin(angle)]], coral, 2);
+        ctx.restore();
+      } else if (time < 29) {
+        const gather = phase(time, 16.1, 17.3);
+        const settle = phase(time, 17.3, 18);
+        dots(time, 180, lerp(315, 444, gather), lerp(185, 95, gather), '#e99474', .28 + .48 * settle);
+        ctx.save(); ctx.globalAlpha = settle;
+        line([[72, 542], [288, 542]], '#bdd1c0', 1);
+        for (let i = 0; i < 4; i++) line([[88 + i * 62, 555], [88 + i * 62, 565]], '#bdd1c0', 1);
+        ctx.restore();
+      } else if (time < 40) {
+        const reform = phase(time, 29, 29.85);
+        dots(time, 180, lerp(444, 434, reform), lerp(95, 48, reform), coral, (1 - reform) * .45);
+        ctx.save(); ctx.globalAlpha = reform;
+        roundRect(83, 319, 194, 230, 8, ink, '#f8f6ef', 1.5);
+        for (let i = 0; i < 4; i++) line([[105, 362 + i * 35], [250 - (i % 2) * 35, 362 + i * 35]], i % 2 ? mint : '#a8b0a6', 2);
+        line([[105, 508], [250, 508]], coral, 2);
+        ctx.restore();
+      } else if (time < 49) {
+        const switchScene = phase(time, 40, 40.75);
+        ctx.save(); ctx.globalAlpha = 1 - switchScene;
+        roundRect(83, 319, 194, 230, 8, ink, null);
+        ctx.restore();
+        ctx.save(); ctx.globalAlpha = switchScene;
+        roundRect(94, 156, 172, 285, 8, ink, null);
+        for (let i = 0; i < 3; i++) {
+          const arrive = phase(time, 40.9 + i * .55, 41.25 + i * .55);
+          roundRect(lerp(320, 116, arrive), 210 + i * 63, 18, 18, 3, mint, null, 1.5);
+          ctx.save(); ctx.globalAlpha = arrive;
+          line([[149, 220 + i * 63], [234, 220 + i * 63]], '#9ba99a', 2);
+          ctx.restore();
+        }
+        ctx.restore();
+      } else {
+        const reform = phase(time, 49, 49.9);
+        const reveal = phase(time, 49.9, 50.8);
+        fridge(80, 148, 200, 317, mint);
+        tomato(141, 242, 25);
+        packageBox(192 + 56 * reveal, 233, 57, 49, '#c2b8a3', 1 - reveal * .65);
+        ctx.save(); ctx.globalAlpha = reform;
+        roundRect(116, 355, 127, 55, 8, mint, null, 1.5);
+        line([[130, 383], [141, 394], [161, 371]], coral, 3);
+        line([[174, 384], [225, 384]], mint, 2);
+        ctx.restore();
+        circle(180, 306, 107, `rgba(134,180,155,${.08 + reveal * .05})`);
+      }
+      fill.style.width = `${time / 60 * 100}%`;
+    }
+
+    function showCopy() {
+      if (!timeline) return;
+      const segment = timeline.segments.find(item => currentTime >= item.start && currentTime < item.end);
+      const key = `${segment?.id || 'none'}:${language}`;
+      if (key === currentSegment) return;
+      currentSegment = key;
+      const content = segment?.[language];
+      copy.replaceChildren();
+      copy.className = `copy ${segment?.id || ''}${segment?.id === 'weight' ? ' dark' : ''}${['forgotten', 'habits', 'action'].includes(segment?.id) ? ' bottom' : ''}`;
+      if (!content) return;
+      for (const field of ['eyebrow', 'number', 'headline', 'body', 'source']) {
+        if (!content[field]) continue;
+        const element = document.createElement(field === 'source' && segment.id === 'action' ? 'a' : 'div');
+        element.className = field;
+        element.textContent = content[field];
+        if (element.tagName === 'A') { element.href = timeline.sourceUrl; element.target = '_blank'; element.rel = 'noopener'; }
+        if (field === 'number') {
+          const mask = document.createElement('div');
+          mask.className = 'number-wrap';
+          mask.appendChild(element);
+          copy.appendChild(mask);
+        } else copy.appendChild(element);
+      }
+    }
+    function showTime() {
+      const seconds = Math.floor(currentTime);
+      timeLabel.textContent = `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')} / 01:00`;
+      seek.value = currentTime;
+    }
+    function tick(now) {
+      if (playing && timeline) currentTime = Math.min(60, currentTime + Math.min((now - lastFrame) / 1000, .1));
+      if (currentTime >= 60) { playing = false; playButton.textContent = '播放'; }
+      lastFrame = now;
+      screen.classList.toggle('sample', currentTime < 5);
+      if (currentTime < 5 && proof.readyState >= 2) {
+        if (playing && proof.paused) void proof.play().catch(() => {});
+        if (!playing && !proof.paused) proof.pause();
+      } else if (!proof.paused) proof.pause();
+      draw(currentTime); showCopy(); showTime(); requestAnimationFrame(tick);
+    }
+    function setLanguage(next) {
+      language = next; document.documentElement.lang = next;
+      document.getElementById('zh').setAttribute('aria-pressed', String(next === 'zh'));
+      document.getElementById('en').setAttribute('aria-pressed', String(next === 'en'));
+      currentSegment = ''; showCopy();
+    }
+    document.getElementById('zh').onclick = () => setLanguage('zh');
+    document.getElementById('en').onclick = () => setLanguage('en');
+    document.getElementById('restart').onclick = () => { currentTime = 0; proof.currentTime = 0; playing = true; playButton.textContent = '暂停'; };
+    playButton.onclick = () => { playing = !playing; playButton.textContent = playing ? '暂停' : '播放'; };
+    seek.oninput = () => {
+      currentTime = Number(seek.value);
+      // Arthur: NarIyirm
+      // 中文：只在用户拖动时设置视频时间，避免逐帧重复 seek 让样片卡在首帧。
+      // EN: Seek the proof only on user scrubs; repeated frame-by-frame seeks would trap it on its first frame.
+      if (currentTime < 5) proof.currentTime = currentTime;
+      else proof.pause();
+      screen.classList.toggle('sample', currentTime < 5);
+      showCopy(); draw(currentTime); showTime();
+    };
+    fetch('./timeline.json').then(response => response.json()).then(data => {
+      timeline = data;
+      const params = new URLSearchParams(location.search);
+      const at = Number(params.get('at'));
+      if (params.has('at') && Number.isFinite(at)) {
+        currentTime = Math.max(0, Math.min(60, at));
+        playing = false;
+        playButton.textContent = '播放';
+        if (currentTime < 5) proof.currentTime = currentTime;
+      }
+      if (params.get('lang') === 'en') setLanguage('en');
+      requestAnimationFrame(tick);
+    });
+  </script>
+</body>
+</html>
