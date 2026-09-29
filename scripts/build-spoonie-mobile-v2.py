@@ -5,7 +5,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 REFERENCE_PATH = ROOT / "models" / "new-sponine.glb"
-MODEL_PATH = ROOT / "models" / "Spoonie-Character-v2.glb"
+MODEL_PATH = ROOT / "assets" / "models" / "Spoonie-Character-v2.glb"
 BLEND_PATH = ROOT / "models" / "Spoonie-Character-v2.blend"
 FRAME_RATE = 30
 TEXTURE_SIZE = 2048

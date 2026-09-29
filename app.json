@@ -34,8 +34,11 @@
         "expo-asset",
         {
           "assets": [
-            "./models/Kitchen-Home-rebuilt-lighting.glb",
-            "./models/achievements/first-item.glb"
+            "./assets/models/Kitchen-Home-rebuilt-lighting.glb",
+            "./assets/models/Spoonie-Character-v2.glb",
+            "./assets/models/achievements/first-item.glb",
+            "./assets/story/food-waste/kitchmemo-food-waste-linear-60s.mp4",
+            "./assets/story/food-waste/poster.png"
           ]
         }
       ],

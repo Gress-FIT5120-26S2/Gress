@@ -51,10 +51,12 @@ KitchMemo/
 ├── supabase/
 │   ├── migrations/         # 数据库 schema 与行为的版本化来源
 │   └── seed.sql            # 可复现的非用户参考数据
-├── models/                 # 3D 厨房与 Spoonie 模型
-├── assets/                 # App 图标及通用静态资源
-└── docs/                   # 架构、业务规则、AI 与部署文档
+├── assets/                 # App 运行时图片、视频、3D 模型及图标
+├── models/                 # Blender 模型工程与源素材，不参与 App 构建
+└── docs/                   # 架构、设计与交接文档，Git 跟踪但不参与 App 构建
 ```
+
+本地素材的放置与构建规则见 [`docs/APP_ASSETS.md`](docs/APP_ASSETS.md)。
 
 ### 本地开发
 
@@ -211,10 +213,12 @@ KitchMemo/
 ├── supabase/
 │   ├── migrations/         # Versioned source of database schema and behaviour
 │   └── seed.sql            # Reproducible non-user reference data
-├── models/                 # 3D kitchen and Spoonie models
-├── assets/                 # App icons and shared static assets
-└── docs/                   # Architecture, business rules, AI, and deployment docs
+├── assets/                 # App runtime images, video, 3D models, and icons
+├── models/                 # Blender source projects, excluded from app builds
+└── docs/                   # Architecture, design, and handoff docs tracked in Git only
 ```
+
+See [`docs/APP_ASSETS.md`](docs/APP_ASSETS.md) for runtime asset and build-upload rules.
 
 ### Local development
 

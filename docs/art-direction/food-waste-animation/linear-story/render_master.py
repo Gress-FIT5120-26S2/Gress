@@ -11,6 +11,7 @@ from PIL import Image, ImageDraw
 
 
 ROOT = Path(__file__).resolve().parent
+APP_ASSETS = ROOT.parents[3] / "assets" / "story" / "food-waste"
 FRAMES = ROOT / ".frames"
 FPS = 30
 END_FRAME = 60 * FPS
@@ -216,6 +217,7 @@ def render_at(time: float) -> Image.Image:
 
 def main():
     FRAMES.mkdir(parents=True, exist_ok=True)
+    APP_ASSETS.mkdir(parents=True, exist_ok=True)
     proof_source = ROOT.parent / "proof-5s" / "generate_proof.py"
     spec = importlib.util.spec_from_file_location("kitchmemo_proof", proof_source)
     assert spec and spec.loader
@@ -228,7 +230,7 @@ def main():
     proof.header = lambda *_args: None
     for index in range(5 * FPS):
         proof.draw_frame(index)
-    shutil.copyfile(FRAMES / "frame_0000.png", ROOT / "poster.png")
+    shutil.copyfile(FRAMES / "frame_0000.png", APP_ASSETS / "poster.png")
     for index in range(5 * FPS, END_FRAME):
         image = render_at(index / FPS)
         image.save(FRAMES / f"frame_{index:04d}.jpg", quality=91, subsampling=0)

@@ -5,11 +5,11 @@ import { VideoView, useVideoPlayer, type VideoPlayerStatus } from 'expo-video';
 import { memo, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, Animated, AppState, Easing, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import timeline from '../../docs/art-direction/food-waste-animation/linear-story/timeline.json';
+import timeline from '../../assets/story/food-waste/timeline.json';
 import { useI18n } from '../i18n';
 
-const VIDEO = require('../../docs/art-direction/food-waste-animation/linear-story/kitchmemo-food-waste-linear-60s.mp4');
-const POSTER = require('../../docs/art-direction/food-waste-animation/linear-story/poster.png');
+const VIDEO = require('../../assets/story/food-waste/kitchmemo-food-waste-linear-60s.mp4');
+const POSTER = require('../../assets/story/food-waste/poster.png');
 const DURATION = timeline.durationSeconds;
 const SOURCE = timeline.sourceUrl;
 const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);

@@ -4,7 +4,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-MODEL = ROOT / "models" / "Kitchen-Home-rebuilt-lighting.glb"
+MODEL = ROOT / "assets" / "models" / "Kitchen-Home-rebuilt-lighting.glb"
 IMPORTANT_NAMES = (
     "Hotspot_Fridge",
     "Hotspot_Recipes",

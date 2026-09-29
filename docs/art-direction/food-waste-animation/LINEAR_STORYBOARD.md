@@ -1,6 +1,6 @@
 # KitchMemo 线性动画：阶段 A 分镜与文案
 
-状态：低保真 animatic，待观看反馈。基准时长 60.0 秒，竖屏 9:16，无配音、音乐或烘焙文字。时间码及播放器字幕以 `linear-story/timeline.json` 为准。
+状态：已接入 App。基准时长 60.0 秒，竖屏 9:16，无配音、音乐或烘焙文字。时间码及播放器字幕以 `assets/story/food-waste/timeline.json` 为准。
 
 ## 叙事原则
 

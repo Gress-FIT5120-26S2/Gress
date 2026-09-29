@@ -7,9 +7,9 @@ import bpy
 ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 OUTPUT_DIR = os.path.join(ROOT, 'models', 'achievements')
 BLEND_PATH = os.path.join(OUTPUT_DIR, 'first-item.blend')
-GLB_PATH = os.path.join(OUTPUT_DIR, 'first-item.glb')
+GLB_PATH = os.path.join(ROOT, 'assets', 'models', 'achievements', 'first-item.glb')
 PREVIEW_PATH = os.path.join(OUTPUT_DIR, 'first-item-preview.png')
-FACE_PATH = os.path.join(ROOT, 'src', 'assets', 'achievements', 'motifs', 'first-item-motif.png')
+FACE_PATH = os.path.join(ROOT, 'docs', 'achievement', 'source-art', 'first-item-motif.png')
 BAKED_FACE_PATH = os.path.join(OUTPUT_DIR, 'first-item-face-baked.png')
 
 

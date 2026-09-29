@@ -286,7 +286,7 @@
       screen.classList.toggle('sample', currentTime < 5);
       showCopy(); draw(currentTime); showTime();
     };
-    fetch('./timeline.json').then(response => response.json()).then(data => {
+    fetch('../../../../assets/story/food-waste/timeline.json').then(response => response.json()).then(data => {
       timeline = data;
       const params = new URLSearchParams(location.search);
       const at = Number(params.get('at'));

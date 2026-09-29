@@ -47,19 +47,19 @@ type LevelVisual = {
 };
 
 const LEVEL_VISUALS: Record<AchievementLevelCode, LevelVisual> = {
-  rocky_seedling: { colors: ['#24B2F2', '#249FE8', '#60C7F5'], image: require('../../assets/achievements/mountain-lv1.png'), imageScale: 1.04 },
-  polar_guardian: { colors: ['#3C9CF3', '#418EE3', '#6CC6F2'], image: require('../../assets/achievements/mountain-lv2.png'), imageScale: 1.02 },
-  cloud_saver: { colors: ['#2E96EF', '#3187E3', '#61BAF4'], image: require('../../assets/achievements/mountain-lv3.png'), imageScale: 1.02 },
-  snowline_steward: { colors: ['#20A6C4', '#2793B7', '#67C3D5'], image: require('../../assets/achievements/mountain-lv4.png'), imageScale: 1.04 },
-  climate_summit: { colors: ['#20156E', '#30209A', '#5642B8'], image: require('../../assets/achievements/mountain-lv5.png'), imageScale: 1.06 },
+  rocky_seedling: { colors: ['#24B2F2', '#249FE8', '#60C7F5'], image: require('../../../assets/achievements/mountain-lv1.png'), imageScale: 1.04 },
+  polar_guardian: { colors: ['#3C9CF3', '#418EE3', '#6CC6F2'], image: require('../../../assets/achievements/mountain-lv2.png'), imageScale: 1.02 },
+  cloud_saver: { colors: ['#2E96EF', '#3187E3', '#61BAF4'], image: require('../../../assets/achievements/mountain-lv3.png'), imageScale: 1.02 },
+  snowline_steward: { colors: ['#20A6C4', '#2793B7', '#67C3D5'], image: require('../../../assets/achievements/mountain-lv4.png'), imageScale: 1.04 },
+  climate_summit: { colors: ['#20156E', '#30209A', '#5642B8'], image: require('../../../assets/achievements/mountain-lv5.png'), imageScale: 1.06 },
 };
 
 const HERO_MAX_WIDTH = 560;
 const HEADING_HEIGHT_FALLBACK = 108;
 const SWIPE_DISTANCE = 42;
 const SWIPE_AXIS_RATIO = 1.2;
-const CLOUD_BACK = require('../../assets/achievements/cloud-back.png');
-const CLOUD_FRONT = require('../../assets/achievements/cloud-front.png');
+const CLOUD_BACK = require('../../../assets/achievements/cloud-back.png');
+const CLOUD_FRONT = require('../../../assets/achievements/cloud-front.png');
 
 // Arthur: NarIyirm
 // 中文：山峰、路线和数据文案分层渲染；本地预览只切换服务端目录中的视觉定义，不改变权威等级或重新计算规则。

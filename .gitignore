@@ -61,12 +61,10 @@ server/.env.production
 /branding/
 
 # Arthur: NarIyirm
-# 中文：厨房主页依赖此 GLB；仅跟踪这一项，确保新电脑和 CI 能正常打包，同时继续忽略其他本地模型。
-# EN: The kitchen home requires this GLB; track only this asset so fresh machines and CI can bundle while other local models stay ignored.
+# 中文：运行时 GLB 已统一放入 assets/models；此处只保留需要版本化的模型源文件。
+# EN: Runtime GLBs live in assets/models; keep only versioned model sources here.
 !/models/
 /models/*
-!/models/Kitchen-Home-rebuilt-lighting.glb
-!/models/Spoonie-Character-v2.glb
 !/models/Spoonie-Character-v2.blend
 
 # Arthur: NarIyirm
@@ -76,13 +74,8 @@ server/.env.production
 !/models/achievements/**
 
 # Arthur: NarIyirm
-# 中文：docs 中保留可审阅的文本资料，忽略不适合版本控制的二进制办公文档。
-# EN: Keep reviewable text documentation in docs while excluding binary office artifacts.
-/docs/**/*.ppt
-/docs/**/*.pptx
-/docs/**/*.doc
-/docs/**/*.docx
-/docs/**/*.pdf
+# 中文：说明与交接文档由 Git 跟踪；.easignore 单独控制它们不进入 App 构建上传。
+# EN: Track documentation in Git; .easignore separately keeps it out of app build uploads.
 .env*
 
 # Arthur: NarIyirm
