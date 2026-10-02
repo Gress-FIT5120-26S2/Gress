@@ -8,6 +8,7 @@ import { useI18n } from '../i18n';
 import { getApiErrorCode } from '../services/apiClient';
 import type { AchievementDashboard, FridgeQuestAssignment } from '../services/achievementApi';
 import { rerollQuest } from '../services/achievementApi';
+import { getWasteLearningStats } from '../services/wasteLearningApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
 import { AchievementCelebration } from './achievement/AchievementCelebration';
@@ -39,7 +40,17 @@ export function AchievementsScreen({ onAddFirstItem, onOpenInventoryItem }: Achi
   const [reportReturnRoute, setReportReturnRoute] = useState<'impact' | null>(null);
   const [initialQuestUid, setInitialQuestUid] = useState<string | null>(null);
   const [celebrationXp, setCelebrationXp] = useState<number | null>(null);
+  const [sortingStats, setSortingStats] = useState<{ answered: number; correct: number } | null>(null);
   const latestXpEventRef = useRef<string | null | undefined>(undefined);
+
+  // Arthur: NarIyirm
+  // 中文：分类学习独立于食物挽回金额与 XP；每次进入成果页重读当前冰箱的学习次数。
+  // EN: Sorting lessons are separate from rescued food value and XP; read the current fridge's counts when this screen opens.
+  useEffect(() => {
+    let active = true;
+    void getWasteLearningStats().then((stats) => { if (active) setSortingStats(stats); }).catch(() => undefined);
+    return () => { active = false; };
+  }, []);
 
   // Arthur: NarIyirm
   // 中文：报告可从概览或环保里程碑打开；系统返回键回到实际来源页面。
@@ -264,6 +275,15 @@ export function AchievementsScreen({ onAddFirstItem, onOpenInventoryItem }: Achi
               </Pressable>
             </View>
 
+            <View style={styles.sortingCard}>
+              <View style={styles.sortingIcon}><Ionicons color="#2A8A61" name="leaf-outline" size={22} /></View>
+              <View style={styles.rowCopy}>
+                <Text style={styles.cardTitle}>{language === 'zh' ? '分类学习' : 'Sorting lessons'}</Text>
+                <Text style={styles.sortingHint}>{language === 'zh' ? '记录学过的分类，不代表实际投放' : 'Learning choices, not confirmed disposal'}</Text>
+              </View>
+              <Text style={styles.sortingCount}>{sortingStats ? `${sortingStats.correct}/${sortingStats.answered}` : '—'}</Text>
+            </View>
+
             <View style={styles.medalCard}>
               <View style={styles.cardHeader}>
                 <View style={styles.cardHeadingGroup}><View style={styles.medalHeaderIcon}><Ionicons color="#BA741B" name="trophy" size={20} /></View><Text style={styles.cardTitle}>{copy.badges.title}</Text></View>
@@ -339,6 +359,10 @@ const styles = StyleSheet.create({
   actionHint: { marginTop: 3, color: '#62776E', fontSize: 11.5, fontWeight: '600' },
   challengeCount: { marginTop: 10, color: '#426658', fontSize: 11, fontWeight: '800', textAlign: 'right' },
   impactSummary: { marginTop: 14, paddingHorizontal: 16, paddingTop: 11, paddingBottom: 6, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#FFFFFF', borderWidth: 1, borderColor: '#DDECE6' },
+  sortingCard: { marginTop: 14, padding: 15, borderRadius: 16, backgroundColor: '#EDF7F1', borderWidth: 1, borderColor: '#CEE8D8', flexDirection: 'row', alignItems: 'center', gap: 12 },
+  sortingIcon: { width: 38, height: 38, borderRadius: 13, backgroundColor: '#D6EEDF', alignItems: 'center', justifyContent: 'center' },
+  sortingHint: { color: '#6C8376', fontSize: 11, marginTop: 3 },
+  sortingCount: { color: '#1F6B49', fontSize: 20, fontWeight: '900' },
   impactSummaryHeader: { minHeight: 36, flexDirection: 'row', alignItems: 'center', gap: 8 },
   impactSummaryBody: { minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 8, paddingVertical: 6 },
   reportShortcut: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 2, paddingLeft: 6 },

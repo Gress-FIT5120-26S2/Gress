@@ -5,6 +5,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, ActivityIndicator, Animated, Easing, InteractionManager, StyleSheet, Text, View } from 'react-native';
 import { initialWindowMetrics, SafeAreaProvider } from 'react-native-safe-area-context';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { getApiHealth } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
@@ -622,7 +623,7 @@ export default function App() {
   // 中文：首帧注入原生窗口安全区，避免首次打开全屏 Modal 时顶部 inset 暂时为 0。
   // EN: Seed the provider with native window metrics so a full-screen Modal never receives a zero top inset on its first frame.
   return (
-    <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
+    <GestureHandlerRootView style={styles.root}><SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
       <RealtimeSyncProvider>
         <AchievementDataProvider>
           <I18nProvider>
@@ -632,7 +633,7 @@ export default function App() {
           </I18nProvider>
         </AchievementDataProvider>
       </RealtimeSyncProvider>
-    </SafeAreaProvider>
+    </SafeAreaProvider></GestureHandlerRootView>
   );
 }
 

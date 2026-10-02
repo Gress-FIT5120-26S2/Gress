@@ -29,6 +29,7 @@ import {
   type InventoryOutcomeReason,
 } from '../../services/inventoryApi';
 import { notifyLocalSync } from '../../services/realtimeSync';
+import type { WasteOpportunity } from '../../services/wasteLearningApi';
 import {
   InventoryEntryFlow,
   type InventoryEntryInitialValues,
@@ -43,6 +44,7 @@ type InventoryItemDetailSheetProps = {
   initialBatch?: InventoryBatchDetail | null;
   blurTarget?: RefObject<View | null>;
   onChanged: () => void | Promise<void>;
+  onWasteOpportunity: (opportunity: WasteOpportunity) => void;
   onClose: () => void;
   onSaveEdit: (batch: InventoryBatchDetail, submission: InventoryEntrySubmission) => Promise<InventoryBatchDetail>;
   visible: boolean;
@@ -91,6 +93,7 @@ export function InventoryItemDetailSheet({
   batchUid,
   initialBatch,
   onChanged,
+  onWasteOpportunity,
   onClose,
   onSaveEdit,
   visible,
@@ -305,6 +308,7 @@ export function InventoryItemDetailSheet({
     setQuantityError(null);
     afterCloseRef.current = afterClose ?? null;
 
+    let wasteOpportunity: WasteOpportunity | null = null;
     try {
       // Arthur: NarIyirm
       // 中文：关闭动画立即跟随手指离场，同时并行保存数量；两者都完成后才卸载弹窗，避免网络延迟让拖拽在松手处停住。
@@ -315,6 +319,7 @@ export function InventoryItemDetailSheet({
         // 中文：拖动期间只更新本地草稿；关闭前一次性提交并携带版本号，避免每一帧都请求后端或覆盖共享成员的新修改。
         // EN: Dragging changes only a local draft; closing commits once with a version so frames never trigger requests or overwrite a shared member's newer edit.
         const result = await updateInventoryBatchQuantity(batch.id, draftQuantity, batch.version, batch.unit);
+        if (draftQuantity < batch.remainingQuantity) wasteOpportunity = result.wasteOpportunity;
         setBatch((current) => current ? {
           ...current,
           lifecycleState: result.batch.lifecycleState,
@@ -328,13 +333,14 @@ export function InventoryItemDetailSheet({
       }
       await closingAnimation;
       finishClose();
+      if (wasteOpportunity) onWasteOpportunity(wasteOpportunity);
     } catch {
       afterCloseRef.current = null;
       setQuantityError(copy.quantitySaveError);
       setIsClosing(false);
       animateToDetent(previewOffset);
     }
-  }, [animateClosed, animateToDetent, batch, copy.quantitySaveError, draftQuantity, finishClose, isClosing, onChanged, previewOffset]);
+  }, [animateClosed, animateToDetent, batch, copy.quantitySaveError, draftQuantity, finishClose, isClosing, onChanged, onWasteOpportunity, previewOffset]);
 
   const panResponder = useMemo(() => PanResponder.create({
       // Arthur: NarIyirm
@@ -474,7 +480,7 @@ export function InventoryItemDetailSheet({
         setIsRemoving(false);
         return;
       }
-      await resolveInventoryBatch(
+      const result = await resolveInventoryBatch(
         batch.id,
         batch.version,
         nearExpiry ? 'consume' : 'discard',
@@ -485,12 +491,13 @@ export function InventoryItemDetailSheet({
       setShowRemoveConfirm(false);
       await animateClosed();
       finishClose();
+      if (result.wasteOpportunity) onWasteOpportunity(result.wasteOpportunity);
     } catch {
       setRemoveError(copy.removeError);
     } finally {
       setIsRemoving(false);
     }
-  }, [animateClosed, batch, copy.removeError, discardReason, finishClose, isRemoving, onChanged]);
+  }, [animateClosed, batch, copy.removeError, discardReason, finishClose, isRemoving, onChanged, onWasteOpportunity]);
 
   const openEditor = useCallback(() => {
     if (!batch) return;

@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-09-13（Australia/Sydney）。
+- 最后核对日期：2026-10-03（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 35 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20260913010000_achievement_badge_progress.sql`，第三阶段成就验证通过。`20260913160000_fridge_daily_weekly_quests.sql` 新增每日/每周挑战定义与分配；须先在开发库 `db push` 并跑 `verify:quests` 后再考虑生产。生产库仍须按顺序补齐未应用的成就相关 migration 后才能发布依赖新契约的 Express 与 App。
+- 本地 schema 历史共有 46 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20261003020000_one_sorting_attempt_per_event.sql`，分类学习接口的端到端验证通过。生产库仍须按顺序补齐未应用的 migration 后才能发布依赖新契约的 Express 与 App。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -845,6 +845,14 @@ GET /api/achievements
 两份 migration 已在 `Gress-development` 应用，远程 schema lint 无错误或警告；使用独立空冰箱验证本周 3 次更换得到互不重复的任务，第 4 次返回 `quest_reroll_exhausted`。生产库尚未应用。
 
 `20260924010000_achievement_stage_report.sql` 新增只授权 service role 的 `get_fridge_stage_report`。`GET /api/achievements/report` 先验证设备及当前冰箱成员，再按冰箱本地日期返回最近 30 天的阶段报告：已用完与已丢弃的去重批次数、带价格的丢弃价值与覆盖率、按七天分桶的使用/丢弃流水次数、丢弃原因与分类排行，以及未来七天有日期的有效食材（最多返回 50 条，另给总数）。报告不改变原有累计成就指标；App 仅在打开报告详情时请求，日期文案按返回的 `timeZone` 格式化。新迁移已在 `Gress-development` 应用，schema lint 无错误，空冰箱 RPC 验证通过且临时数据已回滚；生产库尚未应用。
+
+### 待部署：使用后的分类学习
+
+`20261002010000_waste_sorting_learning.sql` 新增 `waste_sorting_attempts`。每条记录以组合外键关联同冰箱的真实 `inventory_events.event_uid`，共享冰箱合并时随事件迁移；`actor_device_id` 标记答题设备。后续 `20261003020000_one_sorting_attempt_per_event.sql` 将唯一约束收紧为 `event_uid`，即使商品名称或题库版本变化，同一使用事件也只能记录一次。`selected_stream`、`correct_stream` 与生成列 `is_correct` 仅代表学习结果。表只授权服务端 service role，App 不直接读写。
+
+成功的数量减少或明确 `consume` 结果仍先由原有库存 RPC 原子写入批次与 `consume` 流水；Express 随后从本次使用流水寻找分类题，把 `wasteOpportunity` 附加到原 mutation 响应。题库直接判定名称明确的鸡蛋壳、铝罐和塑料瓶；未知材质的 `bottle` 或清零的饮品 `ml`/`L` 先返回 `unknown_bottle`，App 让用户确认瓶身是否为硬塑料，未确认时服务端不会判分。`item` 鸡蛋每次使用产生学习机会；`bottle` 在使用完一瓶时出题；`ml`/`L` 只在整个批次清零时进入包装题。当前客户端一次 mutation 只弹一次题，若同次消耗多个 `item`，题目展示该数量而不连续弹多个窗口。
+
+`POST /api/waste-learning/attempts` 在验证设备和冰箱后，再确认事件由当前设备执行、确为 `consume`，并按服务端题库判分；`unknown_bottle` 必须附 `confirmedMaterial = plastic_bottle`，确认只来自当前答题，不写回产品包装档案。`GET /api/waste-learning/stats` 返回冰箱共享的 `answered` 与 `correct` 次数，在成果页单独展示；不写入 `rescuedValue`、XP，也不宣称物品已经实际投放。VIC/NSW 的解释保留地方 council 差异，尤其不把厨余类别等同于当地必有绿色桶。`20261003010000_skip_sync_for_deleted_fridges.sql` 修复删除临时验证冰箱时级联成员触发器仍试图给已删除冰箱写同步版本的问题；对有效冰箱的版本与 Broadcast 行为不变。三份迁移已在 `Gress-development` 应用；`verify:waste-learning` 实测库存使用、包装清零、材质确认、答题幂等、统计和清理通过，后续远程 schema lint 无错误。生产库未应用，依赖新表的 Express/API 也未部署到生产。
 
 ## 15. Migration 工作流
 
