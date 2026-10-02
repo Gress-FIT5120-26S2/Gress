@@ -66,6 +66,12 @@ async function run() {
     const confirmed = await request('/api/waste-learning/attempts', 'POST', { eventUid: unknownQuestion.eventUid, selectedStream: 'recycling', confirmedMaterial: 'plastic_bottle' });
     assert(confirmed.status === 200 && confirmed.body.isCorrect === true, 'Confirmed plastic bottle was not graded');
 
+    const colaUid = await createBatch('可口可乐', 'item', 1);
+    const colaQuestion = await useTo(colaUid, 0, 'item');
+    assert(colaQuestion?.material === 'unknown_container', 'Counted cola did not ask for packaging material');
+    const colaAnswer = await request('/api/waste-learning/attempts', 'POST', { eventUid: colaQuestion.eventUid, selectedStream: 'recycling', confirmedMaterial: 'aluminium_can' });
+    assert(colaAnswer.status === 200 && colaAnswer.body.isCorrect === true, 'Confirmed aluminium can was not graded');
+
     const bottleUid = await createBatch('plastic bottle juice', 'ml', 500);
     assert(await useTo(bottleUid, 100, 'ml') === null, 'A partly filled bottle offered a packaging lesson');
     const bottleQuestion = await useTo(bottleUid, 0, 'ml');
@@ -73,7 +79,7 @@ async function run() {
     const right = await request('/api/waste-learning/attempts', 'POST', { eventUid: bottleQuestion.eventUid, selectedStream: 'recycling' });
     assert(right.status === 200 && right.body.isCorrect === true, 'Correct answer was not recorded correctly');
     const stats = await request('/api/waste-learning/stats');
-    assert(stats.status === 200 && stats.body.answered === 3 && stats.body.correct === 2, 'Achievement learning counts are wrong');
+    assert(stats.status === 200 && stats.body.answered === 4 && stats.body.correct === 3, 'Achievement learning counts are wrong');
     console.log(JSON.stringify({ verified: true, answered: stats.body.answered, correct: stats.body.correct }));
   } finally {
     if (!fridgeUid) {

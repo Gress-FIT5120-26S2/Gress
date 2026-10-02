@@ -850,9 +850,9 @@ GET /api/achievements
 
 `20261002010000_waste_sorting_learning.sql` 新增 `waste_sorting_attempts`。每条记录以组合外键关联同冰箱的真实 `inventory_events.event_uid`，共享冰箱合并时随事件迁移；`actor_device_id` 标记答题设备。后续 `20261003020000_one_sorting_attempt_per_event.sql` 将唯一约束收紧为 `event_uid`，即使商品名称或题库版本变化，同一使用事件也只能记录一次。`selected_stream`、`correct_stream` 与生成列 `is_correct` 仅代表学习结果。表只授权服务端 service role，App 不直接读写。
 
-成功的数量减少或明确 `consume` 结果仍先由原有库存 RPC 原子写入批次与 `consume` 流水；Express 随后从本次使用流水寻找分类题，把 `wasteOpportunity` 附加到原 mutation 响应。题库直接判定名称明确的鸡蛋壳、铝罐和塑料瓶；未知材质的 `bottle` 或清零的饮品 `ml`/`L` 先返回 `unknown_bottle`，App 让用户确认瓶身是否为硬塑料，未确认时服务端不会判分。`item` 鸡蛋每次使用产生学习机会；`bottle` 在使用完一瓶时出题；`ml`/`L` 只在整个批次清零时进入包装题。当前客户端一次 mutation 只弹一次题，若同次消耗多个 `item`，题目展示该数量而不连续弹多个窗口。
+成功的数量减少或明确 `consume` 结果仍先由原有库存 RPC 原子写入批次与 `consume` 流水；Express 随后从本次使用流水寻找分类题，把 `wasteOpportunity` 附加到原 mutation 响应。题库直接判定名称明确的鸡蛋壳、铝罐和塑料瓶；未知材质的 `bottle` 或清零的饮品 `ml`/`L` 返回 `unknown_bottle`，以 `item` 计数的可识别饮品（包括可乐）每次使用返回 `unknown_container`。App 让用户确认包装是硬塑料瓶还是铝罐；其他或不确定时跳过，未确认时服务端不会判分。`item` 鸡蛋每次使用产生学习机会；`bottle` 在使用完一瓶时出题；`ml`/`L` 只在整个批次清零时进入包装题。当前客户端一次 mutation 只弹一次题，若同次消耗多个 `item`，题目展示该数量而不连续弹多个窗口。
 
-`POST /api/waste-learning/attempts` 在验证设备和冰箱后，再确认事件由当前设备执行、确为 `consume`，并按服务端题库判分；`unknown_bottle` 必须附 `confirmedMaterial = plastic_bottle`，确认只来自当前答题，不写回产品包装档案。`GET /api/waste-learning/stats` 返回冰箱共享的 `answered` 与 `correct` 次数，在成果页单独展示；不写入 `rescuedValue`、XP，也不宣称物品已经实际投放。VIC/NSW 的解释保留地方 council 差异，尤其不把厨余类别等同于当地必有绿色桶。`20261003010000_skip_sync_for_deleted_fridges.sql` 修复删除临时验证冰箱时级联成员触发器仍试图给已删除冰箱写同步版本的问题；对有效冰箱的版本与 Broadcast 行为不变。三份迁移已在 `Gress-development` 应用；`verify:waste-learning` 实测库存使用、包装清零、材质确认、答题幂等、统计和清理通过，后续远程 schema lint 无错误。生产库未应用，依赖新表的 Express/API 也未部署到生产。
+`POST /api/waste-learning/attempts` 在验证设备和冰箱后，再确认事件由当前设备执行、确为 `consume`，并按服务端题库判分；`unknown_bottle` / `unknown_container` 必须附 `confirmedMaterial = plastic_bottle` 或 `aluminium_can`，确认只来自当前答题，不写回产品包装档案。`GET /api/waste-learning/stats` 返回冰箱共享的 `answered` 与 `correct` 次数，在成果页单独展示；不写入 `rescuedValue`、XP，也不宣称物品已经实际投放。VIC/NSW 的解释保留地方 council 差异，尤其不把厨余类别等同于当地必有绿色桶。`20261003010000_skip_sync_for_deleted_fridges.sql` 修复删除临时验证冰箱时级联成员触发器仍试图给已删除冰箱写同步版本的问题；对有效冰箱的版本与 Broadcast 行为不变。三份迁移已在 `Gress-development` 应用；`verify:waste-learning` 实测库存使用、包装清零、材质确认、答题幂等、统计和清理通过，后续远程 schema lint 无错误。生产库未应用，依赖新表的 Express/API 也未部署到生产。
 
 ## 15. Migration 工作流
 

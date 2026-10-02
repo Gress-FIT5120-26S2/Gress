@@ -18,11 +18,19 @@ export function classifyWasteQuestion(batch, event, confirmedMaterial = null) {
   if (/\bplastic\s+bottle(s)?\b|塑料瓶/.test(name) && (unit === 'bottle' || (['ml', 'L'].includes(unit) && Number(batch.remaining_quantity) === 0))) {
     return { questionCode: 'plastic_bottle_v1', correctStream: 'recycling', material: 'plastic_bottle', quantity: unit === 'bottle' ? Math.abs(Number(event.quantity_change)) : 1, sourceUrls: { vic: VICTORIA_GUIDE, nsw: NSW_PACKAGING_GUIDE } };
   }
-  const emptyBottle = unit === 'bottle' || (['ml', 'L'].includes(unit) && Number(batch.remaining_quantity) === 0 && /juice|milk|water|drink|beverage|果汁|牛奶|饮料|汽水|矿泉水/.test(name));
-  if (emptyBottle) {
-    return confirmedMaterial === 'plastic_bottle'
-      ? { questionCode: 'plastic_bottle_v1', correctStream: 'recycling', material: 'plastic_bottle', quantity: unit === 'bottle' ? Math.abs(Number(event.quantity_change)) : 1, sourceUrls: { vic: VICTORIA_GUIDE, nsw: NSW_PACKAGING_GUIDE } }
-      : { questionCode: 'confirm_bottle_material_v1', correctStream: null, material: 'unknown_bottle', quantity: unit === 'bottle' ? Math.abs(Number(event.quantity_change)) : 1, sourceUrls: { vic: VICTORIA_GUIDE, nsw: NSW_PACKAGING_GUIDE } };
+  const isDrink = /\b(?:juice|milk|water|drink|beverage|cola|coke|soda|soft[\s-]?drink|pepsi|sprite|fanta)\b|果汁|牛奶|饮料|汽水|矿泉水|可乐|雪碧|芬达/u.test(name);
+  const emptyContainer = unit === 'bottle'
+    || (['ml', 'L'].includes(unit) && Number(batch.remaining_quantity) === 0 && isDrink)
+    || (unit === 'item' && isDrink);
+  if (emptyContainer) {
+    const quantity = unit === 'item' || unit === 'bottle' ? Math.abs(Number(event.quantity_change)) : 1;
+    if (confirmedMaterial === 'plastic_bottle' || confirmedMaterial === 'aluminium_can') {
+      return { questionCode: `${confirmedMaterial}_v1`, correctStream: 'recycling', material: confirmedMaterial, quantity, sourceUrls: { vic: VICTORIA_GUIDE, nsw: NSW_PACKAGING_GUIDE } };
+    }
+    // Arthur: NarIyirm
+    // 中文：“个”只表示计数，不能推断可乐的包装；先让用户确认塑料瓶或铝罐，其他材质暂不判分。
+    // EN: An item count does not identify a drink's packaging; ask whether it was a plastic bottle or aluminium can before grading.
+    return { questionCode: unit === 'item' ? 'confirm_container_material_v1' : 'confirm_bottle_material_v1', correctStream: null, material: unit === 'item' ? 'unknown_container' : 'unknown_bottle', quantity, sourceUrls: { vic: VICTORIA_GUIDE, nsw: NSW_PACKAGING_GUIDE } };
   }
   return null;
 }

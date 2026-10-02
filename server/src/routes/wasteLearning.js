@@ -15,7 +15,7 @@ router.post('/waste-learning/attempts', requireFridge, async (request, response)
   const selectedStream = request.body?.selectedStream;
   const confirmedMaterial = request.body?.confirmedMaterial ?? null;
   if (typeof eventUid !== 'string' || !UUID_PATTERN.test(eventUid) || !STREAMS.has(selectedStream)
-    || (confirmedMaterial !== null && confirmedMaterial !== 'plastic_bottle')) {
+    || (confirmedMaterial !== null && confirmedMaterial !== 'plastic_bottle' && confirmedMaterial !== 'aluminium_can')) {
     return response.status(400).json({ error: 'invalid_waste_learning_attempt' });
   }
   try {
