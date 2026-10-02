@@ -11,6 +11,7 @@ import sharingRouter, { recoverDeviceRoute } from './routes/sharing.js';
 import syncRouter from './routes/sync.js';
 import assistantRouter from './routes/assistant.js';
 import achievementsRouter from './routes/achievements.js';
+import wasteLearningRouter from './routes/wasteLearning.js';
 import { createCorsPolicy } from './middleware/corsPolicy.js';
 import { databaseRateLimit, getClientIp, rateLimitPolicies } from './middleware/rateLimit.js';
 import { requireDevice } from './middleware/requireDevice.js';
@@ -74,6 +75,7 @@ app.use('/api', sharingRouter);
 app.use('/api', syncRouter);
 app.use('/api', assistantRouter);
 app.use('/api', achievementsRouter);
+app.use('/api', wasteLearningRouter);
 
 // 中文：必须绑 0.0.0.0，Expo Go 才能用局域网 IP 访问；只绑 localhost 时电脑 curl 通、手机保存会失败。
 // EN: Bind 0.0.0.0 so Expo Go can reach the API over LAN; localhost-only binds work in curl but fail when saving from a phone.

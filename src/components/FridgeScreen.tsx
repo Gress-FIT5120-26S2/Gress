@@ -1,7 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { ActivityIndicator, FlatList, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View, type ListRenderItemInfo } from 'react-native';
 import {
   createInventoryBatch,
   generateFoodPreset,
@@ -25,6 +25,8 @@ import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
 import { FridgeAssistantButton } from './fridge/FridgeAssistantButton';
 import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
+import { WasteSortingOverlay } from './fridge/WasteSortingOverlay';
+import type { WasteOpportunity } from '../services/wasteLearningApi';
 import {
   InventoryEntryFlow,
   type InventoryEntrySource,
@@ -193,6 +195,17 @@ export function FridgeScreen({
   const [recognitionInitialValues, setRecognitionInitialValues] = useState<InventoryEntryInitialValues | undefined>();
   const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
+  const [wasteOpportunity, setWasteOpportunity] = useState<WasteOpportunity | null>(null);
+  const wasteOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Arthur: NarIyirm
+  // 中文：等库存详情的原生 Modal 卸载后再展示分类层，避免 iOS 同时切换两个 Modal 时丢失新弹窗。
+  // EN: Open the sorting layer after the native detail modal unmounts so iOS does not drop a modal during simultaneous transitions.
+  const showWasteOpportunity = useCallback((next: WasteOpportunity) => {
+    if (wasteOpenTimer.current) clearTimeout(wasteOpenTimer.current);
+    wasteOpenTimer.current = setTimeout(() => setWasteOpportunity(next), Platform.OS === 'ios' ? 180 : 0);
+  }, []);
+  useEffect(() => () => { if (wasteOpenTimer.current) clearTimeout(wasteOpenTimer.current); }, []);
   const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
   const [isLoadingInventory, setIsLoadingInventory] = useState(true);
   const [isRefreshingInventory, setIsRefreshingInventory] = useState(false);
@@ -896,6 +909,7 @@ export function FridgeScreen({
         blurTarget={blurTarget}
         initialBatch={selectedBatch}
         onChanged={loadInventory}
+        onWasteOpportunity={showWasteOpportunity}
         onClose={() => setSelectedBatchUid(null)}
         onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
@@ -932,6 +946,7 @@ export function FridgeScreen({
         onContextChanged={handleSharingContextChanged}
         visible={sharingFlow !== null}
       />
+      <WasteSortingOverlay opportunity={wasteOpportunity} onClose={() => setWasteOpportunity(null)} />
     </View>
   );
 }

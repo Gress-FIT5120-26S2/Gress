@@ -11,6 +11,7 @@ import {
 } from '../services/foodPresetAi.js';
 import { deliverSharedNotification } from '../services/pushNotifications.js';
 import { consumeRateLimit, rateLimitPolicies } from '../middleware/rateLimit.js';
+import { getLatestWasteOpportunity } from '../services/wasteLearning.js';
 
 const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
@@ -441,6 +442,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
     if (error) throw error;
     const updated = Array.isArray(data) ? data[0] : data;
     await notifySharedInventory(deviceId, batchUid, 'updated');
+    const wasteOpportunity = await getLatestWasteOpportunity(request.fridgeUid, batchUid, deviceId);
     return response.json({
       batch: {
         id: updated.batch_uid,
@@ -448,6 +450,7 @@ inventoryRouter.patch('/inventory/batches/:batchUid/quantity', async (request, r
         remainingQuantity: Number(updated.remaining_quantity),
         version: updated.version,
       },
+      wasteOpportunity,
     });
   } catch (error) {
     return sendInventoryMutationError(response, error);
@@ -539,6 +542,9 @@ inventoryRouter.post('/inventory/batches/:batchUid/resolve', async (request, res
     if (error) throw error;
     const updated = Array.isArray(data) ? data[0] : data;
     await notifySharedInventory(deviceId, batchUid, 'removed');
+    const wasteOpportunity = outcome === 'consume'
+      ? await getLatestWasteOpportunity(request.fridgeUid, batchUid, deviceId)
+      : null;
     return response.json({
       batch: {
         id: updated.batch_uid,
@@ -546,6 +552,7 @@ inventoryRouter.post('/inventory/batches/:batchUid/resolve', async (request, res
         remainingQuantity: Number(updated.remaining_quantity),
         version: updated.version,
       },
+      wasteOpportunity,
     });
   } catch (error) {
     return sendInventoryMutationError(response, error);

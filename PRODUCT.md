@@ -8,6 +8,17 @@ product
 
 KitchMemo primarily serves people aged 18–35 who manage food in a young household. They may live alone or with a partner and are generally not sharing the home with older family members. They want practical help with ingredient freshness, shopping decisions, and fridge organisation without the experience feeling like household administration.
 
+## Problem Statement (4W)
+
+| 4W | Problem definition |
+| --- | --- |
+| **Who** | People aged 18–35 who manage food for themselves or with a partner in a young household. |
+| **What** | They can lose track of the food they already have, how much remains, and which items need attention, making it harder to decide what to use or buy. |
+| **Where** | Across the home kitchen and fridge, and when making shopping decisions away from home. |
+| **Why** | Food that is forgotten and unnecessary repeat purchases can waste food and household money, while keeping inventory up to date manually adds effort. |
+
+**Problem statement:** Young adults managing food alone or with a partner can struggle to keep track of household inventory and freshness at home and while shopping. This makes it harder to use what they already have, can lead to avoidable food waste and repeat purchases, and adds friction to everyday kitchen management.
+
 ## Product Purpose
 
 KitchMemo connects fridge inventory with shopping awareness before and during a store visit. The home screen should quietly answer both “Which ingredients are close to expiring?” and “How stocked is home?” while keeping the interactive 3D kitchen as the product’s main experience. Intelligent recipe discovery is paused and should not be presented as a primary destination.

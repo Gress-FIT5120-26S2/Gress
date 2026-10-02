@@ -1,4 +1,5 @@
 import { requestApi } from './apiClient';
+import type { WasteOpportunity } from './wasteLearningApi';
 
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
 export type InventoryDeadlineType = 'use_by' | 'best_before';
@@ -194,8 +195,8 @@ export function updateInventoryBatchQuantity(
   remainingQuantity: number,
   expectedVersion: number,
   unit: string,
-): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }> {
-  return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/quantity`, {
+): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'>; wasteOpportunity: WasteOpportunity | null }> {
+  return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'>; wasteOpportunity: WasteOpportunity | null }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/quantity`, {
     body: JSON.stringify({ expectedVersion, remainingQuantity, unit }),
     method: 'PATCH',
   });
@@ -236,8 +237,8 @@ export function resolveInventoryBatch(
   expectedVersion: number,
   outcome: InventoryOutcome,
   reasonCode: InventoryOutcomeReason,
-): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }> {
-  return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'> }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/resolve`, {
+): Promise<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'>; wasteOpportunity: WasteOpportunity | null }> {
+  return requestApi<{ batch: Pick<InventoryBatchDetail, 'id' | 'lifecycleState' | 'remainingQuantity' | 'version'>; wasteOpportunity: WasteOpportunity | null }>(`/api/inventory/batches/${encodeURIComponent(batchUid)}/resolve`, {
     body: JSON.stringify({ expectedVersion, outcome, reasonCode }),
     method: 'POST',
   });
