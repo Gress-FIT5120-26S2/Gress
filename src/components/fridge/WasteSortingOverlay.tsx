@@ -1,10 +1,7 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Linking, Modal, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
-import Animated, { useAnimatedStyle, useSharedValue, withSpring, type SharedValue } from 'react-native-reanimated';
-import { scheduleOnRN } from 'react-native-worklets';
+import { AccessibilityInfo, Animated, Linking, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
 import { submitWasteAnswer, type WasteOpportunity, type WasteStream } from '../../services/wasteLearningApi';
@@ -51,18 +48,22 @@ const COPY = {
 };
 
 function BinChoice({ stream, index, hovered, label, onPress, disabled }: {
-  stream: WasteStream; index: number; hovered: SharedValue<number>; label: string; onPress: () => void; disabled: boolean;
+  stream: WasteStream; index: number; hovered: number; label: string; onPress: () => void; disabled: boolean;
 }) {
   const tone = stream === 'recycling' ? '#B7DCEB' : stream === 'organics' ? '#BCE2B5' : '#D5D4D0';
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ scale: hovered.value === index ? 1.07 : 1 }],
-    borderColor: hovered.value === index ? '#F2D786' : 'rgba(255,255,255,0.18)',
-  }));
-  const lidStyle = useAnimatedStyle(() => ({
-    transform: [{ translateX: hovered.value === index ? -6 : 0 }, { translateY: hovered.value === index ? -5 : 0 }, { rotate: hovered.value === index ? '-17deg' : '0deg' }],
-  }));
+  const lid = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    Animated.spring(lid, { toValue: hovered === index ? 1 : 0, useNativeDriver: true, speed: 19, bounciness: 3 }).start();
+  }, [hovered, index, lid]);
+  const lidStyle = {
+    transform: [
+      { translateX: lid.interpolate({ inputRange: [0, 1], outputRange: [0, -6] }) },
+      { translateY: lid.interpolate({ inputRange: [0, 1], outputRange: [0, -5] }) },
+      { rotate: lid.interpolate({ inputRange: [0, 1], outputRange: ['0deg', '-17deg'] }) },
+    ],
+  };
   return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={styles.binTouch}>
-    <Animated.View style={[styles.bin, animatedStyle]}>
+    <Animated.View style={[styles.bin, hovered === index ? styles.binHovered : null]}>
       <View style={styles.binArtwork}>
         <Animated.View style={[styles.binLid, { backgroundColor: tone }, lidStyle]} />
         <View style={[styles.binBody, { borderColor: tone }]}><MaterialCommunityIcons color={tone} name={stream === 'recycling' ? 'recycle' : stream === 'organics' ? 'leaf' : 'dots-horizontal'} size={19} /></View>
@@ -81,9 +82,8 @@ export function WasteSortingOverlay({ opportunity, onClose }: Props) {
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const playWidth = Math.min(width * 0.91 - 40, 380);
-  const offsetX = useSharedValue(0);
-  const offsetY = useSharedValue(0);
-  const hovered = useSharedValue(-1);
+  const position = useRef(new Animated.ValueXY()).current;
+  const [hovered, setHovered] = useState(-1);
   const [selected, setSelected] = useState<WasteStream | null>(null);
   const [isCorrect, setIsCorrect] = useState(false);
   const [correctStream, setCorrectStream] = useState<WasteStream | null>(null);
@@ -107,10 +107,15 @@ export function WasteSortingOverlay({ opportunity, onClose }: Props) {
     setConfirmedPlastic(false);
     setError(false);
     savingRef.current = false;
-    offsetX.value = 0;
-    offsetY.value = 0;
-    hovered.value = -1;
-  }, [hovered, offsetX, offsetY, opportunity?.eventUid]);
+    position.setValue({ x: 0, y: 0 });
+    setHovered(-1);
+  }, [opportunity?.eventUid, position]);
+
+  const returnItem = useCallback(() => {
+    if (reduceMotion) position.setValue({ x: 0, y: 0 });
+    else Animated.spring(position, { toValue: { x: 0, y: 0 }, useNativeDriver: true, speed: 18, bounciness: 5 }).start();
+    setHovered(-1);
+  }, [position, reduceMotion]);
 
   const choose = useCallback(async (index: number) => {
     if (!opportunity || savingRef.current || selected || index < 0 || index > 2
@@ -130,40 +135,40 @@ export function WasteSortingOverlay({ opportunity, onClose }: Props) {
     } finally {
       savingRef.current = false;
       setSaving(false);
-      offsetX.value = reduceMotion ? 0 : withSpring(0);
-      offsetY.value = reduceMotion ? 0 : withSpring(0);
-      hovered.value = -1;
+      returnItem();
     }
-  }, [confirmedPlastic, hovered, offsetX, offsetY, opportunity, reduceMotion, selected]);
+  }, [confirmedPlastic, opportunity, returnItem, selected]);
 
   // Arthur: NarIyirm
-  // 中文：拖动计算只在 UI 线程运行，放手后才将选中的类别送回 JS 发起一次答题请求。
-  // EN: Drag geometry stays on the UI thread; only the final selected category crosses to JS for one answer request.
-  const pan = useMemo(() => Gesture.Pan()
-    .minDistance(4)
-    .onUpdate((event) => {
-      offsetX.value = event.translationX;
-      offsetY.value = event.translationY;
-      const x = playWidth / 2 + event.translationX;
-      hovered.value = event.translationY > 58 && x >= 0 && x < playWidth
-        ? Math.floor(x / (playWidth / 3)) : -1;
-    })
-    .onEnd(() => {
-      const index = hovered.value;
-      if (index >= 0) scheduleOnRN(choose, index);
-      else {
-        offsetX.value = reduceMotion ? 0 : withSpring(0);
-        offsetY.value = reduceMotion ? 0 : withSpring(0);
-      }
-      hovered.value = -1;
-    }), [choose, hovered, offsetX, offsetY, playWidth, reduceMotion]);
-  const itemStyle = useAnimatedStyle(() => ({ transform: [{ translateX: offsetX.value }, { translateY: offsetY.value }] }));
+  // 中文：用应用现有的手势实现拖拽；松手时按物品中心定位垃圾桶，避免启动时加载新的原生动画模块。
+  // EN: Reuse the app's gesture path and resolve the bin from the item's center on release, avoiding new native animation modules at startup.
+  const binAt = useCallback((dx: number, dy: number) => {
+    const x = playWidth / 2 + dx;
+    return dy > 58 && x >= 0 && x < playWidth ? Math.floor(x / (playWidth / 3)) : -1;
+  }, [playWidth]);
+  const pan = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: (_event, gesture) => Math.abs(gesture.dx) > 3 || Math.abs(gesture.dy) > 3,
+    onPanResponderGrant: () => position.stopAnimation(),
+    onPanResponderMove: (_event, gesture) => {
+      position.setValue({ x: gesture.dx, y: gesture.dy });
+      setHovered(binAt(gesture.dx, gesture.dy));
+    },
+    onPanResponderRelease: (_event, gesture) => {
+      const index = binAt(gesture.dx, gesture.dy);
+      if (index >= 0) void choose(index);
+      else returnItem();
+    },
+    onPanResponderTerminate: returnItem,
+    onPanResponderTerminationRequest: () => false,
+  }), [binAt, choose, position, returnItem]);
+  const itemStyle = { transform: position.getTranslateTransform() };
 
   if (!opportunity) return null;
   const activeMaterial = opportunity.material === 'unknown_bottle' && confirmedPlastic ? 'plastic_bottle' : opportunity.material;
   const answerStream = correctStream ?? opportunity.correctStream ?? 'recycling';
   return <Modal animationType={reduceMotion ? 'none' : 'fade'} onRequestClose={onClose} statusBarTranslucent transparent visible>
-    <GestureHandlerRootView style={styles.root}>
+    <View style={styles.root}>
       <Pressable accessibilityLabel={copy.skip} onPress={onClose} style={styles.scrim} />
       <View style={[styles.card, { marginTop: Math.max(insets.top, 22), marginBottom: Math.max(insets.bottom, 22) }]}>
         <View style={styles.topline}><Text style={styles.eyebrow}>{copy.eyebrow}</Text><Pressable accessibilityLabel={copy.skip} accessibilityRole="button" hitSlop={12} onPress={onClose}><Ionicons color="#C8D9D1" name="close" size={22} /></Pressable></View>
@@ -185,7 +190,7 @@ export function WasteSortingOverlay({ opportunity, onClose }: Props) {
           <Text style={styles.title}>{copy.question}</Text>
           <Text style={styles.body}>{copy.instruction}</Text>
           <View style={[styles.playfield, { width: playWidth }]}>
-            <GestureDetector gesture={pan}><Animated.View accessibilityLabel={`${copy.materials[activeMaterial]}${opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}`} style={[styles.item, itemStyle]}><MaterialCommunityIcons color="#183D32" name={ICONS[activeMaterial]} size={39} /><Text style={styles.itemText}>{copy.materials[activeMaterial]}{opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}</Text></Animated.View></GestureDetector>
+            <Animated.View {...pan.panHandlers} accessibilityLabel={`${copy.materials[activeMaterial]}${opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}`} style={[styles.item, itemStyle]}><MaterialCommunityIcons color="#183D32" name={ICONS[activeMaterial]} size={39} /><Text style={styles.itemText}>{copy.materials[activeMaterial]}{opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}</Text></Animated.View>
             <View style={styles.bins}>{STREAMS.map((stream, index) => <BinChoice disabled={saving} hovered={hovered} index={index} key={stream} label={copy.streams[stream]} onPress={() => void choose(index)} stream={stream} />)}</View>
           </View>
           {saving ? <Text style={styles.status}>{copy.saving}</Text> : error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{copy.error}</Text> : null}
@@ -193,7 +198,7 @@ export function WasteSortingOverlay({ opportunity, onClose }: Props) {
           <Pressable accessibilityRole="button" onPress={onClose} style={styles.skip}><Text style={styles.skipText}>{copy.skip}</Text></Pressable>
         </>}
       </View>
-    </GestureHandlerRootView>
+    </View>
   </Modal>;
 }
 
@@ -211,6 +216,7 @@ const styles = StyleSheet.create({
   bins: { flexDirection: 'row', gap: 6 },
   binTouch: { flex: 1 },
   bin: { height: 90, borderRadius: 14, borderWidth: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 3, backgroundColor: '#24473D' },
+  binHovered: { transform: [{ scale: 1.07 }], borderColor: '#F2D786' },
   binArtwork: { width: 44, height: 48, alignItems: 'center', justifyContent: 'flex-end' },
   binLid: { position: 'absolute', top: 2, width: 42, height: 6, borderRadius: 3 },
   binBody: { width: 36, height: 37, borderWidth: 2, borderTopWidth: 0, borderBottomLeftRadius: 7, borderBottomRightRadius: 7, alignItems: 'center', justifyContent: 'center' },
