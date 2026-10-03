@@ -19,6 +19,8 @@ import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inve
 import { useI18n } from '../../i18n';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
+import { WasteProfileSection } from './WasteProfileSection';
+import type { WasteComponent } from '../../services/wasteLearningApi';
 import { getMaxInventoryQuantity, MAX_INVENTORY_NAME_LENGTH, needsLargeQuantityConfirmation } from '../../utils/inventoryValidation';
 
 export type InventoryEntrySource = 'manual' | 'recognition' | 'barcode';
@@ -28,6 +30,7 @@ export type InventoryCategoryCode = 'meat' | 'vegetables' | 'fruit' | 'staples' 
 export type InventoryUnit = 'item' | 'g' | 'kg' | 'ml' | 'L' | 'bag' | 'bottle' | 'box';
 
 export type InventoryEntryInitialValues = Partial<{
+  wasteProfile: WasteComponent[] | null;
   categoryCode: InventoryCategoryCode;
   deadlineType: InventoryDeadlineType;
   expiryEnabled: boolean;
@@ -46,6 +49,7 @@ export type InventoryEntryInitialValues = Partial<{
 
 export type InventoryEntrySubmission = {
   batch: {
+    wasteProfile: WasteComponent[];
     categoryCode: InventoryCategoryCode;
     currency: 'AUD';
     deadlineType: InventoryDeadlineType;
@@ -120,7 +124,7 @@ export function InventoryEntryFlow({
   source = 'manual',
   visible,
 }: InventoryEntryFlowProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const copy = t.fridge.manualEntry;
   const [reduceMotion, setReduceMotion] = useState(false);
   const [name, setName] = useState('');
@@ -150,6 +154,9 @@ export function InventoryEntryFlow({
   const [restockError, setRestockError] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [wasteProfile, setWasteProfile] = useState<WasteComponent[] | null>(null);
+  const [wasteReady, setWasteReady] = useState(false);
+  const updateWasteProfile = useCallback((profile: WasteComponent[] | null, ready: boolean) => { setWasteProfile(profile); setWasteReady(ready); }, []);
   const [pendingSubmission, setPendingSubmission] = useState<InventoryEntrySubmission | null>(null);
   const [confirmationReasons, setConfirmationReasons] = useState<string[]>([]);
   const latestNameRef = useRef('');
@@ -164,6 +171,8 @@ export function InventoryEntryFlow({
     // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和识别录入因此可以复用同一套表单。
     // EN: Each opening initialises its draft from initialValues so create, edit, and recognition flows can share one form.
     setName(initialValues?.name ?? '');
+    setWasteProfile(null);
+    setWasteReady(false);
     latestNameRef.current = initialValues?.name ?? '';
     setQuantity(initialValues?.quantity ?? '');
     setUnit(initialValues?.unit ?? 'item');
@@ -367,12 +376,17 @@ export function InventoryEntryFlow({
     setRestockError(nextRestockError);
     setSaveError(null);
     if (nextExpiryError || nextRestockError || !validateBasics()) return;
+    if (!wasteReady || wasteProfile === null) {
+      setSaveError(language === 'zh' ? '请等待包装判断完成，或确认包装与丢弃物。' : 'Wait for the packaging check or confirm the packaging and residue.');
+      return;
+    }
 
     const numericQuantity = Number(quantity);
     const numericPrice = Number(price);
     const submission: InventoryEntrySubmission = {
       source,
       batch: {
+        wasteProfile,
         categoryCode,
         currency: 'AUD',
         deadlineType,
@@ -414,7 +428,7 @@ export function InventoryEntryFlow({
     }
 
     await submitInventory(submission);
-  }, [categoryCode, copy.confirmation, copy.validation, deadlineType, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays]);
+  }, [categoryCode, copy.confirmation, copy.validation, deadlineType, expiryDate, expiryEnabled, expiryTime, minimumQuantity, name, price, quantity, restockEnabled, source, storageZone, submitInventory, suggestion, targetQuantity, unit, unitLabel, validateBasics, warningDays, wasteReady, wasteProfile, language]);
 
   const confirmSubmission = useCallback(() => {
     if (!pendingSubmission) return;
@@ -491,6 +505,8 @@ export function InventoryEntryFlow({
                   <ChoiceChip key={option} label={copy.units[option]} onPress={() => setUnit(option)} selected={unit === option} tone="orange" />
                 ))}
               </ScrollView>
+
+              <WasteProfileSection enabled={visible && Number(quantity) > 0} initialName={initialValues?.name} initialUnit={initialValues?.unit} initialProfile={initialValues?.wasteProfile} name={name} unit={unit} onChange={updateWasteProfile} />
 
               <View style={styles.sectionDivider} />
               <FieldHeading icon="snow-outline" label={copy.storageLabel} tone="#168ACB" tint="#E8F6FD" />

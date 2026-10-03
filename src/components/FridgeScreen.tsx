@@ -196,6 +196,15 @@ export function FridgeScreen({
   const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
   const [wasteOpportunity, setWasteOpportunity] = useState<WasteOpportunity | null>(null);
+  // Arthur: NarIyirm
+  // 中文：同次使用产生多个部件时逐个展示；关闭当前题只推进队列，不重复库存 mutation。
+  // EN: Advance component lessons from the same consume event without repeating the inventory mutation.
+  const closeWasteOpportunity = useCallback(() => {
+    setWasteOpportunity((current) => {
+      const remaining = current?.nextOpportunities ?? [];
+      return remaining.length ? { ...remaining[0], nextOpportunities: remaining.slice(1) } : null;
+    });
+  }, []);
   const wasteOpenTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Arthur: NarIyirm
@@ -611,6 +620,7 @@ export function FridgeScreen({
       initialQuantity: submission.batch.initialQuantity,
       name: submission.batch.name,
       presetUid: submission.batch.matchedPresetUid,
+      wasteProfile: submission.batch.wasteProfile,
       purchasePrice: submission.batch.purchasePrice,
       priceSource: submission.batch.priceSource === 'manual' ? 'user' : submission.batch.priceSource,
       restockRule: submission.restockRule
@@ -631,6 +641,7 @@ export function FridgeScreen({
   // EN: Detail edits still save the batch and restock rule in order, but list reconciliation no longer extends the form's saving state.
   const saveEditedInventoryEntry = useCallback(async (editingBatch: InventoryBatchDetail, submission: InventoryEntrySubmission) => {
     const updated = await updateInventoryBatch(editingBatch.id, {
+      wasteProfile: submission.batch.wasteProfile,
       categoryCode: submission.batch.categoryCode,
       deadlineType: submission.batch.deadlineType,
       expectedVersion: editingBatch.version,
@@ -946,7 +957,7 @@ export function FridgeScreen({
         onContextChanged={handleSharingContextChanged}
         visible={sharingFlow !== null}
       />
-      <WasteSortingOverlay opportunity={wasteOpportunity} onClose={() => setWasteOpportunity(null)} />
+      <WasteSortingOverlay blurTarget={blurTarget} opportunity={wasteOpportunity} onClose={closeWasteOpportunity} />
     </View>
   );
 }

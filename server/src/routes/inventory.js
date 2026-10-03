@@ -12,6 +12,7 @@ import {
 import { deliverSharedNotification } from '../services/pushNotifications.js';
 import { consumeRateLimit, rateLimitPolicies } from '../middleware/rateLimit.js';
 import { getLatestWasteOpportunity } from '../services/wasteLearning.js';
+import { validateWasteProfile } from '../services/wasteProfiles.js';
 
 const inventoryRouter = Router();
 const CATEGORY_CODES = new Set(['meat', 'vegetables', 'fruit', 'staples', 'condiments', 'drinks', 'other']);
@@ -153,7 +154,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
   const [fridgeResult, categoriesResult, batchesResult, rulesResult] = await Promise.all([
     supabase.from('fridges').select('fridge_uid, name, mode').eq('fridge_uid', fridgeUid).single(),
     supabase.from('food_categories').select('category_uid, name, system_code, colour, icon, icon_path, is_default').eq('fridge_uid', fridgeUid).order('created_at'),
-    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
+    supabase.from('inventory_batches').select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version, waste_profile').eq('fridge_uid', fridgeUid).eq('lifecycle_state', 'active').order('expires_at', { ascending: true, nullsFirst: false }),
     supabase.from('restock_rules').select('normalized_item_name, unit, minimum_quantity, target_quantity, is_enabled').eq('fridge_uid', fridgeUid).eq('is_enabled', true),
   ]);
 
@@ -206,6 +207,7 @@ async function getInventorySnapshot(deviceId, authenticatedFridgeUid = null) {
         expiresAt: batch.expires_at,
         expiryWarningDays: batch.expiry_warning_days,
         id: batch.batch_uid,
+        wasteProfile: batch.waste_profile,
         iconEmoji: preset?.icon_emoji ?? null,
         iconUrl: getPresetIconUrl(preset?.icon_path),
         initialQuantity: Number(batch.initial_quantity),
@@ -243,7 +245,7 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
   const fridgeUid = authenticatedFridgeUid ?? await resolveFridge(deviceId);
   const batchResult = await supabase
     .from('inventory_batches')
-    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version')
+    .select('batch_uid, category_uid, preset_uid, name, storage_zone, initial_quantity, remaining_quantity, unit, purchase_price, price_status, price_source, currency, stocked_at, expires_at, use_by_at, best_before_at, estimated_quality_until, expiry_warning_days, opened_at, lifecycle_state, version, waste_profile')
     .eq('fridge_uid', fridgeUid)
     .eq('batch_uid', batchUid)
     .eq('lifecycle_state', 'active')
@@ -290,6 +292,7 @@ async function getInventoryBatchDetail(deviceId, batchUid, authenticatedFridgeUi
     expiresAt: batch.expires_at,
     expiryWarningDays: batch.expiry_warning_days,
     id: batch.batch_uid,
+        wasteProfile: batch.waste_profile,
     iconEmoji: presetResult.data?.icon_emoji ?? null,
     iconUrl: getPresetIconUrl(presetResult.data?.icon_path),
     initialQuantity: Number(batch.initial_quantity),
@@ -491,7 +494,12 @@ inventoryRouter.patch('/inventory/batches/:batchUid', async (request, response) 
   }
 
   try {
-    const { error } = await supabase.rpc('update_inventory_batch_details_v2', {
+    if (body.wasteProfile !== undefined) {
+      try { validateWasteProfile(body.wasteProfile); }
+      catch (error) { return sendInvalidRequest(response, error.message); }
+    }
+    const { error } = await supabase.rpc(body.wasteProfile === undefined ? 'update_inventory_batch_details_v2' : 'update_inventory_batch_details_v3', {
+      ...(body.wasteProfile === undefined ? {} : { p_waste_profile: validateWasteProfile(body.wasteProfile) }),
       p_batch_uid: batchUid,
       p_category_code: body.categoryCode,
       p_device_id: deviceId,
@@ -757,7 +765,12 @@ inventoryRouter.post('/inventory/batches', async (request, response) => {
   }
 
   try {
-    const { data, error } = await supabase.rpc('create_inventory_batch_v2', {
+    if (body.wasteProfile !== undefined) {
+      try { validateWasteProfile(body.wasteProfile); }
+      catch (error) { return sendInvalidRequest(response, error.message); }
+    }
+    const { data, error } = await supabase.rpc('create_inventory_batch_v3', {
+      p_waste_profile: body.wasteProfile === undefined ? null : validateWasteProfile(body.wasteProfile),
       p_category_code: body.categoryCode,
       p_device_id: deviceId,
       p_deadline_at: body.expiresAt ?? null,
