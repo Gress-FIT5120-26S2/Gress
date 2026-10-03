@@ -519,6 +519,7 @@ export function InventoryItemDetailSheet({
       expiryTime: expiry ? formatEntryTime(expiry) : undefined,
       expiryWarningDays: batch.expiryWarningDays ?? 3,
       name: batch.name,
+      wasteProfile: batch.wasteProfile,
       price: batch.purchasePrice === null ? '' : String(batch.purchasePrice),
       quantity: formatQuantity(draftQuantity),
       restockEnabled,

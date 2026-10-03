@@ -4,9 +4,9 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-10-03（Australia/Sydney）。
+- 最后核对日期：2026-10-04（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 46 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20261003020000_one_sorting_attempt_per_event.sql`，分类学习接口的端到端验证通过。生产库仍须按顺序补齐未应用的 migration 后才能发布依赖新契约的 Express 与 App。
+- 本地 schema 历史共有 47 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20261004010000_inventory_waste_profiles.sql`，包装快照与多部件分类学习接口的端到端验证通过。生产库仍须按顺序补齐未应用的 migration 后才能发布依赖新契约的 Express 与 App。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
@@ -853,6 +853,18 @@ GET /api/achievements
 成功的数量减少或明确 `consume` 结果仍先由原有库存 RPC 原子写入批次与 `consume` 流水；Express 随后从本次使用流水寻找分类题，把 `wasteOpportunity` 附加到原 mutation 响应。题库直接判定名称明确的鸡蛋壳、铝罐和塑料瓶；未知材质的 `bottle` 或清零的饮品 `ml`/`L` 返回 `unknown_bottle`，以 `item` 计数的可识别饮品（包括可乐）每次使用返回 `unknown_container`。App 让用户确认包装是硬塑料瓶还是铝罐；其他或不确定时跳过，未确认时服务端不会判分。`item` 鸡蛋每次使用产生学习机会；`bottle` 在使用完一瓶时出题；`ml`/`L` 只在整个批次清零时进入包装题。当前客户端一次 mutation 只弹一次题，若同次消耗多个 `item`，题目展示该数量而不连续弹多个窗口。
 
 `POST /api/waste-learning/attempts` 在验证设备和冰箱后，再确认事件由当前设备执行、确为 `consume`，并按服务端题库判分；`unknown_bottle` / `unknown_container` 必须附 `confirmedMaterial = plastic_bottle` 或 `aluminium_can`，确认只来自当前答题，不写回产品包装档案。`GET /api/waste-learning/stats` 返回冰箱共享的 `answered` 与 `correct` 次数，在成果页单独展示；不写入 `rescuedValue`、XP，也不宣称物品已经实际投放。VIC/NSW 的解释保留地方 council 差异，尤其不把厨余类别等同于当地必有绿色桶。`20261003010000_skip_sync_for_deleted_fridges.sql` 修复删除临时验证冰箱时级联成员触发器仍试图给已删除冰箱写同步版本的问题；对有效冰箱的版本与 Broadcast 行为不变。三份迁移已在 `Gress-development` 应用；`verify:waste-learning` 实测库存使用、包装清零、材质确认、答题幂等、统计和清理通过，后续远程 schema lint 无错误。生产库未应用，依赖新表的 Express/API 也未部署到生产。
+
+### 包装档案与共享材质图标（2026-10-04）
+
+`20261004010000_inventory_waste_profiles.sql` 已在开发库应用并通过远程 lint。`inventory_batches.waste_profile` 保存最多四个 `{ material, trigger }` 部件，`trigger` 为 `per_unit` 或 `when_empty`。显式 `[]` 表示没有丢弃物；`null` 兼容历史批次和旧客户端。`create_inventory_batch_v3` 与 `update_inventory_batch_details_v3` 在原有版本校验和库存事务内保存包装。数量减少时，`inventory_events` 的 BEFORE INSERT 触发器保存 `waste_profile_snapshot`、`waste_remaining_snapshot`、`waste_initial_snapshot`、`waste_unit_snapshot`，后续编辑不会重写旧题。编辑同时减少数量时，该流水使用编辑前包装档案；新档案用于后续使用。
+
+`POST /api/waste-learning/profile` 复用服务端 Gemini 建议模型，只识别材质和触发时机。名称与单位的规范化键缓存到 `product_waste_suggestions`；不保存设备身份或用户确认结果。名称无法确定包装时返回 `needsConfirmation=true`，表单必须由用户确认，AI 故障仍可人工选择。手动、条码、拍照和购物入库复用同一表单；一键购物入库遇到不确定包装时打开确认表单。
+
+`POST /api/waste-learning/materials/prepare` 只在录入阶段预备图标，复用原有 Cloudflare 图标生成与透明化服务。`waste_material_assets` 以材质编码作为全局主键，`claim_waste_material_icon` 使用两分钟租约避免并发重复生成。固定 Storage 路径 `food-preset-icons/waste-materials/<material>/v1.png` 在不同产品和设备间复用；缺图或生成失败允许备用图标。消耗接口只读取资产，不调用模型。两张新全局参考表启用 RLS，仅 service role 可读写；两个 AI 端点验证设备/冰箱并各限每设备每十五分钟三十次。
+
+有包装档案的所有产品均按使用快照触发，不依赖名称正则。计数单位的部分使用累计完成整单位才出题，g/kg/ml/L 只在清零时出题；共享外包装可设置为整批清零。多部件返回 `nextOpportunities`，客户端依次展示。答题请求携带 `componentKey`，唯一约束从单事件改为 `(event_uid, component_key)`；成果学习次数按部件答案计数，仍不计实际投放、金钱或 XP。软塑料、硬塑料托盘、复合纸盒、玻璃和未知材料只显示投放指引，不设通用正确桶；玻璃可能需要独立收集。无档案的旧批次保留原明确材料判断，其他产品清零后提供待确认指引，用户可在编辑页补充包装。
+
+开发库验证覆盖旧客户端兼容、部分单位边界、容量清零、显式无丢弃物、事件快照、多部件幂等与临时数据清理。真实模型验证了含糊可乐需确认、明确塑料瓶可自动选择，以及塑料瓶图标连续调用复用。TypeScript、八项题库测试和 Android Hermes 导出通过；尚未用手机完成本轮视觉及交互验收，生产迁移与部署未执行。
 
 ## 15. Migration 工作流
 

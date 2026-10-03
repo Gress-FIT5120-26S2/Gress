@@ -1,5 +1,5 @@
 import { requestApi } from './apiClient';
-import type { WasteOpportunity } from './wasteLearningApi';
+import type { WasteOpportunity, WasteComponent } from './wasteLearningApi';
 
 export type InventoryStorageZone = 'chilled' | 'frozen' | 'pantry';
 export type InventoryDeadlineType = 'use_by' | 'best_before';
@@ -17,6 +17,7 @@ export type InventoryCategoryCode =
   | 'other';
 
 export type InventoryBatch = {
+  wasteProfile?: WasteComponent[] | null;
   bestBeforeAt: string | null;
   categoryCode: InventoryCategoryCode;
   categoryId?: string;
@@ -79,6 +80,7 @@ export type InventorySnapshot = {
 export type InventoryCategory = InventorySnapshot['categories'][number];
 
 export type CreateInventoryBatchInput = {
+  wasteProfile?: WasteComponent[];
   categoryCode: InventoryCategoryCode;
   deadlineType: InventoryDeadlineType;
   expiresAt: string | null;
@@ -98,6 +100,7 @@ export type CreateInventoryBatchInput = {
 };
 
 export type UpdateInventoryBatchInput = {
+  wasteProfile?: WasteComponent[];
   categoryCode: InventoryCategoryCode;
   deadlineType: InventoryDeadlineType;
   expectedVersion: number;

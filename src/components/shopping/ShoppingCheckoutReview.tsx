@@ -23,6 +23,7 @@ import {
   type FoodPresetSuggestion,
 } from '../../services/inventoryApi';
 import type { CartItem } from '../../services/cartApi';
+import { prepareWasteMaterials, suggestWasteProfile } from '../../services/wasteLearningApi';
 
 const DEFAULT_SHELF_LIFE_DAYS = 7;
 
@@ -96,6 +97,7 @@ export function ShoppingCheckoutReview({
         purchasePrice: submission.batch.purchasePrice,
         priceSource: submission.batch.priceSource === 'manual' ? 'user' : submission.batch.priceSource,
         presetUid: submission.batch.matchedPresetUid ?? item.preset_uid,
+        wasteProfile: submission.batch.wasteProfile,
         restockRule: submission.restockRule,
       });
       setStatus((prev) => ({ ...prev, [item.item_uid]: 'done' }));
@@ -113,6 +115,15 @@ export function ShoppingCheckoutReview({
       for (const item of remaining) {
         try {
           const suggestion = await suggestFor(item.name);
+          // Arthur: NarIyirm
+          // 中文：一键入库也先确认包装；AI 不确定时打开录入表单，由用户确认后再保存。
+          // EN: One-tap stocking resolves packaging first and opens the entry form when AI needs confirmation.
+          const waste = await suggestWasteProfile(item.name, item.unit ?? 'item');
+          if (waste.needsConfirmation) {
+            setEditing(item);
+            break;
+          }
+          await prepareWasteMaterials(waste.profile).catch(() => undefined);
           const shelfLifeDays = suggestion?.shelfLifeDays ?? DEFAULT_SHELF_LIFE_DAYS;
           const expiresAt = new Date(Date.now() + shelfLifeDays * 86_400_000);
           expiresAt.setHours(23, 59, 0, 0);
@@ -128,11 +139,13 @@ export function ShoppingCheckoutReview({
             purchasePrice: 0,
             priceSource: 'recognition',
             presetUid: suggestion?.presetUid ?? item.preset_uid,
+            wasteProfile: waste.profile,
             restockRule: null,
           });
           setStatus((prev) => ({ ...prev, [item.item_uid]: 'done' }));
         } catch {
-          // one item failing (e.g. name conflict) shouldn't stop the rest of the batch
+          setEditing(item);
+          break;
         }
       }
     } finally {

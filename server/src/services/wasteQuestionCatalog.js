@@ -1,6 +1,32 @@
 const VICTORIA_GUIDE = 'https://www.environment.vic.gov.au/household-waste-recycling/sort-waste-recycling';
 const NSW_PACKAGING_GUIDE = 'https://www.epa.nsw.gov.au/Your-environment/Recycling-and-reuse/business-government-recycling/standard-recycling-signs/containers';
 const NSW_ORGANICS_GUIDE = 'https://www.epa.nsw.gov.au/Your-environment/Recycling-and-reuse/household-recycling-overview/what-can-go-in-your-fogo-bin';
+import { WASTE_MATERIALS } from './wasteMaterialCatalog.js';
+
+// Arthur: NarIyirm
+// 中文：按使用事件的不可变包装快照出题；计数物品只在完成整单位时触发，重量与容量只在清零时触发。
+// EN: Build questions from immutable event packaging snapshots; counted items trigger on completed units, weights and volumes only when emptied.
+export function classifyProfileQuestions(event) {
+  if (event.event_type !== 'consume' || Number(event.quantity_change) >= 0 || !Array.isArray(event.waste_profile_snapshot)) return null;
+  const unit = event.waste_unit_snapshot;
+  const remaining = Number(event.waste_remaining_snapshot);
+  const initial = Number(event.waste_initial_snapshot);
+  const before = remaining - Number(event.quantity_change);
+  const completed = Math.floor(initial - remaining + 0.000001) - Math.floor(initial - before + 0.000001);
+  return event.waste_profile_snapshot.flatMap((part) => {
+    const material = WASTE_MATERIALS[part.material];
+    if (!material) return [];
+    const perUnit = part.trigger === 'per_unit' && ['item','bottle','bag','box'].includes(unit);
+    if (perUnit ? completed < 1 : remaining !== 0) return [];
+    return [{
+      componentKey: `${part.material}:${part.trigger}`, questionCode: `${part.material}_v2`, material: part.material,
+      correctStream: material.stream, quantity: perUnit ? completed : 1,
+      displayName: { zh: material.zh, en: material.en }, explanation: { zh: material.reasonZh, en: material.reasonEn },
+      iconEmoji: material.emoji,
+      sourceUrls: { vic: VICTORIA_GUIDE, nsw: material.stream === 'organics' ? NSW_ORGANICS_GUIDE : NSW_PACKAGING_GUIDE },
+    }];
+  });
+}
 
 // Arthur: NarIyirm
 // 中文：只对名称明确、且不依赖具体 council 服务的材料出题；未知包装不推断材质或本地桶色。

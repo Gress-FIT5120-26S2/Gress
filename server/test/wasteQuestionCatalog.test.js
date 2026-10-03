@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { classifyWasteQuestion } from '../src/services/wasteQuestionCatalog.js';
+import { classifyWasteQuestion, classifyProfileQuestions } from '../src/services/wasteQuestionCatalog.js';
 
 const consumed = (quantityChange) => ({ event_type: 'consume', quantity_change: quantityChange });
 
@@ -33,4 +33,34 @@ test('adjustments and discards never generate a sorting lesson', () => {
   assert.equal(classifyWasteQuestion(batch, { event_type: 'adjust', quantity_change: -1 }), null);
   assert.equal(classifyWasteQuestion(batch, { event_type: 'discard', quantity_change: -1 }), null);
   assert.equal(classifyWasteQuestion(batch, consumed(1)), null);
+});
+
+const snapshot = (remaining, change, unit = 'item', profile = [{ material: 'plastic_bottle', trigger: 'per_unit' }]) => ({
+  event_type: 'consume', quantity_change: change, waste_initial_snapshot: 2,
+  waste_remaining_snapshot: remaining, waste_unit_snapshot: unit, waste_profile_snapshot: profile,
+});
+
+test('partial count consumption waits for a completed unit across separate events', () => {
+  assert.deepEqual(classifyProfileQuestions(snapshot(1.5, -0.5)), []);
+  assert.equal(classifyProfileQuestions(snapshot(1, -0.5))[0].quantity, 1);
+  assert.equal(classifyProfileQuestions(snapshot(0, -2))[0].quantity, 2);
+});
+
+test('volume-based packaging is eligible only on its immutable emptying event', () => {
+  assert.deepEqual(classifyProfileQuestions(snapshot(100, -200, 'ml')), []);
+  assert.equal(classifyProfileQuestions(snapshot(0, -100, 'ml'))[0].quantity, 1);
+});
+
+test('inner residue and shared outer packaging have separate eligibility and keys', () => {
+  const profile = [{ material: 'eggshell', trigger: 'per_unit' }, { material: 'paper_cardboard', trigger: 'when_empty' }];
+  assert.equal(classifyProfileQuestions(snapshot(1, -1, 'item', profile)).length, 1);
+  assert.deepEqual(classifyProfileQuestions(snapshot(0, -1, 'item', profile)).map((q) => q.componentKey), ['eggshell:per_unit', 'paper_cardboard:when_empty']);
+});
+
+test('explicit no waste suppresses lessons while uncertain materials provide guidance only', () => {
+  assert.deepEqual(classifyProfileQuestions(snapshot(0, -1, 'item', [])), []);
+  for (const material of ['soft_plastic', 'rigid_plastic', 'carton', 'glass_container', 'unknown']) {
+    assert.equal(classifyProfileQuestions(snapshot(0, -1, 'item', [{ material, trigger: 'when_empty' }]))[0].correctStream, null);
+  }
+  assert.equal(classifyProfileQuestions({ ...snapshot(0, -1), event_type: 'discard' }), null);
 });
