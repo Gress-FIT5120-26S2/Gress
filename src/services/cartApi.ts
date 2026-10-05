@@ -2,6 +2,7 @@
 // Cart + restock endpoints. Reuses the shared requestApi client (Device-ID,
 // base URL, error handling) so every service module goes through one place.
 import { requestApi } from './apiClient';
+import { notifyLocalSync } from './realtimeSync';
 
 export type CartItem = {
   item_uid: string;
@@ -26,6 +27,17 @@ export type RestockSuggestion = {
   preset_uid: string | null;
 };
 
+// 中文：本机增/删/改名成功后立刻通知其他还挂着的页面（购物车和建议页是左右分页，同时存在），
+//       不用等服务端广播或下一次版本轮询（个人冰箱最长 30 秒）。改数量不通知，避免连点 ± 时被回读覆盖。
+// EN: After a local add/delete/rename succeeds, notify the other mounted pane right away (cart and
+//     suggested are side-by-side pages) instead of waiting for the broadcast or the next version poll
+//     (up to 30s for a personal fridge). Quantity edits don't notify so rapid +/- taps aren't overwritten by a re-read.
+const syncCart = <T,>(request: Promise<T>) =>
+  request.then((result) => {
+    notifyLocalSync(['cart']);
+    return result;
+  });
+
 // --- editable cart ---
 // Arthur: NarIyirm
 // 中文：购物车页面读取当前 fridgeUid 的共享清单；服务端按未购买优先和创建时间排序。
@@ -42,7 +54,7 @@ export const addCartItem = (body: {
   category_uid?: string;
   preset_uid?: string;
   source?: CartItem['source'];
-}) => requestApi<CartItem>('/api/cart', { method: 'POST', body: JSON.stringify(body) });
+}) => syncCart(requestApi<CartItem>('/api/cart', { method: 'POST', body: JSON.stringify(body) }));
 
 // Arthur: NarIyirm
 // 中文：数量编辑映射到 cart.js 的 quantity 路由；数量为零时应调用删除而不是这个函数。
@@ -58,7 +70,7 @@ export const updateCartQuantity = (id: string, quantity: number) =>
 export const updateCartItem = (
   id: string,
   patch: Partial<{ name: string; quantity: number; unit: string }>,
-) => requestApi<CartItem>(`/api/cart/${id}`, { method: 'PATCH', body: JSON.stringify(patch) });
+) => syncCart(requestApi<CartItem>(`/api/cart/${id}`, { method: 'PATCH', body: JSON.stringify(patch) }));
 
 // Arthur: NarIyirm
 // 中文：勾选状态属于整个冰箱并同步给所有成员；后端同时记录操作者和完成时间。
@@ -72,8 +84,11 @@ export const toggleCartItem = (id: string, is_checked: boolean) =>
 // Arthur: NarIyirm
 // 中文：删除共享购物项并返回 204；requestApi 会把无响应体正常转换为 void。
 // EN: This deletes a shared cart item and receives 204; requestApi converts the empty response to void.
-export const deleteCartItem = (id: string) =>
-  requestApi<void>(`/api/cart/${id}`, { method: 'DELETE' });
+// notify=false lets a bulk caller (clear cart) send one notification at the end instead of one per row.
+export const deleteCartItem = (id: string, notify = true) => {
+  const request = requestApi<void>(`/api/cart/${id}`, { method: 'DELETE' });
+  return notify ? syncCart(request) : request;
+};
 
 // --- derived restock suggestions ---
 // Arthur: NarIyirm

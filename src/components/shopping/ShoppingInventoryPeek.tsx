@@ -15,7 +15,9 @@ import {
   ActivityIndicator,
   StyleSheet,
 } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { useI18n } from '../../i18n';
+import { PresetFoodIcon } from '../fridge/PresetFoodIcon';
 import { getInventorySnapshot, type InventoryBatch } from '../../services/inventoryApi';
 
 const USE_FIRST_DAYS = 3; // matches the fridge "expiring" threshold
@@ -25,10 +27,22 @@ type ShoppingInventoryPeekProps = {
   onClose: () => void;
 };
 
-const STORAGE_ICON: Record<InventoryBatch['storageZone'], string> = {
-  chilled: '💧',
-  frozen: '❄️',
-  pantry: '📦',
+// 中文：跟冰箱卡片同一套：左侧食材图标（预设图/emoji），储存位置用 Ionicons 小徽章。
+// EN: Same as the fridge card: a food icon (preset image/emoji) on the left, storage shown as an Ionicons badge.
+const STORAGE_ICON: Record<InventoryBatch['storageZone'], keyof typeof Ionicons.glyphMap> = {
+  chilled: 'water-outline',
+  frozen: 'snow-outline',
+  pantry: 'cube-outline',
+};
+// Same fallback emojis as FridgeScreen's CATEGORY_EMOJI.
+const CATEGORY_EMOJI: Record<InventoryBatch['categoryCode'], string> = {
+  meat: '🥚',
+  vegetables: '🥬',
+  fruit: '🍎',
+  staples: '🍚',
+  condiments: '🫙',
+  drinks: '🥛',
+  other: '📦',
 };
 
 // days left until expiry (null if no expiry set); mirrors FridgeScreen.getDaysLeft
@@ -98,7 +112,13 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
               const useFirst = isUseFirst(item.expiresAt);
               return (
                 <View style={styles.row}>
-                  <Text style={styles.storageIcon}>{STORAGE_ICON[item.storageZone]}</Text>
+                  <View style={styles.emojiTile}>
+                    <PresetFoodIcon
+                      emoji={item.iconEmoji ?? CATEGORY_EMOJI[item.categoryCode] ?? '📦'}
+                      iconUrl={item.iconUrl ?? null}
+                      size="card"
+                    />
+                  </View>
                   <View style={styles.grow}>
                     <View style={styles.nameRow}>
                       <Text style={styles.name}>{item.name}</Text>
@@ -111,9 +131,14 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
                         <Text style={styles.lowTag}>· {copy.low}</Text>
                       ) : null}
                     </View>
-                    <Text style={styles.sub}>
-                      {item.remainingQuantity} {item.unit} · {t.fridge.filters[item.storageZone]} · {expiryLabel(item.expiresAt)}
-                    </Text>
+                    <View style={styles.metaRow}>
+                      <Text style={styles.sub}>{item.remainingQuantity} {item.unit}</Text>
+                      <View style={styles.storageBadge}>
+                        <Ionicons name={STORAGE_ICON[item.storageZone]} size={13} color="#287A8B" />
+                        <Text numberOfLines={1} style={styles.storageText}>{t.fridge.filters[item.storageZone]}</Text>
+                      </View>
+                      <Text style={styles.sub}>{expiryLabel(item.expiresAt)}</Text>
+                    </View>
                   </View>
                 </View>
               );
@@ -127,7 +152,7 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#F5F4EE' },
+  container: { flex: 1, backgroundColor: '#F7FBFA' },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -136,30 +161,35 @@ const styles = StyleSheet.create({
     paddingTop: 56,
     paddingBottom: 8,
   },
-  headerBtn: { color: '#2e7d32', fontSize: 15, fontWeight: '700', width: 44 },
-  headerTitle: { fontSize: 18, fontWeight: '800', color: '#173D31' },
-  subtitle: { paddingHorizontal: 16, paddingBottom: 12, color: '#718078', fontSize: 13 },
-  list: { paddingHorizontal: 16, paddingBottom: 24 },
+  headerBtn: { color: '#C95F14', fontSize: 15, fontWeight: '800', width: 44 },
+  headerTitle: { fontSize: 18, fontWeight: '900', color: '#173D31' },
+  subtitle: { paddingHorizontal: 18, paddingBottom: 12, color: '#5E756D', fontSize: 13 },
+  list: { gap: 10, paddingHorizontal: 18, paddingBottom: 24 },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
     paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(70,91,81,0.15)',
+    paddingHorizontal: 14,
+    borderRadius: 15,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
   },
-  storageIcon: { fontSize: 22 },
+  emojiTile: { width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderCurve: 'continuous', backgroundColor: '#EEF6F4' },
+  metaRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 7, marginTop: 4 },
+  storageBadge: { minHeight: 24, flexDirection: 'row', alignItems: 'center', gap: 3, paddingHorizontal: 6, paddingVertical: 4, borderRadius: 8, borderCurve: 'continuous', backgroundColor: '#E7F4F7' },
+  storageText: { maxWidth: 70, color: '#287A8B', fontSize: 10, fontWeight: '800' },
   grow: { flex: 1 },
   nameRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  name: { fontSize: 16, color: '#244A3E', fontWeight: '600' },
+  name: { fontSize: 15, color: '#183B30', fontWeight: '800' },
   useFirstTag: {
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
-    backgroundColor: '#FFF3E7',
+    backgroundColor: '#FFF1E3',
   },
   useFirstText: { color: '#BE701B', fontSize: 11, fontWeight: '800' },
   lowTag: { color: '#C96E1A', fontSize: 13, fontWeight: '700' },
-  sub: { fontSize: 13, color: '#718078', marginTop: 3 },
+  sub: { fontSize: 12, color: '#61766D', fontWeight: '600' },
   empty: { textAlign: 'center', color: '#718078', marginTop: 40 },
 });
