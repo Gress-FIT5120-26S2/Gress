@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { once } from 'node:events';
+import { spawn } from 'node:child_process';
+import { createServer } from 'node:net';
 import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
@@ -27,10 +29,36 @@ const dir = await mkdtemp(path.join(os.tmpdir(), 'kitchmemo-live-gateway-'));
 const source = await readFile(new URL('../../src/services/learningGateway.ts', import.meta.url), 'utf8');
 await writeFile(path.join(dir, 'gateway.mjs'), ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext } }).outputText);
 const { createLearningGateway } = await import(pathToFileURL(path.join(dir, 'gateway.mjs')).href);
-const app = express(); app.use(express.json()); app.use('/api', requireDevice);
-app.use('/api', createLearningRouter(createLearningRoomService(supabase, environment)));
-const server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
-const base = `http://127.0.0.1:${server.address().port}`;
+let server = null;
+let developmentProcess = null;
+let developmentExit = null;
+let base;
+if (process.argv.includes('--development-startup')) {
+  // Arthur: NarIyirm
+  // 中文：用实际开发启动器测试完整 Express 挂载与草稿配置；只连接本轮子进程的临时端口，避免碰到另一个环境。
+  // EN: Exercise the actual development launcher and full Express mount/config; connect only to this child process's temporary port, never another environment.
+  const probe = createServer(); probe.listen(0, '127.0.0.1'); await once(probe, 'listening');
+  const port = probe.address().port;
+  await new Promise(resolve => probe.close(resolve));
+  developmentProcess = spawn(process.execPath, ['scripts/start-learning-development.js'], {
+    cwd: new URL('../', import.meta.url), env: { ...process.env, PORT: String(port) }, stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true,
+  });
+  developmentExit = once(developmentProcess, 'exit');
+  try {
+    await new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('Development startup timed out')), 15000);
+      developmentProcess.stdout.on('data', data => { if (data.toString().includes('KitchMemo API listening')) { clearTimeout(timer); resolve(); } });
+      developmentProcess.once('error', error => { clearTimeout(timer); reject(error); });
+      developmentProcess.once('exit', code => { clearTimeout(timer); reject(new Error(`Development startup exited: ${code}`)); });
+    });
+  } catch (error) { developmentProcess.kill(); await developmentExit.catch(() => undefined); throw error; }
+  base = `http://127.0.0.1:${port}`;
+} else {
+  const app = express(); app.use(express.json()); app.use('/api', requireDevice);
+  app.use('/api', createLearningRouter(createLearningRoomService(supabase, environment)));
+  server = app.listen(0, '127.0.0.1'); await once(server, 'listening');
+  base = `http://127.0.0.1:${server.address().port}`;
+}
 let requests = 0; let lose = null; const lostBodies = [];
 const request = async (endpoint, init = {}) => {
   requests++;
@@ -127,9 +155,11 @@ try {
   quiz = await gateway.startQuiz('beginner', 'review'); await gateway.abandonQuiz(quiz.attemptUid);
   const restarted = await gateway.startQuiz('beginner', 'review'); assert.notEqual(restarted.attemptUid, quiz.attemptUid); await gateway.abandonQuiz(restarted.attemptUid);
   assert.deepEqual(await counts(fridge), baseline);
-  console.log(JSON.stringify({ result: 'PASS', requests, simulatedLostResponses: lostBodies.length, emptyInventory: true, completePath: true, isolation: true }));
+  console.log(JSON.stringify({ result: 'PASS', requests, simulatedLostResponses: lostBodies.length, emptyInventory: true, completePath: true, isolation: true, developmentStartup: Boolean(developmentProcess) }));
 } finally {
-  gateway.dispose(); await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  gateway.dispose();
+  if (server) await new Promise((resolve, reject) => server.close(error => error ? reject(error) : resolve()));
+  if (developmentProcess) { developmentProcess.kill(); await developmentExit.catch(() => undefined); }
   try { await cleanup(); console.log('Random learning gateway test data cleaned; no learner/attempt remains.'); }
   finally {
     assert.equal(path.dirname(path.resolve(dir)), path.resolve(os.tmpdir()));

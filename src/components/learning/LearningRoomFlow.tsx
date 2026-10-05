@@ -14,7 +14,7 @@ import { LearningResultScreen } from './LearningResultScreen';
 import { learningNavigationReducer } from './learningNavigation';
 import { LearningBody, LearningButton, LearningPage, ui } from './LearningUi';
 import { learningColors as c } from './learningTheme';
-import { LearningWidthContext } from './learningViewport';
+import { LearningBottomSafeAreaContext, LearningWidthContext } from './learningViewport';
 
 const loadStory = () => import('../LinearFoodWasteStory').then(m => ({ default: m.LinearFoodWasteStory }));
 
@@ -141,12 +141,14 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   useEffect(() => { const sub = AppState.addEventListener('change', value => { if (value === 'active') refresh.current(); }); return () => sub.remove(); }, []);
   const present = (node: ReactNode) => {
     const body = <View style={{ flex: 1 }} onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}>
-      <LearningWidthContext.Provider value={containerWidth}>{node}</LearningWidthContext.Provider>
+      <LearningBottomSafeAreaContext.Provider value={origin !== 'tab'}>
+        <LearningWidthContext.Provider value={containerWidth}>{node}</LearningWidthContext.Provider>
+      </LearningBottomSafeAreaContext.Provider>
     </View>;
     return embedded ? body : <Modal visible presentationStyle="fullScreen" animationType="none" onRequestClose={back}>{body}</Modal>;
   };
 
-  if (loading || !content || !session) return present(<LearningPage backLabel={origin === 'home' ? copy.home : copy.profile} onBack={close} brand testID="learning-load"
+  if (loading || !content || !session) return present(<LearningPage backLabel={origin === 'home' ? copy.home : copy.profile} onBack={origin === 'tab' ? undefined : close} brand testID="learning-load"
     footer={!loading ? <LearningButton label={copy.retry} onPress={() => { void load(); }} /> : undefined}>
     <Text accessibilityRole="header" style={ui.title}>{copy.title}</Text><Text style={ui.secondary}>{copy.tagline}</Text>
     <View style={[ui.panel, { minHeight: 190, justifyContent: 'center', gap: 16 }]}>

@@ -2,7 +2,6 @@ import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
 import type { KitchenTimePhase } from './KitchenTimeLighting';
 
@@ -12,7 +11,6 @@ type HomeAmbientOverlayProps = {
   expiringCount: number;
   onOpenExpiring: () => void;
   onOpenNotifications: () => void;
-  onOpenLearningRoom: () => void;
   phase: KitchenTimePhase;
   showInteractionHint: boolean;
   unreadCount: number;
@@ -32,13 +30,11 @@ export function HomeAmbientOverlay({
   expiringCount,
   onOpenExpiring,
   onOpenNotifications,
-  onOpenLearningRoom,
   phase,
   showInteractionHint,
   unreadCount,
 }: HomeAmbientOverlayProps) {
   const { t } = useI18n();
-  const insets = useSafeAreaInsets();
   const isNight = phase === 'night';
   const hasExpiring = expiringCount > 0;
   const headline = hasExpiring ? t.home.expiring(expiringCount) : t.home.useFirst;
@@ -114,17 +110,13 @@ export function HomeAmbientOverlay({
         ) : null}
       </Pressable>
 
-      <View pointerEvents="box-none" style={[styles.learningDock, { bottom: Math.max(118, insets.bottom + 94) }]}>{showInteractionHint ? (
+      {showInteractionHint ? (
         <View pointerEvents="none" style={styles.interactionHint}>
           <Text style={[styles.interactionHintText, isNight ? styles.nightSecondary : styles.daySecondary]}>
             {t.home.interactionHint}
           </Text>
         </View>
       ) : null}
-        <Pressable accessibilityRole="button" onPress={onOpenLearningRoom} style={({ pressed }) => [styles.learningEntry, pressed && styles.copyPressed]}>
-          <Ionicons name="book-outline" size={20} color="#2A8A61" /><Text style={styles.learningText}>{t.learning.title}</Text><Ionicons name="chevron-forward" size={16} color="#2A8A61" />
-        </Pressable>
-      </View>
     </View>
   );
 }
@@ -147,9 +139,6 @@ const styles = StyleSheet.create({
   mailGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
   mailBadge: { position: 'absolute', top: -5, right: -5, minWidth: 22, height: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: 11, borderWidth: 2, borderColor: '#F7FBFA', backgroundColor: '#F06B24' },
   mailBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', lineHeight: 13 },
-  interactionHint: { alignItems: 'center' },
-  learningDock: { position: 'absolute', left: 24, right: 24, alignItems: 'center', gap: 10 },
-  learningEntry: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 18, paddingVertical: 10, borderRadius: 22, backgroundColor: '#F7FBFA', borderWidth: 1, borderColor: '#DDEFE7' },
-  learningText: { fontSize: 14, fontWeight: '600', color: '#173D31' },
+  interactionHint: { position: 'absolute', left: 24, right: 24, bottom: '18%', alignItems: 'center' },
   interactionHintText: { fontSize: 13, fontWeight: '600', lineHeight: 18, letterSpacing: 0.15 },
 });

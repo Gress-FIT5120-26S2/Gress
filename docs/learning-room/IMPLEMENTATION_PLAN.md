@@ -1,6 +1,6 @@
 # Learning Room 实施计划与跨对话基准
 
-最后更新：2026-10-05（Australia/Sydney）。当前状态：**P0 已完成；P1 内容／技术验证完成、独立校对待完成；P2 五页组件／预览已实现、原生验收待完成；P3 数据／考试 API 在开发库验证完成；P4 真实 gateway／视频／practice／入口完成开发验证；下一步 P5 真机与独立审核。**
+最后更新：2026-10-06（Australia/Sydney）。当前状态：**P0–P4 已完成开发验证；按用户修订将入口移到独立「学堂 / Learn」Tab，并修复默认开发启动的草稿加载；下一步 P5 真机与独立审核。**
 
 ## 1. 本次授权与固定基准
 
@@ -10,6 +10,8 @@
 
 ### 1.1 必须保留的决定
 
+2026-10-06 用户修订优先：将学习入口移到导航栏，独立成页并改名。原 Home／Profile 入口、五 Tab 和全屏学习 Modal 决定已被替代；批准的五页内部布局、素材与配色继续沿用。详见 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)。
+
 - 项目对应 **UN SDG 13 — Climate Action**。学习室最直接的教育联系是 target **13.3**。
 - 主题始终围绕 waste，逐步解释 waste prevention、材料分类、回收和气候之间的关系。
 - 主流程为 **短课 → 教育动画／Bin Action 练习 → 阶段 Quiz → 解锁下一阶段**。
@@ -17,7 +19,7 @@
 - 主视觉严格沿用已批准的 **app palette v2**：薄荷白、深绿文字、绿色状态、橙色主操作、少量浅蓝。
 - Quiz 按初级、中级、高级推进，达到 80% 后永久解锁下一阶段。重返功能时继续个人当前阶段，旧课与旧阶段可复习。
 - 个人学习进度独立于共享冰箱成就。答题不会增加冰箱 XP、挽救金额、实际投放次数或估算个人减排量。
-- 不新增第六个底部导航按钮；学习室作为现有 App 内的二级完整功能。
+- 新增独立「学堂 / Learn」底部 Tab，位于 Fridge 与 Achievements 之间；课程／测验保留局部导航栈，主导航持续可用。
 - 首版同时支持现有英文／中文语言切换；英文用于对照已批准效果图。
 
 ### 1.2 文档优先关系
@@ -41,15 +43,15 @@
 
 | 当前文件／能力 | 已存在事实 | 本功能的接入方式 |
 | --- | --- | --- |
-| `App.tsx` | 使用本地主 Tab 状态；动画和助手等通过独立入口／Modal 打开 | 增加学习室入口和一个懒加载的全屏功能容器，保留底部五 Tab |
-| `src/components/FloatingTabBar.tsx` | Home、Shopping、Fridge、Achievements、Profile | 不把 Learning Room 塞入主 Tab 类型或替换其中任何一项 |
+| `App.tsx` | 使用本地主 Tab 状态；动画和助手等通过独立入口／Modal 打开 | 按需加载学堂 Tab 内容；底栏上方预留 dock 高度，切离即销毁本人 gateway |
+| `src/components/FloatingTabBar.tsx` | Home、Shopping、Fridge、Learn、Achievements、Profile | 新增 Learn 与双语标签；通知仍为二级页 |
 | `src/components/LinearFoodWasteStory.tsx` | 一分钟动画，独立 Modal；支持暂停、拖动、静态摘要 | 课程复用现有视频；新增的完成回调不影响首页原调用 |
 | `src/components/InteractiveFoodWasteStory.tsx` | 另一个已有互动故事实现 | 不误把它替换成当前首页实际引用的线性动画 |
 | `src/components/fridge/WasteSortingOverlay.tsx` | 桶图、材质图、拖拽／点击、反馈；提交函数绑定库存使用事件 | 抽取纯展示交互层，增加独立学习室练习适配层 |
 | `src/services/wasteLearningApi.ts` | 材质建议、图标准备、事件答题、共享统计 | 保持现有接口语义；学习室另用 `learningApi.ts` |
 | `server/src/routes/wasteLearning.js` | 事件必须属于当前冰箱、当前操作者且为 consume；统计按冰箱 | 不可直接用它提交独立 Quiz，也不能伪造 eventUid |
 | `waste_sorting_attempts` | 最新唯一性为 `(event_uid, component_key)`，存在后续包装 migration | 不编辑旧 migration，不把该表改造成个人课程考试表 |
-| `src/components/ProfileScreen.tsx` | 有个人资料／收藏／设置入口 | 增加学习室第二入口；不改共享冰箱唯一主入口 |
+| `src/components/ProfileScreen.tsx` | 有个人资料／收藏／设置入口 | 学习入口迁到主导航，不再保留重复列表行 |
 | `src/services/deviceId.ts` | 匿名安装 ID 和凭证；Web 当前不支持 | 进度关联已鉴权设备；不能承诺账号登录或任意跨设备同步 |
 | 设备恢复 | `recover_device` 更新成员 device_id，并有个人资料转移 trigger | 规划学习身份随已验证恢复转移，不能只改客户端缓存 |
 | `src/i18n.tsx` | 现有双语系统 | 界面文案接入现有系统，课程内容同样有 en／zh |
@@ -62,9 +64,9 @@
 
 ### 3.1 入口及容器
 
-首版主入口：Home 的明确「Learning Room／学习室」教育入口；第二入口：Profile 的学习相关列表行。保留首页现有动画直接入口。首页的 3D 场景不为新增学习室而整体重做；主入口优先放现有 UI 覆盖层的可见教育位置，不依赖一个未说明的新 3D 热点。
+当前主入口：底部「学堂 / Learn」Tab，书本图标，位于冰箱与成果之间。Home 教育按钮和 Profile 学习行已移除。首页原有动画直接入口与 3D 场景保留。
 
-学习室用全屏容器呈现自己的局部导航栈。主 Tab 状态保留在原页面；关闭后回到打开它的位置。学习室内部不显示底部主导航。容器打开时暂停 Home 后台 3D 交互、助手浮层和会抢输入的覆盖层，关闭后恢复现有生命周期。
+学堂以嵌入式页面呈现局部导航栈，加载／失败也在页面内，底部主导航持续可用。内部返回先回上层，根页系统返回回到进入前的主 Tab。切到学堂时暂停 Home 3D，关闭助手／首页故事；切离后卸载本人 gateway，再进时从服务器恢复。视频仍使用原有全屏 Modal。
 
 初版沿用当前项目的本地状态／Modal 方式，局部路由以明确的 route 类型与 reducer 管理。此任务不顺带迁移整个 App 到 Expo Router。后续仓库若已统一导航，适配现有导航即可。
 
@@ -336,7 +338,7 @@ P2 的 fixture 只供开发或截图验证，使用相同组件和 API 数据类
 | 现有生产迁移落后 | 发布前核对实际 remote migration 状态，先补依赖；不能跳过环境验证 |
 | 数字会被误当用户减排 | 阅读页标全球 food loss and waste；Quiz 结果只表学习成绩 |
 
-无需现在再问用户的实现默认值：Home 主入口＋Profile 副入口、现有五 Tab 不变、三阶段 6／8／10 题、80% 门槛、单选首版、课程自由阅读、个人成绩、双语支持、可恢复的无倒计时考试、人工审核的版本化内容。
+无需现在再问用户的实现默认值：独立学堂主 Tab、三阶段 6／8／10 题、80% 门槛、单选首版、课程自由阅读、个人成绩、双语支持、可恢复的无倒计时考试、人工审核的版本化内容。
 
 有实质产品分歧时才记录待决策，例如用户后续要求正式账号、多设备同时学习、后台 CMS、自动新闻订阅或 Quiz 奖励共享 XP。这些不是本计划首版依赖，不应阻止当前授权范围的实现。
 

@@ -4,7 +4,9 @@ import { type RefObject, useEffect, useRef, useState } from 'react';
 import { Animated, PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../i18n';
 
-export type AppTab = 'home' | 'shopping' | 'fridge' | 'achievements' | 'profile' | 'notifications';
+export type AppTab = 'home' | 'shopping' | 'fridge' | 'learn' | 'achievements' | 'profile' | 'notifications';
+
+export const APP_TAB_DOCK_HEIGHT = Platform.OS === 'ios' ? 118 : 104;
 
 type FloatingTabBarProps = {
   activeTab: AppTab;
@@ -14,14 +16,15 @@ type FloatingTabBarProps = {
 };
 
 // Arthur: NarIyirm
-// 中文：通知保留为二级页面；成就与报告从这里重新进入主导航，方便后续持续开发与验收。
-// EN: Notifications remains a secondary screen; Wins and reports return to the primary navigation for ongoing development and review.
+// 中文：学堂是独立主导航页，通知仍为二级页面；各页面可复用 dock 高度为固定操作预留空间。
+// EN: Learn is a primary tab while notifications stays secondary; pages reuse the dock height to reserve space for fixed actions.
 type BottomTab = Exclude<AppTab, 'notifications'>;
 
 const tabs: Array<{ key: BottomTab; icon: keyof typeof Ionicons.glyphMap }> = [
   { key: 'home', icon: 'home-outline' },
   { key: 'shopping', icon: 'cart-outline' },
   { key: 'fridge', icon: 'cube-outline' },
+  { key: 'learn', icon: 'book-outline' },
   { key: 'achievements', icon: 'trophy-outline' },
   { key: 'profile', icon: 'person-outline' },
 ];
@@ -97,6 +100,7 @@ export function FloatingTabBar({ activeTab, bottomMaskColor = '#F7FBFA', onChang
       <View pointerEvents="none" style={[styles.bottomMask, { backgroundColor: bottomMaskColor }]} />
       <BlurView
         {...swipeResponder.panHandlers}
+        accessibilityRole="tablist"
         blurMethod="dimezisBlurViewSdk31Plus"
         blurTarget={blurTarget}
         intensity={76}
@@ -126,7 +130,7 @@ export function FloatingTabBar({ activeTab, bottomMaskColor = '#F7FBFA', onChang
         {tabs.map((tab) => {
           const selected = tab.key === activeTab;
           const label = t.tabs[tab.key];
-          return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} onPress={() => onChange(tab.key)} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}>
+          return <Pressable key={tab.key} accessibilityRole="tab" accessibilityLabel={label} accessibilityState={{ selected }} aria-selected={selected} onPress={() => onChange(tab.key)} style={({ pressed }) => [styles.tab, pressed && styles.tabPressed]}>
             {tab.key === 'fridge' ? (
               <MaterialCommunityIcons name="fridge-outline" size={23} color={selected ? '#D77A1B' : '#506057'} />
             ) : (
@@ -144,7 +148,7 @@ const styles = StyleSheet.create({
   // Arthur: NarIyirm
   // 中文：只遮住毛玻璃胶囊下方的安全区间隙，胶囊仍直接模糊页面并保留原来的悬浮边距、圆角和阴影。
   // EN: Only the safe-area gap below the glass pill is masked, so the pill still blurs the page directly and keeps its original inset, corners, and shadow.
-  dock: { position: 'absolute', right: 0, bottom: 0, left: 0, height: Platform.OS === 'ios' ? 118 : 104 },
+  dock: { position: 'absolute', right: 0, bottom: 0, left: 0, height: APP_TAB_DOCK_HEIGHT },
   bottomMask: { position: 'absolute', right: 0, bottom: 0, left: 0, height: Platform.OS === 'ios' ? 32 : 20 },
   glass: { position: 'absolute', right: 16, bottom: Platform.OS === 'ios' ? 26 : 14, left: 16, flexDirection: 'row', minHeight: 76, padding: 6, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(255,255,255,0.74)', borderRadius: 28, backgroundColor: 'rgba(255,255,255,0.34)', shadowColor: '#29473D', shadowOpacity: 0.15, shadowRadius: 20, shadowOffset: { width: 0, height: 9 }, elevation: 8 },
   selectionIndicator: { position: 'absolute', top: 6, left: 6, height: 62, borderRadius: 21, backgroundColor: 'rgba(255,255,255,0.55)' },

@@ -1,6 +1,6 @@
 const en = {
-  title: 'Learning Room', tagline: 'Small lessons. Less waste.', home: 'Home', profile: 'Profile',
-  learn: 'Learn', path: 'My path', library: 'Library', close: 'Close Learning Room',
+  title: 'Learn', tagline: 'Small lessons. Less waste.', home: 'Home', profile: 'Profile',
+  learn: 'Learn', path: 'My path', library: 'Library', close: 'Back to Learn',
   continueLearning: 'CONTINUE LEARNING', startLearning: 'Start learning', continueLesson: 'Continue lesson',
   continueNumberedLesson: (n: number) => `Continue lesson ${n}`, lessonProgress: (n: number, total: number, minutes: number) => `Lesson ${n} of ${total} · ${minutes} min`,
   nextSteps: 'Your next steps', animation: 'Animation', shortLesson: 'Short lesson', handsOn: 'Hands-on',
@@ -48,8 +48,8 @@ const en = {
 
 type LearningCopy = typeof en;
 const zh: LearningCopy = {
-  title: '学习室', tagline: '学一点，少浪费一点。', home: '首页', profile: '我的',
-  learn: '学习', path: '学习路径', library: '资料库', close: '关闭学习室',
+  title: '学堂', tagline: '学一点，少浪费一点。', home: '首页', profile: '我的',
+  learn: '学习', path: '学习路径', library: '资料库', close: '返回学堂',
   continueLearning: '继续学习', startLearning: '开始学习', continueLesson: '继续课程',
   continueNumberedLesson: (n) => `继续第 ${n} 课`, lessonProgress: (n, total, minutes) => `第 ${n} 课，共 ${total} 课 · ${minutes} 分钟`,
   nextSteps: '接下来的学习', animation: '动画', shortLesson: '短课', handsOn: '动手练习',

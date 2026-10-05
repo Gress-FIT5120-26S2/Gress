@@ -2,6 +2,8 @@
 
 更新时间：2026-10-05。用户已经认可本版，后续开发的目标是还原，不重新选择审美方向。
 
+2026-10-06 用户修订：名称改为「学堂 / Learn」，入口移到独立主 Tab。批准截图中的旧标题与 Home 返回仅为原方案；当前根页使用品牌标题，底部保留主导航，内容／素材／配色继续遵照本规格。详见 verification/2026-10-06/NAVIGATION_UPDATE.md。
+
 配套：[实施计划](IMPLEMENTATION_PLAN.md)、[实际状态](IMPLEMENTATION_STATUS.md)、[内容计划](CONTENT_PLAN.md)。
 
 ## 1. 唯一批准的五张参考图

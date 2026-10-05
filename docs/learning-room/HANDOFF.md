@@ -1,6 +1,8 @@
 # Learning Room — 新对话接手入口
 
-更新时间：2026-10-05（Australia/Sydney）。
+更新时间：2026-10-06（Australia/Sydney）。
+
+最新用户修订：独立「学堂 / Learn」主 Tab 已替代 Home／Profile 学习入口与全屏学习 Modal。默认 `npm start`／`npm run server` 已使用指定开发库草稿启动器；`npm run server:start` 和生产仍仅接受 published。请先读 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)，不要照旧文档还原五 Tab 或误判 content_unavailable 为路由未挂载。
 
 ## 1. 三句话说明当前任务
 
@@ -29,7 +31,7 @@
 - SDG 13，特别是 13.3 的气候教育；不是 SDG 12。
 - UI 采用批准的五页 v2：学习室、课程、Quiz、通关、气候阅读。
 - 背景 `#F7FBFA`、标题 `#173D31`、状态 `#2A8A61`、CTA `#F58220`、少量浅蓝 `#EAF7FD`。
-- 主学习结构 Learn／My path／Library；Home 主入口与 Profile 副入口，不加第六个底部 Tab。
+- 主学习结构 Learn／My path／Library；独立「学堂 / Learn」底部 Tab，位于 Fridge 与 Achievements 之间。
 - Beginner Waste basics、Intermediate Packaging & recycling、Advanced Preventing waste。
 - 正式题数 6／8／10，80% 门槛，对应最低正确 5／7／8。
 - 持久化个人进度，考试由服务端判分，结束事务原子解锁；共享家人不能代升级。
@@ -45,7 +47,7 @@
 | 找到旧 warm-white／SDG 12 图直接实现 | 只用 app-palette-v2 的最终五张图 |
 | 把效果图的 1/3、5/6 当默认数据 | 真实新用户 0/3；固定情景只给开发验收 |
 | 用整张 mockup 做可点击页面 | 真正 RN 字体、列表、按钮和状态＋独立视觉资产 |
-| 为新功能重构整个 App 导航 | 用当前模式添加局部功能容器，主五 Tab 不变 |
+| 为新功能重构整个 App 导航 | 沿用本地 tab state，新增 Learn 主 Tab，课程／测验保留局部栈 |
 | 把 existing sorting stats 当个人等级 | 它按冰箱聚合；另做个人 learning contract |
 | 用虚假 consume event 让 Bin Action 能运行 | 分离纯交互组件和独立 learning practice adapter |
 | 只凭前端答对数量设置 Intermediate | POST finish 的数据库事务决定等级 |
@@ -61,19 +63,19 @@
 
 P0–P4 已完成代码与各自开发验证；P1 独立校对、P2 原生视觉与 P5 设备验收 pending。下一步从 **P5** 开始，保留批准五页，不重新生成图或题库。
 
-先读 P4_VERIFICATION。真实 gateway 位于 src/services/learningGateway.ts，原生 adapter 位于 learningApi.ts；LearningRoomEntry 每次打开创建本人实例。Home／Profile 已连；视频重用现有 LinearFoodWasteStory；practice 与库存 overlay 共用 WasteSortingInteraction，但各自保存。16 项 gateway 故障测试、8 项导航测试、22 项服务端学习测试、8 项原分类测试、123 次真实 API 请求通过。My path 有服务器历史，状态／答案／next／finish 重试与身份隔离已处理。不要把 UI fixtures 或 Web 截图当成真实考试／原生证据。
+先读 NAVIGATION_UPDATE 与 P4_VERIFICATION。真实 gateway 位于 src/services/learningGateway.ts，原生 adapter 位于 learningApi.ts；LearningRoomEntry 每次打开创建本人实例。当前入口为独立学堂 Tab；视频重用现有 LinearFoodWasteStory；practice 与库存 overlay 共用 WasteSortingInteraction，但各自保存。54 项自动测试与实际开发启动器的 123 次 API 请求通过。My path 有服务器历史，状态／答案／next／finish 重试与身份隔离已处理。不要把 UI fixtures 或 Web 截图当成真实考试／原生证据。
 
 P5 首先检查实际设备的入口遮挡、GL 暂停／恢复、返回、视频嵌套 Modal、分类 tap／drag、网络失败／后台／杀进程恢复、字体 1.3／1.6、读屏与 Reduce Motion。浏览器鼠标拖拽尝试没有确认提交，不能勾选拖拽通过；tap／纠错与视频播放／暂停／关闭有 Web 证据。当前没有 adb／原生控制界面，设备证据仍需补齐。
 
 开发 Supabase ref 为 thmbtsssvnslotoexntz，49 migrations 最新 20261005011000，生产未应用本轮 schema；不得改已应用 SQL。真实参考内容 learning-room-v1 仍 draft／pending。普通服务仅 published，开发测试须双草稿开关＋开发域名＋非 production；后续正式发布需真实独立审核、生成追加 reference migration，不能直接伪造 review.json 或绕过 gate。P3 提交 6d0af20／b63584f，前序成果 1eb83a8；P4 提交查当前 Git log，测试数据已清理。重跑数据库断言用 prepare-learning-preflight.js --applied。
 
-`npm run learning:preview -- --web --port 8083` 可独立预览，不启动 Express；`node server/scripts/export-learning-preview.js` 更新公开草稿快照。P4 正常 Android bundle 已检查不含预览题／attempt／私有 bank，含真实 API；通用 i18n 预览文案保留。不要重新生成素材或重新写题库；客户端只能使用公开投影，不得导入私有答案。实际草稿服务运行 `npm --prefix server run dev:learning`，不改 .env，仅非 production＋指定开发域名可用；普通 server 对 draft 显示审核中是预期。后续明确按任务拆分提交；用户未要求代理并行时不要自行派子代理。
+`npm run learning:preview -- --web --port 8083` 可独立预览，不启动 Express；URL 加 nav=1 可检查真实底栏组件，但其他 Tab 只显示预览菜单。`node server/scripts/export-learning-preview.js` 更新公开草稿快照。正常 Android bundle 不包含预览题／attempt／私有 bank；通用 i18n 的预览文案保留。不要重新生成素材或重写题库；客户端只能使用公开投影。根目录 `npm start`／`npm run server` 已自动调用指定开发域名的草稿启动器，`server:start`／生产继续只读 published。后续明确按任务拆分提交；用户未要求代理并行时不要自行派子代理。
 
 每次结束对话前更新状态文件，记录到具体任务、文件、测试和 migration 环境。写代码时对非显然 intent／data flow 按 AGENTS.md 添加 Arthur 标识与中英双语注释；不要给 trivial syntax 加重复注释。
 
 ## 6. 可直接粘贴到新对话的提示词
 
-> 继续 KitchMemo Learning Room 的 P5 真机验收与发布准备。先读 HANDOFF、状态／计划／视觉规格、API_CONTRACT、P1–P4 验证记录与 AGENTS.md。保留已批准的 app-palette-v2 五页、SDG 13／13.3、冰箱／成就 palette 和原五 Tab。P4 真实 gateway、本人状态／首答／重试／恢复、视频、独立 practice、Home／Profile 已实现，54 项自动测试、123 次真实 HTTP、Android 正常 bundle 和 Web practice／视频检查通过。开发库 thmbtsssvnslotoexntz 仍 49 migrations，已应用 SQL 不可修改；v1 draft／独立审核 pending，生产未发布。实际草稿 server 用 npm --prefix server run dev:learning；8083 是标注清楚的 fixture，不是成绩。浏览器拖拽未确认提交、原生入口／手势／生命周期／读屏／动态字体／Reduce Motion 都待验收。先补真实设备证据与独立校对，再生成新的发布 reference migration、开发验证并按用户授权处理生产。代码前读 Expo v57，数据前完整读 BACKEND_DATA_CONTEXT 与 migrations。每阶段更新状态，不伪造审核或真实设备验证。
+> 继续 KitchMemo 学堂的 P5 真机验收与发布准备。先读 HANDOFF、状态／计划／视觉规格、API_CONTRACT、P1–P4 验证记录、2026-10-06/NAVIGATION_UPDATE 与 AGENTS.md。用户已修订为独立「学堂 / Learn」主 Tab，Home／Profile 学习入口已移除；沿用批准的 app-palette-v2 五页、SDG 13／13.3 和冰箱／成就配色。真实本人状态／首答／重试／恢复、视频和独立 practice 已接入；54 项自动测试、实际开发启动器 123 次 HTTP 与 Android 导出通过，六项导航的小屏／错误页有 Web 证据。npm start／npm run server 自动启用指定开发库草稿；server:start／生产仍仅读 published。开发库 thmbtsssvnslotoexntz 仍 49 migrations，v1 draft／独立审核 pending，生产未发布；不可修改已应用 SQL。8083 是明确标注的 fixture，不是成绩。原生入口／手势／生命周期／读屏／动态字体／Reduce Motion 与独立校对仍待完成。先补真实设备证据和独立审核，再生成追加发布 migration，开发验证后按用户授权处理生产。代码前读 Expo v57，数据前完整读 BACKEND_DATA_CONTEXT 与 migrations。每阶段更新状态，不伪造审核或真机验证。
 
 ## 7. 完成后的交接报告要点
 

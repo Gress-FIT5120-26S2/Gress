@@ -60,7 +60,7 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "server": "npm --prefix server run dev",
+    "server": "npm --prefix server run dev:learning",
     "server:start": "npm --prefix server start"
   },
   "private": true

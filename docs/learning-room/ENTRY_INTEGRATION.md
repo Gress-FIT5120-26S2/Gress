@@ -1,5 +1,14 @@
 # Learning Room 入口接入定位（P0）
 
+## 2026-10-06 用户修订（当前实现，优先于下方历史）
+
+- 独立「学堂 / Learn」底部 Tab，位于 Fridge 与 Achievements 之间；Home 按钮及 Profile 学习行已移除。
+- App.tsx 在 activeTab=learn 时嵌入懒加载 LearningRoomEntry，入口与错误状态不再覆盖底部导航。
+- 内容区预留 APP_TAB_DOCK_HEIGHT，学习页底部安全区交给 dock；五页内部布局／配色沿用批准版本。
+- 根页不显示 Home／Profile 返回按钮。课程／Quiz 保留内部返回；根页系统返回回到之前的主 Tab。
+- 切离卸载本人 gateway，再进入从服务器恢复；视频仍全屏显示。
+- 运行与验证记录见 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)。下方保留 P0／P4 历史定位，不能作为当前入口要求。
+
 核对日期：2026-10-05。这里只登记接入点；P0 不展示未接真实状态的学习入口。
 
 ## Home 主入口

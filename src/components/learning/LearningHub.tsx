@@ -33,7 +33,7 @@ export function LearningHub({ content, session, origin, segment, initialCategory
   const continueLabel = isDone ? copy.mixedReview : isQuiz ? copy.continueQuiz : completed === 0 ? copy.startLearning : copy.continueLesson;
   const visible = content.resources.filter((item) => (category === 'all' || item.category === category) && (topic === 'all' || item.topicCodes.includes(topic)));
   const kinds = { video: copy.animation, lesson: copy.shortLesson, practice: copy.handsOn };
-  return <LearningPage backLabel={origin === 'home' ? copy.home : copy.profile} onBack={onClose} brand error={error} testID="learning-hub">
+  return <LearningPage backLabel={origin === 'home' ? copy.home : copy.profile} onBack={origin === 'tab' ? undefined : onClose} brand error={error} testID="learning-hub">
     <View style={ui.group}><Text accessibilityRole="header" style={ui.title}>{copy.title}</Text><Text style={ui.secondary}>{copy.tagline}</Text></View>
     <View accessibilityRole="tablist" style={styles.segments}>{(['learn', 'path', 'library'] as const).map((key) =>
       <Pressable key={key} accessibilityRole="tab" aria-selected={segment === key} accessibilityState={{ selected: segment === key }} onPress={() => onSegment(key)}

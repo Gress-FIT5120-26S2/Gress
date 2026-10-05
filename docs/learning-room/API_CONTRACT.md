@@ -43,4 +43,6 @@ P4 映射：gateway.load 并行 GET catalog＋state；startQuiz／resumeQuiz／s
 
 ## P4 客户端映射
 
+2026-10-06 启动修订：根目录 `npm start`／`npm run server` 改为调用 `server` 的 `dev:learning`，自动设置双开关并强制检查指定开发项目。`npm run server:start`／生产仍使用普通 published-only 服务。内容仍 draft／pending，没有跳过独立审核或新增数据库契约；路由已挂载时缺可用内容返回 503 content_unavailable。
+
 真实原生入口使用 src/services/learningApi.ts → requestApi，纯映射／故障测试位于 learningGateway.ts。一次操作保留 UUID 与首个 payload；next 的键绑定当前题目，响应前后核对本人身份，stateVersion 单调采纳；关闭不持久化题目或答案。recentResults 与旧考试来源快照直接来自服务器。markResource 走同一 completion 路径；practice 通过三题 finish 完成，不能直接 markActivity 绕过。接口与数据库契约未修改；实际验证与原生待验项见 verification/2026-10-05/P4_VERIFICATION.md。

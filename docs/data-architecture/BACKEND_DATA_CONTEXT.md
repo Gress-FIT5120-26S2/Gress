@@ -868,6 +868,8 @@ GET /api/achievements
 
 ## 14.3 Learning Room 个人教学与考试（2026-10-05）
 
+2026-10-06 本地启动修复：根目录 `npm start`／`npm run server` 使用 `dev:learning`，在不修改 env 文件的前提下设置双草稿开关，并强制校验指定开发库和非 production。根目录 `npm run server:start`／生产入口仍为 published-only。API、RPC、schema 与内容发布状态均未更改；独立审核仍 pending。Expo 导航入口已改为「学堂 / Learn」独立主 Tab。启动验证可运行 `npm --prefix server run verify:learning-gateway -- --development-startup`，启动本轮临时 API 子进程并清理随机记录。
+
 此功能与既有 consume 分类题分开，主线为 SDG 13／13.3。新增 `20261005010000_learning_room_assessment.sql` 与 `20261005011000_learning_room_draft.sql`；两份文件已在 Git 提交 6d0af20 保存，并成功应用到开发库。预演回滚、38 项相关测试、298 次真实 HTTP 请求、追加版本／审核 SQL 回滚验证和远程 lint 均通过；测试 learner／attempt 余量为零，真实 v1 仍 draft／pending。生产未应用。
 
 七张表：`learning_content_versions` 保存不可变的公开目录、服务端私有题库、hash、审核及发布状态；`learning_learners` 以稳定 UUID 绑定当前 owner device；`learning_stage_progress` 保存永久解锁／首过／最佳成绩；`learning_activity_progress` 保存活动完成与资料阅读；`learning_quiz_attempts` 保存内容版本、题目／选项／来源冻结快照及游标；`learning_quiz_answers` 保存不可替换的首答；`learning_attempt_requests` 将所有创建／恢复请求键绑定原考试，完成后重发仍读原结果。

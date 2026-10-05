@@ -2,7 +2,7 @@ import type { LearningAssetKey } from '../components/learning/learningAssets';
 import type { LearningSource, LearningStageCode, LearningText, PublicLearningContent } from './learningContent';
 export type { LearningStageCode } from './learningContent';
 
-export type LearningOrigin = 'home' | 'profile';
+export type LearningOrigin = 'home' | 'profile' | 'tab';
 export type LearningSegment = 'learn' | 'path' | 'library';
 export type LearningStageStatus = 'completed' | 'unlocked' | 'locked';
 export type LearningResumeTarget =

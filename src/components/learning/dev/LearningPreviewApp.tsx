@@ -1,9 +1,11 @@
 import { StatusBar } from 'expo-status-bar';
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
+import { BlurTargetView } from 'expo-blur';
 import { Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { initialWindowMetrics, SafeAreaInsetsContext, SafeAreaProvider } from 'react-native-safe-area-context';
 import { I18nProvider, useI18n } from '../../../i18n';
 import { LearningRoomFlow } from '../LearningRoomFlow';
+import { APP_TAB_DOCK_HEIGHT, FloatingTabBar, type AppTab } from '../../FloatingTabBar';
 import { learningColors as c } from '../learningTheme';
 import { createLearningPreview, previewScenarios, type LearningPreviewScenario } from './learningFixtures';
 
@@ -13,14 +15,24 @@ function Preview() {
   const initial = params.get('screen');
   const [scenario, setScenario] = useState<LearningPreviewScenario | null>(previewScenarios.includes(initial as LearningPreviewScenario) ? initial as LearningPreviewScenario : 'hub');
   const [revision, setRevision] = useState(0);
+  const [activeTab, setActiveTab] = useState<AppTab>('learn');
+  const blurTarget = useRef<View>(null);
+  const tabPreview = params.get('nav') === '1';
   const preview = useMemo(() => scenario ? createLearningPreview(scenario) : null, [scenario, revision]);
   const width = params.get('width') === '320' ? 320 : 390;
   const height = params.get('height') === '667' ? 667 : 844;
-  const origin = params.get('origin') === 'profile' ? 'profile' : 'home';
-  const content = preview ? <LearningRoomFlow key={`${scenario}:${revision}`} {...preview} origin={origin} embedded onClose={() => setScenario(null)} />
+  const origin = tabPreview ? 'tab' : params.get('origin') === 'profile' ? 'profile' : 'home';
+  const content = preview && (!tabPreview || activeTab === 'learn') ? <LearningRoomFlow key={`${scenario}:${revision}`} {...preview} origin={origin} embedded onClose={() => setScenario(null)} />
     : <ScrollView contentContainerStyle={styles.menu}><Text style={styles.menuTitle}>{t.learning.choosePreview}</Text>
-      {previewScenarios.map((item) => <Pressable key={item} accessibilityRole="button" onPress={() => { setRevision((n) => n + 1); setScenario(item); }} style={styles.menuRow}><Text style={styles.menuText}>{item}</Text></Pressable>)}
+      {previewScenarios.map((item) => <Pressable key={item} accessibilityRole="button" onPress={() => { setActiveTab('learn'); setRevision((n) => n + 1); setScenario(item); }} style={styles.menuRow}><Text style={styles.menuText}>{item}</Text></Pressable>)}
     </ScrollView>;
+  // Arthur: NarIyirm
+  // 中文：明确 nav=1 才展示真实导航组件的开发画布；其他 Tab 显示预览选择器，不模拟业务数据或绕过原生身份。
+  // EN: Only explicit nav=1 shows the real dock in this development canvas; other tabs show the preview picker without faking business data or bypassing native identity.
+  const canvas = tabPreview ? <View style={{ flex: 1 }}>
+    <BlurTargetView ref={blurTarget} style={{ flex: 1 }}><View style={{ flex: 1, paddingBottom: APP_TAB_DOCK_HEIGHT }}>{content}</View></BlurTargetView>
+    <FloatingTabBar activeTab={activeTab} blurTarget={blurTarget} onChange={tab => { setActiveTab(tab); if (tab === 'learn') setScenario('hub'); }} />
+  </View> : content;
   const chrome = <View style={styles.toolbar}><Text style={styles.label}>{t.learning.preview}</Text>
     <View style={styles.toolbarButtons}><Pressable accessibilityRole="button" onPress={() => setScenario(null)} style={styles.toolbarHit}><Text style={styles.label}>{t.learning.backPreview}</Text></Pressable>
       <Pressable accessibilityRole="button" accessibilityLabel="English" accessibilityState={{ selected: language === 'en' }} onPress={() => setLanguage('en')} style={styles.toolbarHit}><Text style={styles.label}>EN</Text></Pressable>
@@ -31,10 +43,10 @@ function Preview() {
   // EN: The web canvas simulates content insets only; native uses real safe areas. The development label sits outside the canvas, with no drawn phone frame or status bar.
   if (Platform.OS === 'web') return <ScrollView style={styles.desktop} contentContainerStyle={styles.desktopContent}>
     {chrome}<View testID="learning-preview-canvas" style={{ width, height, maxWidth: '100%', backgroundColor: c.background }}>
-      <SafeAreaInsetsContext.Provider value={{ top: 44, bottom: 24, left: 0, right: 0 }}>{content}</SafeAreaInsetsContext.Provider>
+      <SafeAreaInsetsContext.Provider value={{ top: 44, bottom: 24, left: 0, right: 0 }}>{canvas}</SafeAreaInsetsContext.Provider>
     </View>
   </ScrollView>;
-  return <View style={{ flex: 1, backgroundColor: c.background }}>{chrome}{content}</View>;
+  return <View style={{ flex: 1, backgroundColor: c.background }}>{chrome}{canvas}</View>;
 }
 
 export default function LearningPreviewApp() {

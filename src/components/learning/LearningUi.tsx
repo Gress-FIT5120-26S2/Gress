@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, Animated, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
@@ -8,7 +8,7 @@ import type { LearningBodyBlock, LearningSource, PublicLearningContent } from '.
 import type { LearningSessionView } from '../../types/learningRoom';
 import { getLearningImageSource, learningAssets, learningSdgAttribution, type LearningAssetKey } from './learningAssets';
 import { learningColors as c, learningLayout, learningMotion, learningStyles as s, learningTypography as type } from './learningTheme';
-import { useLearningViewport } from './learningViewport';
+import { LearningBottomSafeAreaContext, useLearningViewport } from './learningViewport';
 
 export const ui = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 }, flex: { flex: 1, minWidth: 0 },
@@ -96,11 +96,12 @@ export function LearningProgress({ value, label }: { value: number; label: strin
 }
 
 export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true }: {
-  backLabel: string; onBack: () => void; onClose?: () => void; brand?: boolean;
+  backLabel?: string; onBack?: () => void; onClose?: () => void; brand?: boolean;
   children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number; scrollEnabled?: boolean;
 }) {
   const { t } = useI18n();
   const { width } = useLearningViewport();
+  const bottomSafeArea = useContext(LearningBottomSafeAreaContext);
   const gutter = width < learningLayout.narrowWidth ? 18 : 24;
   const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -117,11 +118,11 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
   // Arthur: NarIyirm
   // 中文：顶部和底部由同一个安全区容器处理，滚动区不重复自动加 inset，固定 CTA 不覆盖正文。
   // EN: One safe-area container owns the top and bottom; scrolling does not add duplicate automatic insets, and fixed actions never cover body content.
-  return <SafeAreaView style={s.screen} edges={['top', 'bottom', 'left', 'right']} testID={testID}>
+  return <SafeAreaView style={s.screen} edges={bottomSafeArea ? ['top', 'bottom', 'left', 'right'] : ['top', 'left', 'right']} testID={testID}>
     <View style={[ui.header, { paddingHorizontal: gutter }]}>
-      <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [ui.back, pressed ? s.pressed : null]}>
+      {onBack ? <Pressable accessibilityRole="button" onPress={onBack} style={({ pressed }) => [ui.back, pressed ? s.pressed : null]}>
         <LearningIcon name="chevron-back" size={25} /><Text style={ui.backText}>{backLabel}</Text>
-      </Pressable>
+      </Pressable> : null}
       {brand ? <View style={[ui.row, { gap: 3 }]}><Text style={ui.brand}>KitchMemo</Text><LearningIcon name="leaf" size={18} /></View> : null}
       {onClose ? <Pressable accessibilityRole="button" accessibilityLabel={t.learning.close} onPress={onClose} style={ui.iconButton}><LearningIcon name="close-outline" size={27} color={c.textPrimary} /></Pressable> : null}
     </View>

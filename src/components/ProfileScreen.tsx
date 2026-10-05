@@ -35,13 +35,12 @@ const AVATAR_COLOURS: Record<ProfileAvatarKey, { background: string; foreground:
 type ProfileScreenProps = {
   onOpenNotifications: () => void;
   onReplayOnboarding: () => void;
-  onOpenLearningRoom: () => void;
 };
 
 // Arthur: NarIyirm
 // 中文：个人页把设备昵称、共享空间摘要和已实现设置集中展示；口味入口仅保留占位，不创建未生效的数据。
 // EN: The profile screen combines device identity, shared-space context, and working settings while keeping taste preferences as a non-persisting placeholder.
-export function ProfileScreen({ onOpenNotifications, onReplayOnboarding, onOpenLearningRoom }: ProfileScreenProps) {
+export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: ProfileScreenProps) {
   const { language, t } = useI18n();
   const copy = t.profile;
   const { failed, fridgeContext: context, loading, profile, refresh, setProfile } = useProfileData();
@@ -133,8 +132,8 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding, onOpenL
               else void refreshAchievements().then(() => setMedalWallVisible(true));
             }}
             title={copy.medalWallTitle}
+            isLast
           />
-          <ProfileRow icon="book-outline" title={t.learning.title} detail={t.learning.entryDetail} onPress={onOpenLearningRoom} isLast />
         </View>
 
         <Text style={styles.sectionTitle}>{copy.preferencesTitle}</Text>
