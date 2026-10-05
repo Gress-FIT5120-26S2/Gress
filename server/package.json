@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "verify:learning-room": "node scripts/verify-learning-room.js",
     "backfill:preset-icons": "node scripts/backfill-preset-icons.js",
     "ingest:assistant-knowledge": "node scripts/ingest-assistant-knowledge.js",
     "dev": "node src/index.js",

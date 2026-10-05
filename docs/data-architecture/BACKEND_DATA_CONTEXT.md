@@ -866,6 +866,20 @@ GET /api/achievements
 
 开发库验证覆盖旧客户端兼容、部分单位边界、容量清零、显式无丢弃物、事件快照、多部件幂等与临时数据清理。真实模型验证了含糊可乐需确认、明确塑料瓶可自动选择，以及塑料瓶图标连续调用复用。TypeScript、八项题库测试和 Android Hermes 导出通过；尚未用手机完成本轮视觉及交互验收，生产迁移与部署未执行。
 
+## 14.3 Learning Room 个人教学与考试（2026-10-05）
+
+此功能与既有 consume 分类题分开，主线为 SDG 13／13.3。新增 `20261005010000_learning_room_assessment.sql` 与 `20261005011000_learning_room_draft.sql`；当前已完成开发库回滚预演，正式应用及 HTTP 验证在本轮进行，生产未应用。
+
+七张表：`learning_content_versions` 保存不可变的公开目录、服务端私有题库、hash、审核及发布状态；`learning_learners` 以稳定 UUID 绑定当前 owner device；`learning_stage_progress` 保存永久解锁／首过／最佳成绩；`learning_activity_progress` 保存活动完成与资料阅读；`learning_quiz_attempts` 保存内容版本、题目／选项／来源冻结快照及游标；`learning_quiz_answers` 保存不可替换的首答；`learning_attempt_requests` 将所有创建／恢复请求键绑定原考试，完成后重发仍读原结果。
+
+`learning_room_action(device, action, payload, allow_draft)` 只向 service role 授权，锁成员和个人 learner，事务内选题校验、首答判分、结算解锁。所有表启用 RLS；anon／authenticated 无权限，service role 只能直接 SELECT，写入必须经 RPC。辅助函数无公开或 service-role 执行权。Express `/api/learning/*` 经既有 Device-ID＋Device-Credential 验证；归属只取 request.deviceId，不允许客户端传 learner、score 或 passed。只返回当前题，未答题不返回答案／解释；已答反馈及复习使用冻结来源。正式题数 6／8／10，以整数乘法判 80%（5／7／8）；review、三题 practice、十二题 mixed-review 都不解锁，练习只标记活动完成。
+
+API：GET catalog／state／courses/:code／activities/:code；PUT activities/:code/completion；POST attempts；GET attempts/:uid；POST attempts/:uid/answers／next／finish／abandon；GET attempts/:uid/review?missedOnly=true。具体 payload、错误码及验证证据见 `docs/learning-room/verification/2026-10-05/P3_VERIFICATION.md`。completion 按 learner＋code＋版本自然幂等，其余请求使用 createKey／requestKey；答案使用 questionUid。stateVersion 为字符串 bigint。断点恢复以数据库游标和首答为准。
+
+`fridge_members_transfer_learning` 仅在设备恢复 UPDATE device_id 时合并 learner；共享 join／leave 的 fridge_uid 变化不会合并个人等级。原 learner UUID 保留，临时考试／答案及已通过阶段合并；相同 stage／mode／activity 的临时 active 考试标记 abandoned，键冲突改为 recovery 命名空间保留原键审计。此触发器在既有 recover_device 同一事务中执行，旧凭证撤销规则不变。Learning Room 不写库存、inventory_events、waste_sorting_attempts、共享 XP、成就、通知或 Broadcast。
+
+草稿 reference migration 保存 `learning-room-v1`（48 题），独立审核仍 pending。默认 API 只选 published；开发验证须同时设置 `LEARNING_ROOM_ALLOW_DRAFT=1`、`LEARNING_ROOM_DRAFT_PROJECT_REF=thmbtsssvnslotoexntz`，且 SUPABASE_URL 必须为该开发域名、NODE_ENV 非 production。不修改现有 env 文件。生产无法开启草稿例外；正式发布必须用生成器经过真实独立审核检查生成新 migration。禁止重写已应用草稿；内容变更使用新 contentVersion。撤回版本会使其未完成考试 invalidated，保留已结算历史和永久资格。
+
 ## 15. Migration 工作流
 
 不要直接修改已经部署的 `20260829000000` migration。后续 schema 变化创建新的时间戳 migration。
