@@ -10,6 +10,8 @@ declare
   replay jsonb;
   attempt_id uuid;
   old_uid uuid;
+  settled_id uuid;
+  frozen_snapshot jsonb;
   q jsonb;
   option_value text;
   stage text;
@@ -91,6 +93,7 @@ begin
     assert replay #>> '{attempt,status}' = 'submitted';
   end loop;
   assert value #>> '{session,stageStatus,advanced}' = 'completed';
+  settled_id := attempt_id;
   assert value #>> '{session,resumeTarget,type}' = 'mixed-review';
   perform public.learning_room_action(device_a, 'start', jsonb_build_object('stageCode', 'advanced', 'mode', 'mixed-review', 'createKey', 'mixed_start', 'contentVersion', 'learning-room-v1', 'questionCodes', selections->'mixed'), true);
   value := public.learning_room_action(device_a, 'start', jsonb_build_object('stageCode', 'beginner', 'mode', 'checkpoint', 'createKey', 'recovery_collision', 'contentVersion', 'learning-room-v1', 'questionCodes', selections->'beginner'), true);
@@ -101,14 +104,44 @@ begin
   assert (select learner_uid = old_uid from public.learning_learners where owner_device_id = device_b);
   assert (select count(*) = 1 from public.learning_quiz_attempts where learner_uid = old_uid and terminal_reason = 'recovery_conflict');
   value := public.learning_room_action(device_b, 'read', jsonb_build_object('attemptUid', attempt_id), true);
+  frozen_snapshot := value #> '{attempt,question_snapshot}';
   assert value #>> '{session,stageStatus,advanced}' = 'completed';
   assert not exists (select 1 from public.learning_learners where owner_device_id = device_a);
+  insert into public.learning_content_versions(content_version, public_catalog, private_question_bank, content_hash, review_metadata, status, created_at)
+    select 'learning-room-sql-test-v2', jsonb_set(public_catalog, '{contentVersion}', '"learning-room-sql-test-v2"'),
+      jsonb_set(private_question_bank, '{contentVersion}', '"learning-room-sql-test-v2"'), repeat('1', 64), review_metadata, 'draft', now() + interval '1 second'
+      from public.learning_content_versions where content_version = 'learning-room-v1';
+  replay := public.learning_room_action(device_b, 'read', jsonb_build_object('attemptUid', attempt_id), true);
+  assert replay->>'contentVersion' = 'learning-room-sql-test-v2';
+  assert replay #>> '{attempt,content_version}' = 'learning-room-v1';
+  assert replay #> '{attempt,question_snapshot}' = frozen_snapshot;
+  assert replay #>> '{session,stageStatus,advanced}' = 'completed';
+  -- Arthur: NarIyirm
+  -- 中文：审核替身只验证发布 SQL，在外层事务回滚，不会把真实 pending 内容标记为已校对。
+  -- EN: This review fixture tests publication SQL only and is rolled back, never marking real pending content as reviewed.
+  insert into public.learning_content_versions(content_version, public_catalog, private_question_bank, content_hash, review_metadata, status, published_at)
+    select content_version, public_catalog, private_question_bank, content_hash,
+      jsonb_set(jsonb_set(review_metadata, '{independentReview}', jsonb_build_object('status', 'approved', 'reviewer', 'SQL rollback fixture',
+        'reviewedAt', '2026-10-05', 'approvedContentHash', content_hash)), '{questions}',
+        (select jsonb_agg(r || '{"independentStatus":"approved"}'::jsonb) from jsonb_array_elements(review_metadata->'questions') r)), 'published', now()
+      from public.learning_content_versions where content_version = 'learning-room-sql-test-v2'
+    on conflict (content_version) do update set public_catalog = excluded.public_catalog, private_question_bank = excluded.private_question_bank,
+      content_hash = excluded.content_hash, review_metadata = excluded.review_metadata, status = excluded.status,
+      published_at = coalesce(public.learning_content_versions.published_at, excluded.published_at);
+  assert (select status = 'published' from public.learning_content_versions where content_version = 'learning-room-sql-test-v2');
+  expected_error := false;
+  begin update public.learning_content_versions set status = 'draft' where content_version = 'learning-room-sql-test-v2';
+  exception when others then assert sqlerrm = 'learning_content_immutable'; expected_error := true; end;
+  assert expected_error;
   update public.learning_content_versions set status = 'withdrawn' where content_version = 'learning-room-v1';
-  assert not exists (select 1 from public.learning_quiz_attempts where status = 'in_progress');
+  assert not exists (select 1 from public.learning_quiz_attempts where learner_uid = old_uid and content_version = 'learning-room-v1' and status = 'in_progress');
   assert (select count(*) = 4 from public.learning_quiz_attempts where learner_uid = old_uid and status = 'submitted');
   expected_error := false;
   begin perform public.learning_room_action(device_b, 'read', jsonb_build_object('attemptUid', attempt_id), true);
   exception when others then assert sqlerrm = 'attempt_invalidated'; expected_error := true; end;
   assert expected_error;
+  replay := public.learning_room_action(device_b, 'review', jsonb_build_object('attemptUid', settled_id), true);
+  assert replay #>> '{attempt,status}' = 'submitted';
+  assert replay #>> '{session,stageStatus,advanced}' = 'completed';
   raise notice 'Learning Room preflight passed: grading, idempotency, isolation, recovery, withdrawal';
 end $$;

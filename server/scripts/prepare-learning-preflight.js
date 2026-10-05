@@ -11,7 +11,8 @@ const selections = Object.fromEntries(['beginner', 'intermediate', 'advanced'].m
 selections.practice = selectLearningQuestions(content, 'beginner', 'practice', bundle.bank.practice[0].activityCode);
 selections.mixed = selectLearningQuestions(content, 'advanced', 'mixed-review');
 const migrationFiles = ['20261005010000_learning_room_assessment.sql', '20261005011000_learning_room_draft.sql'];
-const migrations = await Promise.all(migrationFiles.map((name) => readFile(path.join(root, 'supabase/migrations', name), 'utf8')));
+const applied = process.argv.includes('--applied');
+const migrations = applied ? [] : await Promise.all(migrationFiles.map((name) => readFile(path.join(root, 'supabase/migrations', name), 'utf8')));
 const checks = await readFile(path.join(root, 'supabase/tests/learning_room.sql'), 'utf8');
 const output = path.join(root, '.codex-build/learning-room-p3/preflight.sql');
 await mkdir(path.dirname(output), { recursive: true });
@@ -19,4 +20,4 @@ await mkdir(path.dirname(output), { recursive: true });
 // 中文：新迁移在单一事务中预演并回滚；随机测试设备及审核替身不会留在开发库。
 // EN: Rehearse new migrations in one rolled-back transaction so random test devices and review fixtures never persist in development.
 await writeFile(output, `begin;\n${migrations.join('\n')}\nset local kitchmemo.test_selections = '${JSON.stringify(selections).replaceAll("'", "''")}';\n${checks}\nrollback;\n`);
-console.log(JSON.stringify({ preflight: path.relative(root, output), migrations: migrationFiles }));
+console.log(JSON.stringify({ preflight: path.relative(root, output), migrations: applied ? [] : migrationFiles }));

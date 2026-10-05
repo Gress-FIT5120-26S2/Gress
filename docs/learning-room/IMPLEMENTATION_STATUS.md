@@ -1,6 +1,6 @@
 # Learning Room 实际进度与继续位置
 
-最后更新：2026-10-05（Australia/Sydney）。当前阶段：**P0 已完成；P1 内容与技术验证已完成、独立校对待完成；P2 五页组件／导航／开发预览已实现，原生视觉验收待完成；P3 真实数据服务未开始。**
+最后更新：2026-10-05（Australia/Sydney）。当前阶段：**P0 已完成；P1 内容与技术验证已完成、独立校对待完成；P2 五页组件／导航／开发预览已实现，原生视觉验收待完成；P3 个人数据与考试 API 已在开发库完成验证；下一步 P4 页面真实接入。**
 
 ## 1. 已完成的真实工作
 
@@ -26,6 +26,12 @@
 - [x] 通过 8 项导航／预览隔离测试、既有 22 项测试、TypeScript、Android 开发与正常模式 bundle 导出。
 - [x] 留存 390×844 英文五页与 320×667 中文浏览器截图，验证主要交互。
 - [ ] 补 Android／iOS 真机截图、手势、读屏、动态字体与 Reduce Motion 验收。
+- [x] 新增并提交两份 Learning Room migration，开发库应用成功，远程共 49 份且 lint 无错误。
+- [x] 七张个人学习表、稳定 learner／恢复 trigger、首答冻结／游标／原子判分和永久解锁事务。
+- [x] 12 个鉴权 learning API、服务器 blueprint 抽样、已答反馈白名单和版本快照。
+- [x] 38 项相关测试、TypeScript、298 次真实 HTTP 请求、版本／撤回／发布门槛 SQL 回滚验证。
+- [x] 随机测试数据已精确清理；真实参考版本仍 draft／pending，普通服务默认不可用草稿。
+- [ ] P4 learningApi gateway、视频与独立 practice、Home／Profile 正式入口及真实页面验收。
 
 ## 2. 实施阶段状态
 
@@ -34,13 +40,13 @@
 | P0 基准与独立素材 | 已完成 | 见 verification/2026-10-05/P0_VERIFICATION.md；后续页面阶段需真机对照 |
 | P1 内容契约 | 内容／作者核对／技术验证完成；独立校对 pending | 通过独立校对后才可发布；详见 CONTENT_REVIEW.md 与 P1_VERIFICATION.md |
 | P2 五页 UI | 组件／导航／开发预览／Web 验证完成；原生视觉门槛 pending | 真机五页图、返回手势、安全区、读屏与字体缩放；见 P2_VERIFICATION.md |
-| P3 数据与服务端 | 未开始 | 新表／RPC／迁移、Express learning routes、开发库验证、恢复接入 |
+| P3 数据与服务端 | 开发环境完成 | 已提交迁移／七表／RPC／恢复／API；见 P3_VERIFICATION.md；独立内容发布仍 pending |
 | P4 全链路集成 | 未开始 | learningApi；Learn／My path／Library；动画与独立 practice；主入口 |
 | P5 真机与发布 | 未开始 | 双语／无障碍／离线／回归、真机证据、获授权后的生产发布 |
 
 ## 3. 下一条具体任务
 
-**下一步是 P3 开发环境数据与服务。** P2 页面代码已有；有可用设备时先补 P2 原生截图与交互门槛，没有设备可先推进独立的数据工作，但不能把 Web 截图当作原生验收。先完整读取后端上下文与最新 migrations，再设计个人 learner／内容版本／考试事务／身份恢复，新增 timestamped migration 并在开发库验证。P1 独立审核仍 pending，不能发布草稿；P2 原生与 P1 审核均不能在后续记录中自动勾选完成。
+**下一步是 P4 全链路页面整合。** 先读 API_CONTRACT.md、P3_VERIFICATION.md、现有 requestApi 和 LearningRoomFlow，实现真实 gateway／个人数据管理，保留一次操作的请求键和网络重试状态。接教育视频、独立 Bin Action practice、Home／Profile 入口，验收空库存可学习与真实初→中→高。不要重做五页图或将 fixture 当权威成绩。P1 独立审核、P2 原生验收仍 pending；开发草稿须显式双开关且仅开发域名，正常／生产入口不能绕过门槛。
 
 目前不需要再确认总体方向、SDG、配色、题数或等级门槛。技术命名和普通布局尺寸可按计划与实际仓库自行落实。
 
@@ -58,6 +64,10 @@
 - `src/types/learningRoom.ts`、`src/components/learning/`、`src/i18n/learning.ts`
 - `scripts/start-learning-preview.mjs`、`scripts/test-learning-room.mjs`、`server/scripts/export-learning-preview.js`
 - `docs/learning-room/verification/2026-10-05/P2_VERIFICATION.md`、`p2-web/` 截图与 manifest
+- `docs/learning-room/API_CONTRACT.md`、`verification/2026-10-05/P3_VERIFICATION.md`
+- `server/src/routes/learning.js`、`services/learningAssessment.js`、`services/learningRoom.js`、assessment test
+- `server/scripts/generate-learning-migration.js`、`prepare-learning-preflight.js`、`verify-learning-room.js`；`supabase/tests/learning_room.sql`
+- `supabase/migrations/20261005010000_learning_room_assessment.sql`、`20261005011000_learning_room_draft.sql`
 - 批准图片、视觉说明、完整图片生成提示词：`docs/art-direction/learning-room/2026-10-05-app-palette-v2/`
 - 原 v1 图片保留在旧文件夹作历史比较，标记 superseded。
 
@@ -65,16 +75,16 @@
 
 | 项目 | 当前事实 |
 | --- | --- |
-| 新 learning 业务代码 | 离线内容工具＋五页组件／局部导航／注入 gateway；无真实考试服务、持久进度或业务路由 |
+| 新 learning 业务代码 | 内容工具＋五页组件／预览，真实考试 API／持久进度已完成开发库验证；页面 gateway 尚未连 API |
 | 学习室基础样式／图片代码 | learningTheme.ts、learningAssets.ts 已用于五页 RN 组件；正式入口尚未接入 |
 | 正式独立 UI 图片资产 | 10 张已制作／取得；8 张生成图片＋中英官方 SDG 13，运行时合计 2,653,475 bytes |
-| learning API | 未实现 |
-| learning 新表／RPC／trigger | 未创建 |
-| 本功能 migration | 未生成、未应用、未提交 |
-| 远程数据库检查 | 本规划对话未连接；既有环境说明来自后端上下文，未来需重核 |
+| learning API | 12 个鉴权路由，显式投影，不接受用户分数／passed |
+| learning 新表／RPC／trigger | 7 表、6 函数、3 trigger，RLS 与服务端写入权限已验证 |
+| 本功能 migration | 两份新文件已提交（6d0af20），开发库已应用；文件／内容 hash 见 P3_VERIFICATION.md |
+| 远程数据库检查 | 开发 ref 已核对，49 migrations；lint PASS；真实 v1 draft／pending，测试 learner／attempt 均 0 |
 | Android／iOS 功能验收 | Android bundle 导出通过；原生设备 UI／手势／读屏尚未验收，iOS 未运行 |
 | 生产发布 | 未进行 |
-| App／Express 改动 | P2 在 index.ts 增加显式开发分支、现有 i18n 增加学习文案与预览选项；App.tsx、正式 screens、Express routes 未修改 |
+| App／Express 改动 | P2 preview 与双语保留；P3 挂载 learning router；App.tsx、Home／Profile 正式入口尚未接入 |
 
 不要将后端上下文中 existing waste learning 已在开发库验证，误记为 Learning Room 已经可用。
 
@@ -88,6 +98,7 @@
 | 2026-10-05 | P0 静态基准与素材 | PASS：TypeScript 无错误；10 张素材 hash／尺寸一致；4 张透明素材 alpha 保留；10 个静态 require 路径存在；完整记录见 P0_VERIFICATION.md |
 | 2026-10-05 | P1 草稿内容与契约 | PASS：3 课程／9 活动／9 资料／48 题／18 来源；22 项测试、TypeScript；发布检查因独立校对 pending 按预期失败；见 P1_VERIFICATION.md |
 | 2026-10-05 | P2 UI 与开发隔离 | PASS：30 项相关测试、TypeScript、两种 Android bundle、Web 交互／截图；原生截图待完成，见 P2_VERIFICATION.md |
+| 2026-10-05 | P3 个人进度／考试服务 | PASS：38 项测试、TypeScript、298 次 HTTP、开发迁移／lint、版本与恢复回滚；真实内容仍 pending，见 P3_VERIFICATION.md |
 
 ## 7. 后续每阶段的更新模板
 
@@ -107,7 +118,7 @@
 
 ## 8. 仍需制作，但不妨碍开始开发的事项
 
-真正独立校对、考试服务与正式真机截图尚未完成。五页原生组件已实现，开发可使用公开草稿；正式入口、动画／practice 集成和数据持久化留待 P3/P4。发布不得绕过独立审核，不需要重新选择视觉方向。
+真正独立校对、页面真实 API 接入和正式真机截图尚未完成。五页组件与后端服务已实现并分别验证；正式入口、动画／practice 与 gateway 留待 P4。发布不得绕过独立审核，不需要重新选择视觉方向。
 
 ### P0 执行记录 — 2026-10-05
 
@@ -139,3 +150,13 @@
 - 尚未完成：P1 独立审核、P2 原生截图／字体／手势／读屏、P3 数据／服务、P4 集成、P5 发布。
 - Git／远程：未提交；没有 migration、远程数据库连接或部署。
 - 下次具体任务：P3 开发环境个人学习进度与考试事务；有设备时补 P2 原生验收，所有 pending 门槛保持明确记录。
+
+### P3 执行记录 — 2026-10-05
+
+- 完成：七表、内容版本／发布 gate、首答与 snapshot、幂等创建／恢复／游标／结算、独立个人进度、恢复合并 trigger、鉴权 Express API 和测试工具。
+- 开发：新 SQL 在单事务回滚预演后提交并应用至 Gress-development；本地／远程共 49 migrations，lint 无错误；已应用 migration 不再修改。
+- 验证：38 项相关测试／TypeScript，298 次真实 HTTP，追加版本／撤回／审核 upsert 回滚测试通过。库存、共享 XP、原分类统计与通知无学习写入；test learner／attempt 零残留。
+- 发布：真实 v1 为 draft／pending；release validator 按预期拒绝。没有生产迁移、部署或 Git push。
+- Git：1eb83a8 留存前序 P0–P2 成果，6d0af20 保存 P3 schema 与依赖代码；交接和验证工具另作追加提交。
+- 页面：8083 preview 仍开发 fixture，没有真实 gateway。既有五页视觉本轮未改；P1 独立审核／P2 原生门槛仍 pending。
+- 下次具体任务：P4 learningApi＋个人数据管理与重试，教育视频／独立 Bin Action practice，Home／Profile 接入；按 API_CONTRACT.md 映射 quiz／result／失效状态。

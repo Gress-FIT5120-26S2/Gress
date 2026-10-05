@@ -35,7 +35,7 @@ const base = `http://127.0.0.1:${server.address().port}/api`;
 
 async function api(device, endpoint, payload, { status = 200, error = null, method = payload === undefined ? 'GET' : 'POST' } = {}) {
   requests += 1;
-  const response = await fetch(base + endpoint, { method, headers: { 'Content-Type': 'application/json', 'Device-ID': devices[device], 'Device-Credential': credentials[device] },
+  const response = await fetch(base + endpoint, { method, signal: AbortSignal.timeout(60_000), headers: { 'Content-Type': 'application/json', 'Device-ID': devices[device], 'Device-Credential': credentials[device] },
     ...(payload === undefined ? {} : { body: JSON.stringify(payload) }) });
   const body = await response.json();
   assert.equal(response.status, status, `${method} ${endpoint}: ${body.error ?? 'unexpected status'}`);
@@ -101,6 +101,7 @@ async function solve(device, response, correctCount, { concurrent = false } = {}
   assert.equal(pair[0].result.passed, correctCount * 100 >= stored.question_snapshot.length * 80);
   const missed = await api(device, `/learning/attempts/${uid}/review?missedOnly=true`);
   assert.equal(missed.questions.length, stored.question_snapshot.length - correctCount);
+  console.log(JSON.stringify({ progress: `${pair[0].result.stageCode}/${pair[0].result.mode}`, correctCount, total: stored.question_snapshot.length, requests }));
   return pair[0];
 }
 
@@ -177,12 +178,14 @@ try {
   verified.push('5/6, 7/8, 8/10 thresholds; failed checkpoints; mixed review; completion idempotency; inventory/XP/stat isolation');
   console.log(JSON.stringify({ progress: verified.length, requests }));
 
+  await api(1, '/learning/state');
   const personalB = await row('learning_learners', 'learner_uid', 'owner_device_id', devices[1]);
   const share = await api(0, '/fridges/share', { name: 'Learning Room test' }, { status: 201 });
   await api(1, '/fridges/join', { code: share.activeInvite.code });
   assert.equal((await api(1, '/learning/state')).session.stageStatus.intermediate, 'locked');
   assert.equal((await row('learning_learners', 'learner_uid', 'owner_device_id', devices[1])).learner_uid, personalB.learner_uid);
   await api(1, `/learning/attempts/${uid}`, undefined, { status: 404, error: 'attempt_not_found' });
+  const sharedBaseline = await counts(fridge);
   await solve(1, await start(1, 'intermediate', 'review'), 8);
   assert.equal((await api(1, '/learning/state')).session.stageStatus.intermediate, 'locked');
   const practice = catalog.activities.find((a) => a.stageCode === 'beginner' && a.type === 'practice');
@@ -190,6 +193,7 @@ try {
   assert.ok(practiced.session.completedActivityCodes.includes(practice.activityCode));
   assert.equal(practiced.session.stageStatus.intermediate, 'locked');
   await api(1, `/learning/activities/${practice.activityCode}/completion`, completeBody, { method: 'PUT', status: 409, error: 'learning_practice_requires_attempt' });
+  assert.deepEqual(await counts(fridge), sharedBaseline);
   await api(1, '/fridges/leave', { name: 'Personal test' });
   assert.equal((await row('learning_learners', 'learner_uid', 'owner_device_id', devices[1])).learner_uid, personalB.learner_uid);
   verified.push('shared members remain separate; join/leave preserve learner; review/practice never unlock');

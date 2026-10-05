@@ -4,13 +4,13 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-10-04（Australia/Sydney）。
+- 最后核对日期：2026-10-05（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 47 份 migration。CLI 当前链接 `Gress-development`；开发库已登记并应用到 `20261004010000_inventory_waste_profiles.sql`，包装快照与多部件分类学习接口的端到端验证通过。生产库仍须按顺序补齐未应用的 migration 后才能发布依赖新契约的 Express 与 App。
+- 本地 schema 历史共有 49 份 migration。CLI 当前链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库已登记并应用到 `20261005011000_learning_room_draft.sql`，Learning Room 298 次真实 HTTP 请求及版本／恢复 SQL 回滚验证通过。既有包装快照与多部件分类学习接口验证保留。生产库未应用本轮两份 learning migration，仍须按顺序补齐前置 migration 后才能发布依赖新契约的 Express 与 App。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
-- 应用最新本地 migration 后共有 22 张业务/安全表、7 个枚举，并新增设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC、冰箱领域同步版本，以及成就等级和 XP 流水。
+- 本轮远程只读核对 public schema 共有 44 张普通表，其中 Learning Room 新增 7 张；保留既有设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC、冰箱领域同步版本，以及成就等级和 XP 流水。
 - Seed 现在包含 16 条常见食材建议和 4 条旧成就定义；`20260912020000_achievement_dashboard.sql` 会幂等扩充并统一为 8 条已确认成就定义。新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
 - 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。分类管理接口尚未实现；生产发布仍须先应用 `20260912010000` 和 `20260912020000`。
@@ -868,7 +868,7 @@ GET /api/achievements
 
 ## 14.3 Learning Room 个人教学与考试（2026-10-05）
 
-此功能与既有 consume 分类题分开，主线为 SDG 13／13.3。新增 `20261005010000_learning_room_assessment.sql` 与 `20261005011000_learning_room_draft.sql`；当前已完成开发库回滚预演，正式应用及 HTTP 验证在本轮进行，生产未应用。
+此功能与既有 consume 分类题分开，主线为 SDG 13／13.3。新增 `20261005010000_learning_room_assessment.sql` 与 `20261005011000_learning_room_draft.sql`；两份文件已在 Git 提交 6d0af20 保存，并成功应用到开发库。预演回滚、38 项相关测试、298 次真实 HTTP 请求、追加版本／审核 SQL 回滚验证和远程 lint 均通过；测试 learner／attempt 余量为零，真实 v1 仍 draft／pending。生产未应用。
 
 七张表：`learning_content_versions` 保存不可变的公开目录、服务端私有题库、hash、审核及发布状态；`learning_learners` 以稳定 UUID 绑定当前 owner device；`learning_stage_progress` 保存永久解锁／首过／最佳成绩；`learning_activity_progress` 保存活动完成与资料阅读；`learning_quiz_attempts` 保存内容版本、题目／选项／来源冻结快照及游标；`learning_quiz_answers` 保存不可替换的首答；`learning_attempt_requests` 将所有创建／恢复请求键绑定原考试，完成后重发仍读原结果。
 
@@ -878,7 +878,7 @@ API：GET catalog／state／courses/:code／activities/:code；PUT activities/:c
 
 `fridge_members_transfer_learning` 仅在设备恢复 UPDATE device_id 时合并 learner；共享 join／leave 的 fridge_uid 变化不会合并个人等级。原 learner UUID 保留，临时考试／答案及已通过阶段合并；相同 stage／mode／activity 的临时 active 考试标记 abandoned，键冲突改为 recovery 命名空间保留原键审计。此触发器在既有 recover_device 同一事务中执行，旧凭证撤销规则不变。Learning Room 不写库存、inventory_events、waste_sorting_attempts、共享 XP、成就、通知或 Broadcast。
 
-草稿 reference migration 保存 `learning-room-v1`（48 题），独立审核仍 pending。默认 API 只选 published；开发验证须同时设置 `LEARNING_ROOM_ALLOW_DRAFT=1`、`LEARNING_ROOM_DRAFT_PROJECT_REF=thmbtsssvnslotoexntz`，且 SUPABASE_URL 必须为该开发域名、NODE_ENV 非 production。不修改现有 env 文件。生产无法开启草稿例外；正式发布必须用生成器经过真实独立审核检查生成新 migration。禁止重写已应用草稿；内容变更使用新 contentVersion。撤回版本会使其未完成考试 invalidated，保留已结算历史和永久资格。
+草稿 reference migration 保存 `learning-room-v1`（48 题），独立审核仍 pending。默认 API 只选 published；开发验证须同时设置 `LEARNING_ROOM_ALLOW_DRAFT=1`、`LEARNING_ROOM_DRAFT_PROJECT_REF=thmbtsssvnslotoexntz`，且 SUPABASE_URL 必须为该开发域名、NODE_ENV 非 production。不修改现有 env 文件。生产无法开启草稿例外；正式发布必须用生成器经过真实独立审核检查生成新 migration。新发布 migration 可将同 hash／同内容的既有草稿更新审核元数据和 published 状态；guard 拒绝复用版本改正文／题库、撤回后重启或退回 draft。禁止重写已应用草稿；内容变更使用新 contentVersion。撤回版本会使其未完成考试 invalidated，保留已结算历史和永久资格。
 
 ## 15. Migration 工作流
 
@@ -911,7 +911,7 @@ npx supabase db push --include-seed
 3. 查看 `server/src/index.js` 是否已经新增接口；本文档可能落后于代码。
 4. 确认 `device_id` 仍为 text 格式。
 5. 确认前端没有 Supabase client 或 key。
-6. 所有业务访问都先由 Express 将设备解析到唯一 `fridge_uid`。
+6. 所有业务访问都先由 Express 验证设备凭证并解析唯一 `fridge_uid`；Learning Room 在可信设备上下文下另按本人 learner 归属，不能使用共享冰箱作为学习等级归属。
 7. 所有库存修改同时写入 `inventory_events`。
 8. 不把临期、过期保存成固定库存状态。
 9. 通知事件按冰箱共享，已读状态按设备保存。

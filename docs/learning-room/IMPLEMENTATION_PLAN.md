@@ -1,12 +1,12 @@
 # Learning Room 实施计划与跨对话基准
 
-最后更新：2026-10-05（Australia/Sydney）。当前状态：**P0 已完成；P1 内容／技术验证完成、独立校对待完成；P2 五页组件与开发预览已实现、原生视觉验收待完成；P3 真实数据功能未开始。**
+最后更新：2026-10-05（Australia/Sydney）。当前状态：**P0 已完成；P1 内容／技术验证完成、独立校对待完成；P2 五页组件／预览已实现、原生验收待完成；P3 数据／考试 API 在开发库验证完成；下一步 P4 页面真实接入。**
 
 ## 1. 本次授权与固定基准
 
-用户确认：「这版特别好，我就希望按照这版严格做出了，现在先根据这版效果生成一个详细的计划，这样后面切换对话也能继续做」。本次交付是可接手的实施计划，不是开始修改 App 或远程数据库。后续用户要求继续实现时，直接按本计划和状态文件推进，已有视觉选择无需重新询问。
+用户确认：「这版特别好，我就希望按照这版严格做出了，现在先根据这版效果生成一个详细的计划，这样后面切换对话也能继续做」。最初交付为可接手计划；随后用户逐阶段授权继续开发。按本计划和状态文件推进，已有视觉选择无需重新询问。
 
-后续授权更新（2026-10-05）：用户先要求完成第一步，再依次要求继续。P0 素材与 P1 内容／契约完成；本轮完成 P2 五页 RN 组件、局部导航、明确开发预览与 Web 验证。独立内容审核和原生视觉验收仍 pending；P3 数据／服务未开始。实际阶段以 IMPLEMENTATION_STATUS 和 P2_VERIFICATION 为准，不把开发通过情景当作真实等级。
+后续授权更新（2026-10-05）：P0 素材、P1 内容、P2 五页组件／预览完成；本轮完成 P3 个人学习 schema、考试 API、开发迁移／lint、298 次真实 HTTP 及版本 SQL 验证。独立内容审核与原生视觉验收仍 pending，生产未发布。下一步 P4 gateway／动画与 practice／主入口，实际阶段以 IMPLEMENTATION_STATUS 和各期验证记录为准，预览 fixture 不是真实成绩。
 
 ### 1.1 必须保留的决定
 
@@ -157,7 +157,7 @@ attempt 生命周期为 `in_progress → submitted`，主动放弃为 `abandoned
 
 建议引入稳定 `learner_uid`，由服务端懒初始化并唯一关联当前 owner_device_id（text）。它只是匿名设备学习档案，不是新登录账号。加入／退出共享冰箱不迁移或合并学习成绩，也不向其他成员广播个人进度。
 
-下面的表名与字段是待实现方案，实际 SQL 由新 migration 落地：
+下表已由 P3 两份新 migration 在开发库落地；实际 SQL 为权威来源，完整证据见 P3_VERIFICATION.md：
 
 | 表 | 主要字段与约束 | 用途 |
 | --- | --- | --- |
@@ -167,8 +167,9 @@ attempt 生命周期为 `in_progress → submitted`，主动放弃为 `abandoned
 | `learning_activity_progress` | learner_uid＋activity_code PK；activity_type；first_completed_at；last_completed_at；seen_content_version；completed_attempt_uid 可空 | lesson、practice、resource 已学／已读状态，稳定 activity code 防重复 |
 | `learning_quiz_attempts` | attempt_uid UUID PK；learner_uid FK；stage_code；mode；activity_code 可空；content_version FK；question_snapshot jsonb；pass_percent；question_count；status；correct_count；started_at／submitted_at；create_key | 冻结抽题、恢复、正式考试／复习／练习记录 |
 | `learning_quiz_answers` | answer_uid UUID PK；attempt_uid＋question_instance_uid UNIQUE；selected_option_id；is_correct；answered_at；request_key | 每题首次答案、幂等与本人错题复习 |
+| `learning_attempt_requests` | learner_uid＋create_key PK；original_key；attempt_uid FK | 每个恢复创建键永久绑定原考试，已完成后重试也不另开考试 |
 
-关键约束：正式未完成 attempt 的部分唯一索引按 learner_uid／stage_code；create_key 在 learner 内唯一；answer 请求键在对应 attempt 内唯一；completed 状态必须符合题数和时间约束。历史题目快照包括双语解释与来源，题库发布后不能重写历史考试。
+关键约束：未完成 attempt 的部分唯一索引按 learner_uid／stage_code／mode／activity_code，正式 checkpoint 每级至多一份；create_key 在 learner 内唯一；answer 请求键在对应 attempt 内唯一；submitted 状态必须符合题数和时间约束。历史题目快照包括双语解释与来源，题库发布后不能重写历史考试。
 
 解锁、finish 和答案提交都通过仅 service role 有权执行的 RPC 事务完成；不能分成多次 HTTP 数据库写入再由客户端合成结果。所有新表启用 RLS，撤销 public／anon／authenticated 权限；App 不导入 Supabase Data API client。
 
@@ -194,23 +195,24 @@ attempt 生命周期为 `in_progress → submitted`，主动放弃为 `abandoned
 
 新内容版本不让已解锁阶段重新锁定。已有 attempt 按冻结版本恢复；若错误内容必须撤回，服务端 invalidated 后给出明确重新开始提示，不计失败、不抹掉既往合法阶段解锁。
 
-## 7. 待实现 Express API
+## 7. Express API（P3 实际契约）
 
-接口统一在 `/api/learning` 下。下表是目标契约，当前均不存在：
+接口统一在 `/api/learning` 下，已挂载在既有凭证鉴权之后。页面的真实 HTTP gateway 映射留给 P4，开发 preview 仍独立运行。所有文本一次返回 zh／en，不按 language 参数动态裁剪。
 
 | 方法与路径 | 请求重点 | 响应重点 |
 | --- | --- | --- |
-| GET `/catalog` | language 可选 | contentVersion、stage／course／activity 元信息、resource 索引、assetKey、来源概要；无正确答案 |
+| GET `/catalog` | 设备鉴权 | `{content}` 公开双语目录、stage／course／activity、resource、assetKey、来源；无私有题库 |
 | GET `/state` | 身份来自中间件 | 三阶段 status、已完成活动、resumeTarget、activeAttemptUid、最近本人结果、stateVersion |
 | GET `/courses/:courseCode` | 稳定 courseCode | 目标、三活动目录、时间、checkpoint 配置、相关阅读 |
 | GET `/activities/:activityCode` | 稳定 activityCode | 结构化 lesson／resource 内容、日期、统计范围、媒体与来源 |
 | PUT `/activities/:activityCode/completion` | contentVersion、幂等键；不接收任意用户 ID | read／lesson 已学状态和更新的 state；practice 由有效 practice attempt 结算 |
-| POST `/attempts` | stageCode、mode、可选 practice activityCode、createKey | 创建或恢复 attempt、questionCount、第一道可提交题、snapshotVersion |
+| POST `/attempts` | stageCode、mode、可选 practice activityCode、createKey | 创建或恢复考试，`quiz`／`result`、`status`、`attemptContentVersion` 和个人 state |
 | GET `/attempts/:attemptUid` | attempt 必须属于本人 | status、已答进度、当前题、允许展示的历史反馈、未完成或已结算 state |
-| POST `/attempts/:attemptUid/answers` | questionInstanceUid、selectedOptionId、requestKey | 已持久化判分、当前题解释／来源、nextQuestion 或可 finish 状态 |
+| POST `/attempts/:attemptUid/answers` | questionUid、optionId、requestKey | 已持久化首答 feedback 与来源，仍停在该题；不会隐式前进 |
+| POST `/attempts/:attemptUid/next` | requestKey | 当前题已答后才前进；重发同键不跨题，最后一题不再推进 |
 | POST `/attempts/:attemptUid/finish` | 幂等键 | 分数、passed、首次解锁与否、nextStage、更新的 state |
-| POST `/attempts/:attemptUid/abandon` | 显式操作原因、幂等键 | abandoned 或既有终态；不能抹掉结果 |
-| GET `/attempts/:attemptUid/review` | 本人 attempt | 本人已提交答案、题目快照、解释与相关课；未答题不能偷取答案 |
+| POST `/attempts/:attemptUid/abandon` | requestKey | abandoned（learner_restart）或既有终态；不能抹掉结果 |
+| GET `/attempts/:attemptUid/review` | 本人 attempt；missedOnly=true 可选 | `{questions,sources}` 本人已答题与解释；未答题不能偷取答案 |
 
 响应要有稳定错误码：invalid_input、learning_stage_locked、attempt_not_found、attempt_not_active、answer_already_submitted、attempt_incomplete、content_unavailable、learning_unavailable。另一个人的 attempt 返回 404，避免泄露是否存在。未通过是正常 200 结果，不当作网络异常。
 
@@ -278,7 +280,7 @@ P2 的 fixture 只供开发或截图验证，使用相同组件和 API 数据类
 6. 真正获发布授权后，核对生产未应用前置 migration，按顺序使用已验证的同一 SQL，再部署依赖的新 Express，最后启用 App 功能。
 7. 回退应用发布时可以关闭入口／回退 Express/App；保留追加式数据库记录，不重置生产库或删除考试数据。
 
-本次没有生成、应用或提交任何数据库 migration，也未连接远程数据库。Git status 当前仅显示学习室设计资料未跟踪；后续开发开始前重新核对，勿覆盖其他人的改动。
+规划阶段没有迁移；P3 已新增、提交并在 Gress-development 应用 `20261005010000`／`20261005011000`。生产未应用，独立审核 pending，正式发布状态与验证结果见 IMPLEMENTATION_STATUS.md 和 P3_VERIFICATION.md。后续不能修改已应用 SQL。
 
 ## 10. 验收与验证计划
 
@@ -320,7 +322,7 @@ P2 的 fixture 只供开发或截图验证，使用相同组件和 API 数据类
 
 回归原库存 consume→Bin Action 流程、包装多部件提示、成就共享排序统计、共享加入／退出／恢复、首页动画独立入口。学习室测验不能改变库存数量、expiry、共享成就或原 learning stats。
 
-实施后的检查命令候选：`npx tsc --noEmit`、`node --test server/test/learningAssessment.test.js`、内容 validator、开发端到端脚本、现有 wasteQuestionCatalog 测试。需要原生导出时再运行 Expo Android export，并把产物放独立验证目录。命令在本计划阶段**尚未执行**；仅文档无需启动构建或远程验证。
+检查命令：`node node_modules/typescript/bin/tsc --noEmit`、Node assessment／content／wasteQuestionCatalog／UI 测试、内容 validator、`npm --prefix server run verify:learning-room`（从 server cwd 运行）。P3 已执行相关检查，具体结果见验证记录。需要原生导出时再运行 Expo Android export，产物放独立验证目录。
 
 ## 11. 实施风险及可直接采取的处理
 
