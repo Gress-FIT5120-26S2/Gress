@@ -1,19 +1,21 @@
+import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { LearningSource, LearningText } from '../../types/learningContent';
 import type { LearningQuizView } from '../../types/learningRoom';
-import { LearningButton, LearningIcon, LearningImage, LearningPage, LearningProgress, LearningSourceLink, ui } from './LearningUi';
+import { LearningButton, LearningIcon, LearningImage, LearningLink, LearningPage, LearningProgress, LearningSourceLink, ui } from './LearningUi';
 import { learningColors as c, learningStyles as s, learningTypography } from './learningTheme';
 
-export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources, onSelect, onSubmit, onNext, onBack, onClose, busy, error, reviewing = false }: {
+export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources, onSelect, onSubmit, onNext, onBack, onClose, busy, error, reviewing = false, selectionLocked = false, onRestart }: {
   quiz: LearningQuizView; stageTitle: LearningText; selectedOptionId: string | null; sources: LearningSource[];
   onSelect: (id: string) => void; onSubmit: () => void; onNext: () => void; onBack: () => void; onClose: () => void;
-  busy: boolean; error: string | null; reviewing?: boolean;
+  busy: boolean; error: string | null; reviewing?: boolean; selectionLocked?: boolean; onRestart?: () => void;
 }) {
   const { language, t } = useI18n();
   const copy = t.learning;
+  const [confirmRestart, setConfirmRestart] = useState(false);
   const feedback = quiz.feedback;
-  const frozen = feedback !== null || reviewing;
+  const frozen = feedback !== null || reviewing || selectionLocked;
   const selected = feedback?.selectedOptionId ?? selectedOptionId;
   const last = quiz.questionNumber === quiz.questionCount;
   const nextLabel = reviewing ? last ? copy.reviewComplete : copy.nextQuestion : last ? copy.seeResults : copy.nextQuestion;
@@ -47,12 +49,17 @@ export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources
     {quiz.question.regionCode === 'AU-VIC' ? <View style={[ui.row, { alignItems: 'flex-start', gap: 8 }]}><LearningIcon name="information-circle-outline" size={18} color={c.textSecondaryReadable} />
       <Text style={[ui.caption, ui.flex]}>{copy.councilHint}</Text></View> : null}
     <Text style={ui.caption}>{quiz.question.serviceAssumptions[language]}</Text>
+    {selectionLocked && !feedback ? <Text accessibilityLiveRegion="polite" style={ui.caption}>{copy.selectionPending}</Text> : null}
     {feedback ? <View accessibilityLiveRegion="polite" style={[ui.panel, feedback.isCorrect ? null : styles.feedbackError]}>
       <View style={ui.row}><LearningIcon name={feedback.isCorrect ? 'checkmark-circle-outline' : 'information-circle-outline'} color={feedback.isCorrect ? c.learningGreenReadable : c.error} />
         <Text style={ui.listTitle}>{feedback.isCorrect ? copy.correct : copy.incorrect}</Text></View>
       <Text style={ui.body}>{feedback.explanation[language]}</Text><Text style={ui.caption}>{copy.firstAnswer}</Text>
       {feedback.sourceRefs.map((code) => { const source = sources.find((item) => item.sourceCode === code); return source ? <LearningSourceLink key={code} label={source.publisher} url={source.url} /> : null; })}
     </View> : null}
+    {onRestart && !reviewing ? confirmRestart ? <View style={ui.panel}><Text style={ui.body}>{copy.restartBody}</Text>
+      <LearningButton label={copy.confirmRestart} disabled={busy} onPress={onRestart} />
+      <LearningLink label={copy.cancel} onPress={() => setConfirmRestart(false)} /></View>
+      : <LearningLink label={copy.restartQuiz} icon="refresh-outline" onPress={() => { if (!busy) setConfirmRestart(true); }} /> : null}
   </LearningPage>;
 }
 

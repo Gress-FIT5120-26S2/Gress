@@ -1,28 +1,15 @@
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { LinearGradient } from 'expo-linear-gradient';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { AccessibilityInfo, Animated, Easing, Image, Linking, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Linking, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import Svg, { Defs, LinearGradient as SvgLinearGradient, Path, Stop } from 'react-native-svg';
+import { MaterialArtwork, WasteSortingInteraction } from './WasteSortingInteraction';
 import { useI18n } from '../../i18n';
 import { submitWasteAnswer, type WasteOpportunity, type WasteStream } from '../../services/wasteLearningApi';
 
 type Props = { opportunity: WasteOpportunity | null; blurTarget?: RefObject<View | null>; onClose: () => void };
 const STREAMS: WasteStream[] = ['organics', 'recycling', 'general'];
-const BIN_ART: Record<WasteStream, { closed: number; open: number }> = {
-  organics: { closed: require('../../../assets/waste-bins/organics-closed.png'), open: require('../../../assets/waste-bins/organics-open.png') },
-  recycling: { closed: require('../../../assets/waste-bins/recycling-closed.png'), open: require('../../../assets/waste-bins/recycling-open.png') },
-  general: { closed: require('../../../assets/waste-bins/general-closed.png'), open: require('../../../assets/waste-bins/general-open.png') },
-};
-const ICONS: Partial<Record<WasteOpportunity['material'], keyof typeof MaterialCommunityIcons.glyphMap>> = {
-  eggshell: 'egg-outline',
-  aluminium_can: 'cylinder',
-  plastic_bottle: 'bottle-soda-outline',
-  unknown_bottle: 'bottle-soda-outline',
-  unknown_container: 'help-circle-outline',
-};
 const COPY = {
   zh: {
     eyebrow: '分类练习', question: (material: string) => `${material}该去哪一类？`, instruction: '拖动或点击选择',
@@ -59,57 +46,6 @@ const COPY = {
     correct: 'Correct category', council: 'Check your council before real disposal', source: 'Official guidance', close: 'Continue', skip: 'Skip', saving: 'Saving…', error: 'Could not save. Please try again', practiceDone: 'Now you know!', practiceHint: 'You can sort it this way next time.',
   },
 };
-
-function BinChoice({ stream, index, hovered, highlighted, label, onPress, disabled, reducedMotion }: {
-  stream: WasteStream; index: number; hovered: number; highlighted: boolean; label: string; onPress: () => void; disabled: boolean; reducedMotion: boolean;
-}) {
-  const lid = useRef(new Animated.Value(0)).current;
-  const isOpen = hovered === index;
-  const artwork = BIN_ART[stream];
-  useEffect(() => {
-    if (reducedMotion) lid.setValue(isOpen ? 1 : 0);
-    else Animated.timing(lid, { toValue: isOpen ? 1 : 0, duration: 170, easing: Easing.out(Easing.cubic), useNativeDriver: true }).start();
-  }, [isOpen, lid, reducedMotion]);
-  // Arthur: NarIyirm
-  // 中文：同一款实物桶模型预渲染开合两帧，拖拽悬停时交叉淡化，避免在 Expo Go 中加载实时 3D 场景。
-  // EN: Crossfade offline open and closed renders of one bin model on hover, avoiding a live 3D scene in Expo Go.
-  return <Pressable accessibilityLabel={label} accessibilityRole="button" disabled={disabled} onPress={onPress} style={styles.binTouch}>
-    <View style={[styles.binFigure, (isOpen || highlighted) && styles.binFigureActive]}>
-      <Animated.Image resizeMode="contain" source={artwork.closed} style={[styles.binImage, { opacity: lid.interpolate({ inputRange: [0, 1], outputRange: [1, 0] }) }]} />
-      <Animated.Image resizeMode="contain" source={artwork.open} style={[styles.binImage, { opacity: lid }]} />
-    </View>
-    <Text numberOfLines={2} style={styles.binText}>{label}</Text>
-  </Pressable>;
-}
-
-function MaterialArtwork({ material, iconUrl, emoji }: { material: WasteOpportunity['material']; iconUrl?: string | null; emoji?: string }) {
-  const [failed, setFailed] = useState(false);
-  if (iconUrl && !failed) return <Image accessibilityIgnoresInvertColors onError={() => setFailed(true)} resizeMode="contain" source={{ uri: iconUrl }} style={{ width: 100, height: 100 }} />;
-  if (emoji && !ICONS[material]) return <Text style={{ fontSize: 65 }}>{emoji}</Text>;
-  if (material === 'eggshell') {
-    return <Svg height={91} viewBox="0 0 100 91" width={100}>
-      <Defs><SvgLinearGradient id="shell" x1="0" x2="1" y1="0" y2="1"><Stop offset="0" stopColor="#FFFFFF" /><Stop offset="1" stopColor="#ECD9AF" /></SvgLinearGradient></Defs>
-      <Path d="M17 37 C19 18 33 7 50 7 C68 7 81 20 83 37 L72 31 L61 40 L49 31 L37 42 L26 34 Z" fill="url(#shell)" stroke="#D6BE92" strokeWidth="2.5" />
-      <Path d="M13 45 L24 37 L36 46 L49 36 L62 46 L75 37 L87 45 C86 69 71 84 50 84 C29 84 14 69 13 45 Z" fill="url(#shell)" stroke="#D6BE92" strokeLinejoin="round" strokeWidth="2.5" />
-      <Path d="M22 58 C27 70 36 76 45 77" fill="none" stroke="#FFFFFF" strokeLinecap="round" strokeWidth="5" />
-    </Svg>;
-  }
-  if (material === 'aluminium_can') {
-    return <View style={styles.canArt}>
-      <View style={styles.canTop} />
-      <LinearGradient colors={['#F4F8F3', '#8DD3DD', '#2C9AAC', '#D9F1E9']} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }} style={styles.canBody}>
-        <MaterialCommunityIcons color="#FFE277" name="circle-slice-8" size={38} />
-      </LinearGradient>
-      <View style={styles.canBottom} />
-    </View>;
-  }
-  return <MaterialCommunityIcons
-    color="#CDEEF1"
-    name={ICONS[material] ?? 'help-circle-outline'}
-    size={96}
-    style={styles.materialGlyph}
-  />;
-}
 
 // Arthur: NarIyirm
 // 中文：组件只记录用户对材质的学习选择，不宣称现实中的垃圾已投放，也不修改挽回金额。
@@ -316,13 +252,9 @@ export function WasteSortingOverlay({ opportunity, blurTarget, onClose }: Props)
               : <Pressable accessibilityRole="button" onPress={() => { returnItem(); setFeedbackDismissed(true); }} style={styles.continueAction}><Text style={styles.continueText}>{copy.retry}</Text><Ionicons color="#FFFFFF" name="refresh" size={17} /></Pressable>}
           </View>
         </View> : <Text style={[styles.question, { top: topbarTop + 51 }]}>{copy.question(materialName)}</Text>}
-        {!guidanceOnly ? <View style={[styles.playArea, { top: itemTop, width: playWidth, height: Math.max(245, binY + 176) }]}>
-          <Animated.View {...pan.panHandlers} accessibilityLabel={`${materialName}${opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}`} pointerEvents={resultSuccess ? 'none' : 'auto'} style={[styles.item, resultSuccess && styles.itemBehindBin, itemStyle]}>
-            <MaterialArtwork key={`${activeMaterial}:${opportunity.iconUrl}`} emoji={opportunity.iconEmoji} iconUrl={opportunity.iconUrl} material={activeMaterial} />
-            <Text style={styles.itemText}>{materialName}{opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}</Text>
-          </Animated.View>
-          <View style={[styles.bins, { top: binY }]}>{STREAMS.map((stream, index) => <BinChoice disabled={saving || resultSuccess} highlighted={Boolean(selected && !resultSuccess && stream === answerStream)} hovered={hovered} index={index} key={stream} label={copy.streams[stream]} onPress={() => void choose(index)} reducedMotion={reduceMotion} stream={stream} />)}</View>
-        </View> : null}
+        {!guidanceOnly ? <WasteSortingInteraction mode="inventory" width={playWidth} binY={binY} style={{ position: 'absolute', top: itemTop }} gestureHandlers={pan.panHandlers} itemStyle={itemStyle} hovered={hovered} reducedMotion={reduceMotion} disabled={saving || resultSuccess} itemDisabled={resultSuccess}
+          itemLabel={`${materialName}${opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}`} onChoose={(index) => void choose(index)} choices={STREAMS.map(stream => ({ stream, label: copy.streams[stream], highlighted: Boolean(selected && !resultSuccess && stream === answerStream) }))}
+          item={<><MaterialArtwork key={`${activeMaterial}:${opportunity.iconUrl}`} emoji={opportunity.iconEmoji} iconUrl={opportunity.iconUrl} material={activeMaterial} /><Text style={styles.itemText}>{materialName}{opportunity.quantity > 1 ? ` ×${opportunity.quantity}` : ''}</Text></>} /> : null}
         {saving || error ? <Text accessibilityLiveRegion="polite" style={[styles.status, error && styles.error, { bottom: insets.bottom + 73 }]}>{error ? copy.error : copy.saving}</Text> : null}
         {!showFeedback ? <View style={[styles.footer, { bottom: insets.bottom + 21 }]}><Text style={styles.instruction}>{copy.instruction}</Text></View> : null}
       </>}
@@ -337,21 +269,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: '#F2FCF3', fontSize: 15, fontWeight: '800', letterSpacing: 0.4, textShadowColor: 'rgba(4,30,22,0.5)', textShadowRadius: 5 },
   skipText: { color: '#F2FCF3', fontSize: 14, fontWeight: '800', textShadowColor: 'rgba(4,30,22,0.5)', textShadowRadius: 5 },
   question: { position: 'absolute', left: 22, right: 22, color: '#F4FFF7', fontSize: 30, fontWeight: '800', lineHeight: 37, textAlign: 'center', textShadowColor: 'rgba(4,30,22,0.75)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 8 },
-  playArea: { position: 'absolute', alignSelf: 'center' },
-  item: { position: 'absolute', top: 0, left: '50%', marginLeft: -55, width: 110, height: 122, zIndex: 5, alignItems: 'center', justifyContent: 'center' },
-  itemBehindBin: { zIndex: 1 },
-  materialGlyph: { textShadowColor: 'rgba(255,255,255,0.55)', textShadowOffset: { width: -2, height: -2 }, textShadowRadius: 10 },
   itemText: { color: '#FFFFFF', fontSize: 13, fontWeight: '800', marginTop: 2, textAlign: 'center', textShadowColor: 'rgba(0,24,20,0.85)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 5 },
-  canArt: { width: 67, height: 91, alignItems: 'center', transform: [{ rotate: '15deg' }], shadowColor: '#001F23', shadowOpacity: 0.35, shadowRadius: 10, elevation: 8 },
-  canTop: { width: 58, height: 10, borderRadius: 9, backgroundColor: '#E7ECEB', borderWidth: 2, borderColor: '#7A9598', zIndex: 2 },
-  canBody: { width: 60, height: 72, marginTop: -2, borderWidth: 1, borderColor: '#DBF7F3', alignItems: 'center', justifyContent: 'center' },
-  canBottom: { width: 57, height: 8, marginTop: -2, borderRadius: 8, backgroundColor: '#9BB6B5', borderWidth: 1, borderColor: '#ECF8F1' },
-  bins: { position: 'absolute', left: 0, right: 0, flexDirection: 'row', alignItems: 'flex-start', zIndex: 2 },
-  binTouch: { flex: 1, minHeight: 168, alignItems: 'center', justifyContent: 'flex-start' },
-  binFigure: { width: 112, height: 145, alignItems: 'center' },
-  binFigureActive: { transform: [{ scale: 1.06 }] },
-  binImage: { position: 'absolute', width: 112, height: 145 },
-  binText: { color: '#FFFFFF', fontSize: 12, fontWeight: '800', lineHeight: 15, textAlign: 'center', marginTop: -2, paddingHorizontal: 2, textShadowColor: 'rgba(3,30,20,0.8)', textShadowOffset: { width: 0, height: 2 }, textShadowRadius: 4 },
   footer: { position: 'absolute', left: 16, right: 16, alignItems: 'center' },
   instruction: { color: '#F0FAF3', fontSize: 12, fontWeight: '700', textAlign: 'center', textShadowColor: 'rgba(3,30,20,0.75)', textShadowRadius: 4 },
   status: { position: 'absolute', left: 15, right: 15, color: '#F7FFF8', fontSize: 12, fontWeight: '700', textAlign: 'center' },

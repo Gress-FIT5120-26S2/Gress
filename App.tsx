@@ -10,6 +10,8 @@ import { fetchNotificationPreferences, fetchNotifications } from './src/services
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { SPOONIE_MODEL_ASSET } from './src/assets/spoonieModel';
 import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
+import { LearningLazyModal } from './src/components/learning/LearningLazyModal';
+import type { LearningOrigin } from './src/types/learningRoom';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
 import { countExpiringBatches, getInventorySnapshot, type InventorySnapshot } from './src/services/inventoryApi';
@@ -43,6 +45,10 @@ const LinearFoodWasteStory = lazy(() =>
   import('./src/components/LinearFoodWasteStory').then((module) => ({ default: module.LinearFoodWasteStory })),
 );
 
+// Arthur: NarIyirm
+// 中文：学习室按需加载；保留入口 Tab 并暂停厨房，关闭后回到原页面。
+// EN: Load learning on demand, preserving the origin tab and pausing the kitchen until the room closes.
+const loadLearningRoom = () => import('./src/components/learning/LearningRoomEntry').then(m => ({ default: m.LearningRoomEntry }));
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
   shopping: '#FFF1DC',
@@ -98,6 +104,11 @@ function KitchMemoApp() {
   const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
   const [firstUseJourneyState, setFirstUseJourneyState] = useState<FirstUseJourneyState>('checking');
   const [storyVisible, setStoryVisible] = useState(false);
+  const [learningOrigin, setLearningOrigin] = useState<LearningOrigin | null>(null);
+  const closeLearning = useCallback(() => setLearningOrigin(null), []);
+  const openLearning = useCallback((origin: LearningOrigin) => {
+    setAssistantVisible(false); setStoryVisible(false); setLearningOrigin(origin);
+  }, []);
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
@@ -365,6 +376,7 @@ function KitchMemoApp() {
   }, []);
 
   const openSystemNotification = useCallback((notificationId?: string) => {
+    setLearningOrigin(null);
     setNotificationReturnTab('home');
     setNotificationTargetId(notificationId ?? null);
     setActiveTab('notifications');
@@ -461,7 +473,7 @@ function KitchMemoApp() {
               中文：首页 GL Canvas 在首次创建后保持挂载；切走时只暂停并隐藏，返回时复用已经绘制的纹理和 GL 上下文，消除重新建场景产生的白帧。
               EN: Keep the Home GL canvas mounted after its first creation; hide and pause it off-tab so returning reuses the rendered texture and GL context without a reconstruction flash. */}
           <View
-            pointerEvents={activeTab === 'home' ? 'auto' : 'none'}
+            pointerEvents={activeTab === 'home' && learningOrigin === null ? 'auto' : 'none'}
             style={[
               styles.homeSceneLayer,
               { backgroundColor: kitchenLighting.background },
@@ -471,7 +483,7 @@ function KitchMemoApp() {
             {canMountKitchen ? (
               <Suspense fallback={<KitchenLoading />}>
                 <Kitchen3DPrototype
-                  active={activeTab === 'home' && !storyVisible}
+                  active={activeTab === 'home' && !storyVisible && learningOrigin === null}
                   batches={assistantSnapshot?.batches ?? []}
                   expiringCount={expiringCount}
                   inventoryFillRatio={HOME_PREVIEW_INVENTORY_FILL_RATIO}
@@ -522,6 +534,7 @@ function KitchMemoApp() {
                 />
               ) : activeTab === 'profile' ? (
                 <ProfileScreen
+                  onOpenLearningRoom={() => openLearning('profile')}
                   onOpenNotifications={() => {
                     setNotificationReturnTab('profile');
                     setNotificationTargetId(null);
@@ -552,13 +565,14 @@ function KitchMemoApp() {
           ) : null}
         </Animated.View>
       </BlurTargetView>
-      {!isOpening && firstUseJourneyState === 'complete' && (
+      {!isOpening && firstUseJourneyState === 'complete' && learningOrigin === null && (
         <Animated.View
           pointerEvents={isCinematicActive ? 'none' : 'box-none'}
           style={[styles.chromeLayer, { opacity: chromeOpacity }]}
         >
           {activeTab === 'home' ? (
             <HomeAmbientOverlay
+              onOpenLearningRoom={() => openLearning('home')}
               blurTarget={blurTargetRef}
               badgeCount={notificationBadgeCount}
               expiringCount={expiringCount}
@@ -601,9 +615,9 @@ function KitchMemoApp() {
         onClose={closeAssistant}
         onDataChanged={handleAssistantDataChanged}
         onOpenItem={handleAssistantOpenItem}
-        visible={assistantVisible}
+        visible={assistantVisible && learningOrigin === null}
       />
-      <StatusBar style={!isFirstUseJourneyVisible && ((activeTab === 'home' && kitchenLighting.phase === 'night') || activeTab === 'achievements') ? 'light' : 'dark'} />
+      <StatusBar style={learningOrigin === null && !isFirstUseJourneyVisible && ((activeTab === 'home' && kitchenLighting.phase === 'night') || activeTab === 'achievements') ? 'light' : 'dark'} />
       {isOpening && (
         <OpeningAnimation
           canReveal={canRevealKitchen}
@@ -612,6 +626,7 @@ function KitchMemoApp() {
         />
       )}
       <FirstUseJourney onComplete={completeFirstUseJourney} visible={isFirstUseJourneyVisible} />
+      {learningOrigin ? <LearningLazyModal load={loadLearningRoom} componentProps={{ origin: learningOrigin, onClose: closeLearning }} onClose={closeLearning} /> : null}
       {storyVisible ? <Suspense fallback={null}><LinearFoodWasteStory onClose={() => setStoryVisible(false)} /></Suspense> : null}
     </View>
   );

@@ -29,3 +29,7 @@
 `LearningRoomFlow.tsx` 已建立局部容器，必须传入 `LearningRoomGateway`，没有默认 fixture；全屏 Modal 的 `onRequestClose`、顶部返回、Android BackHandler 与 iOS 左边缘返回共用处理逻辑。原生手势仍待设备验证。
 
 Home／Profile 回调和 App.tsx root 生命周期尚未接入，留待 P4。`index.ts` 只在明确设置 `EXPO_PUBLIC_LEARNING_PREVIEW=1` 的开发进程进入独立 Preview App；正常入口及生产 bundle 仍为真实 App。预览不启动身份服务，也不持久化学习或语言偏好。运行命令、截图与待验收事项见 [P2_VERIFICATION.md](verification/2026-10-05/P2_VERIFICATION.md)。
+
+## P4 实际接入补记
+
+HomeAmbientOverlay 已增加底部教育按钮，Profile medal wall 后已增加学习行。App.tsx 用 learningOrigin 与 LearningLazyModal 按需打开 LearningRoomEntry；打开时关闭助手、暂停 Home GL 并隐藏 chrome，关闭保持主 Tab，通知导航会关闭学习室。本人 gateway 每次打开重建，后台回前台刷新服务器状态。动画与独立 practice 已接入，普通服务不会加载 draft／fixture。真机安全区、字体、热点遮挡、返回与 GL／视频生命周期待 P5 实测；见 P4_VERIFICATION.md。

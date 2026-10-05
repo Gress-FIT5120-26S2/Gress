@@ -53,12 +53,13 @@ export function createLearningPreview(scenario: LearningPreviewScenario) {
       if (loadFailure) { loadFailure = false; throw new Error('Preview load failure'); }
       return { content: learningPreviewContent, session: structuredClone(session) };
     },
-    async startQuiz(stageCode, mode) {
+    async startQuiz(stageCode, mode, _activityCode) {
       if (mode === 'checkpoint' && session.stageStatus[stageCode] === 'locked') throw new Error('Preview checkpoint locked');
       const count = learningPreviewContent.stages.find((stage) => stage.stageCode === stageCode)!.questionCount;
-      current = { ...structuredClone(quiz), stageCode, mode, questionNumber: 1, questionCount: count };
+      current = { ...structuredClone(quiz), stageCode, mode, questionNumber: 1, questionCount: mode === 'practice' ? 3 : mode === 'mixed-review' ? 12 : count };
       return structuredClone(current);
     },
+    async abandonQuiz() { return structuredClone(session); },
     async resumeQuiz() { return structuredClone(current); },
     async submitAnswer(_attemptUid, _questionUid, selectedOptionId) {
       if (answerFailure) { answerFailure = false; throw new Error('Preview answer failure'); }
@@ -68,7 +69,7 @@ export function createLearningPreview(scenario: LearningPreviewScenario) {
       return structuredClone(current);
     },
     async nextQuestion() {
-      current = { ...current, questionNumber: current.questionCount, question: { ...question, questionUid: 'preview-last-can-question' }, feedback: null };
+      current = { ...current, questionNumber: current.mode === 'practice' ? Math.min(current.questionNumber + 1, current.questionCount) : current.questionCount, question: { ...question, questionUid: `preview-can-${current.questionNumber + 1}` }, feedback: null };
       return structuredClone(current);
     },
     async finishQuiz() {
@@ -80,9 +81,10 @@ export function createLearningPreview(scenario: LearningPreviewScenario) {
         : current.stageCode === 'intermediate' ? { ...progressed, currentStageCode: 'advanced' as const,
           stageStatus: { beginner: 'completed' as const, intermediate: 'completed' as const, advanced: 'unlocked' as const },
           resumeTarget: { type: 'activity' as const, activityCode: 'advanced-plan-first' } } : progressed;
-      const correctCount = failing ? 4 : current.stageCode === 'advanced' ? 8 : current.stageCode === 'intermediate' ? 7 : 5;
+      if (current.mode === 'practice' && !session.completedActivityCodes.includes('beginner-bin-action')) session.completedActivityCodes.push('beginner-bin-action');
+      const correctCount = current.mode === 'practice' ? 2 : current.mode === 'mixed-review' ? 10 : failing ? 4 : current.stageCode === 'advanced' ? 8 : current.stageCode === 'intermediate' ? 7 : 5;
       const value: LearningResultView = { ...structuredClone(result), stageCode: current.stageCode, mode: current.mode,
-        passed: !failing, totalCount: current.questionCount, correctCount, scorePercent: Math.round(correctCount / current.questionCount * 100),
+        passed: current.mode === 'practice' ? false : !failing, totalCount: current.questionCount, correctCount, scorePercent: Math.round(correctCount / current.questionCount * 100),
         missedCount: current.questionCount - correctCount,
         nextStageCode: current.mode !== 'checkpoint' || failing || current.stageCode === 'advanced' ? null : current.stageCode === 'beginner' ? 'intermediate' : 'advanced',
         session: structuredClone(nextSession) };

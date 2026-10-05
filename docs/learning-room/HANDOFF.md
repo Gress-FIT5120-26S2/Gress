@@ -4,9 +4,9 @@
 
 ## 1. 三句话说明当前任务
 
-用户已认可 `docs/art-direction/learning-room/2026-10-05-app-palette-v2/` 的五张效果图，并要求后续严格按图实现。项目主线是 **SDG 13 Climate Action**，配色匹配现有 Fridge／Achievements。**P0、P1 内容／技术验证、P2 五页组件／预览、P3 个人数据与考试 API 已完成开发验证**；独立内容审核、原生视觉验收和 P4 页面真实接入仍待完成。
+用户已认可 `docs/art-direction/learning-room/2026-10-05-app-palette-v2/` 的五张效果图，并要求后续严格按图实现。项目主线是 **SDG 13 Climate Action**，配色匹配现有 Fridge／Achievements。**P0、P1 内容／技术验证、P2 五页组件／预览、P3 个人数据与考试 API、P4 真实适配器／入口／视频／practice 已完成开发验证**；独立内容审核与 P5 原生验收仍待完成。
 
-用户依次授权各阶段，本轮完成 P3 开发库迁移与真实 HTTP 验证。未来用户说继续时从 **P4 learningApi 与全链路整合** 接手，有设备时同时补 P2 原生验收；保留 P1／P2 pending 门槛，不必重新询问已经确定的页面方向。
+用户依次授权各阶段，本轮完成 P4，54 项自动测试、123 次真实适配器 HTTP、Web practice 与视频检查通过。未来用户说继续时从 **P5 真机验收与发布准备** 接手，有设备时同时补 P2 原生验收；保留 P1／P2 pending 门槛，不必重新询问已经确定的页面方向。
 
 ## 2. 必须读取的顺序
 
@@ -18,6 +18,7 @@
    同时读 [CONTENT_CONTRACT.md](CONTENT_CONTRACT.md)、[CONTENT_REVIEW.md](CONTENT_REVIEW.md) 与 [P1_VERIFICATION.md](verification/2026-10-05/P1_VERIFICATION.md)：实际字段、48 题和来源、测试与待审事实。
    再读 [P2_VERIFICATION.md](verification/2026-10-05/P2_VERIFICATION.md)：现有页面／gateway、运行预览、截图差异及原生 pending。
    再读 [API_CONTRACT.md](API_CONTRACT.md)、[P3_VERIFICATION.md](verification/2026-10-05/P3_VERIFICATION.md)：真实 API 字段、迁移／开发验证、版本／审核 gate 与恢复。
+   再读 [P4_VERIFICATION.md](verification/2026-10-05/P4_VERIFICATION.md)：真实适配器、入口／媒体／独立 practice、测试、草稿启动命令和原生待验项。
 6. 任何代码之前，读取 [Expo SDK 57 的确切版本文档](https://docs.expo.dev/versions/v57.0.0/)。使用特定 Expo API 时再读该版本对应模块文档。
 7. 任何 Supabase、Express、设备恢复、共享／库存／成就相关改动前，完整读取 `docs/data-architecture/BACKEND_DATA_CONTEXT.md`，并检查相关最新 migration。
 
@@ -58,19 +59,21 @@
 
 ## 5. 下一步执行方式
 
-P0 已完成；P1 内容／技术验证完成、独立校对 pending；P2 五页组件／预览／Web 验证完成、原生验收 pending；P3 已提交并在开发库应用两份 migration，七表／API／判分／恢复通过 298 次 HTTP 与 SQL 版本验证。用户要求继续时从 **P4 learningApi／个人数据管理／动画与 practice／正式入口** 开始。发布前必须完成独立审核和原生门槛，不得让生产入口暴露 fixture 假成绩。
+P0–P4 已完成代码与各自开发验证；P1 独立校对、P2 原生视觉与 P5 设备验收 pending。下一步从 **P5** 开始，保留批准五页，不重新生成图或题库。
 
-先查看 P0–P3 验证记录、`assets/learning-room/SOURCE.md`、`ENTRY_INTEGRATION.md`、`src/types/learningRoom.ts` 与 `LearningRoomFlow.tsx`。真实 HTTP 与前端视图字段已匹配，按 API_CONTRACT.md 实现 gateway 并补 practice activityCode、abandon、来源与异常处理。网络重试复用同一键，UI 不推算分数／升级。`dev/` 只回放一题和固定结果；8083 preview 仍 fixture。视频只有摘要、Bin Action practice 待集成，主 App 无学习入口。
+先读 P4_VERIFICATION。真实 gateway 位于 src/services/learningGateway.ts，原生 adapter 位于 learningApi.ts；LearningRoomEntry 每次打开创建本人实例。Home／Profile 已连；视频重用现有 LinearFoodWasteStory；practice 与库存 overlay 共用 WasteSortingInteraction，但各自保存。16 项 gateway 故障测试、8 项导航测试、22 项服务端学习测试、8 项原分类测试、123 次真实 API 请求通过。My path 有服务器历史，状态／答案／next／finish 重试与身份隔离已处理。不要把 UI fixtures 或 Web 截图当成真实考试／原生证据。
 
-开发 Supabase ref 为 thmbtsssvnslotoexntz，49 migrations 最新 20261005011000，生产未应用本轮 schema；不得改已应用 SQL。真实参考内容 learning-room-v1 仍 draft／pending。普通服务仅 published，开发测试须双草稿开关＋开发域名＋非 production；后续正式发布需真实独立审核、生成追加 reference migration，不能直接伪造 review.json 或绕过 gate。P3 提交 6d0af20，前序成果 1eb83a8，测试数据已清理。重跑数据库断言用 prepare-learning-preflight.js --applied。
+P5 首先检查实际设备的入口遮挡、GL 暂停／恢复、返回、视频嵌套 Modal、分类 tap／drag、网络失败／后台／杀进程恢复、字体 1.3／1.6、读屏与 Reduce Motion。浏览器鼠标拖拽尝试没有确认提交，不能勾选拖拽通过；tap／纠错与视频播放／暂停／关闭有 Web 证据。当前没有 adb／原生控制界面，设备证据仍需补齐。
 
-`npm run learning:preview -- --web --port 8083` 可独立预览，不启动 Express；`node server/scripts/export-learning-preview.js` 更新公开草稿快照。正常 bundle 已检查不含预览题／attempt／草稿 catalog。不要重新生成素材或重新写题库；客户端只能使用公开投影，不得导入私有答案。后续明确按任务拆分提交；用户未要求代理并行时不要自行派子代理。
+开发 Supabase ref 为 thmbtsssvnslotoexntz，49 migrations 最新 20261005011000，生产未应用本轮 schema；不得改已应用 SQL。真实参考内容 learning-room-v1 仍 draft／pending。普通服务仅 published，开发测试须双草稿开关＋开发域名＋非 production；后续正式发布需真实独立审核、生成追加 reference migration，不能直接伪造 review.json 或绕过 gate。P3 提交 6d0af20／b63584f，前序成果 1eb83a8；P4 提交查当前 Git log，测试数据已清理。重跑数据库断言用 prepare-learning-preflight.js --applied。
+
+`npm run learning:preview -- --web --port 8083` 可独立预览，不启动 Express；`node server/scripts/export-learning-preview.js` 更新公开草稿快照。P4 正常 Android bundle 已检查不含预览题／attempt／私有 bank，含真实 API；通用 i18n 预览文案保留。不要重新生成素材或重新写题库；客户端只能使用公开投影，不得导入私有答案。实际草稿服务运行 `npm --prefix server run dev:learning`，不改 .env，仅非 production＋指定开发域名可用；普通 server 对 draft 显示审核中是预期。后续明确按任务拆分提交；用户未要求代理并行时不要自行派子代理。
 
 每次结束对话前更新状态文件，记录到具体任务、文件、测试和 migration 环境。写代码时对非显然 intent／data flow 按 AGENTS.md 添加 Arthur 标识与中英双语注释；不要给 trivial syntax 加重复注释。
 
 ## 6. 可直接粘贴到新对话的提示词
 
-> 继续实现 KitchMemo 的 Learning Room。先读 HANDOFF、状态／计划／视觉规格、API_CONTRACT 和 P1–P3 验证记录。严格保留 app-palette-v2 五页布局与冰箱／成就配色，SDG 13／13.3，不加第六个 Tab。P0 素材、P1 内容、P2 五页组件／预览、P3 七表／个人考试 API 已实现。当前从 P4 learningApi gateway＋个人数据管理开始，再接教育视频、独立 Bin Action practice、Home／Profile 入口。开发库 ref thmbtsssvnslotoexntz，49 migrations，298 次 HTTP 验证通过；已应用两份新 SQL 不可改。真实 v1 draft／独立审核 pending，P2 原生验收 pending，生产未发布。8083 仍 fixture；真实客户端只能读 API 投影并使用服务器分数／等级，不能导入题库。保留请求键重试、失效考试处理、旧快照与恢复身份规则。代码前读 Expo v57，数据前完整读 BACKEND_DATA_CONTEXT 与 migrations。每阶段更新状态，保留未完成门槛。
+> 继续 KitchMemo Learning Room 的 P5 真机验收与发布准备。先读 HANDOFF、状态／计划／视觉规格、API_CONTRACT、P1–P4 验证记录与 AGENTS.md。保留已批准的 app-palette-v2 五页、SDG 13／13.3、冰箱／成就 palette 和原五 Tab。P4 真实 gateway、本人状态／首答／重试／恢复、视频、独立 practice、Home／Profile 已实现，54 项自动测试、123 次真实 HTTP、Android 正常 bundle 和 Web practice／视频检查通过。开发库 thmbtsssvnslotoexntz 仍 49 migrations，已应用 SQL 不可修改；v1 draft／独立审核 pending，生产未发布。实际草稿 server 用 npm --prefix server run dev:learning；8083 是标注清楚的 fixture，不是成绩。浏览器拖拽未确认提交、原生入口／手势／生命周期／读屏／动态字体／Reduce Motion 都待验收。先补真实设备证据与独立校对，再生成新的发布 reference migration、开发验证并按用户授权处理生产。代码前读 Expo v57，数据前完整读 BACKEND_DATA_CONTEXT 与 migrations。每阶段更新状态，不伪造审核或真实设备验证。
 
 ## 7. 完成后的交接报告要点
 

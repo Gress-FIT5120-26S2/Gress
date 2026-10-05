@@ -1,6 +1,6 @@
 # Learning Room 实际进度与继续位置
 
-最后更新：2026-10-05（Australia/Sydney）。当前阶段：**P0 已完成；P1 内容与技术验证已完成、独立校对待完成；P2 五页组件／导航／开发预览已实现，原生视觉验收待完成；P3 个人数据与考试 API 已在开发库完成验证；下一步 P4 页面真实接入。**
+最后更新：2026-10-05（Australia/Sydney）。当前阶段：**P0 已完成；P1 内容与技术验证已完成、独立校对待完成；P2 五页组件／导航／开发预览已实现，原生视觉验收待完成；P3 个人数据与考试 API 已在开发库完成验证；P4 真实适配器／入口／视频／practice 已实现并完成开发验证；下一步 P5 真机验收与独立审核。**
 
 ## 1. 已完成的真实工作
 
@@ -31,7 +31,8 @@
 - [x] 12 个鉴权 learning API、服务器 blueprint 抽样、已答反馈白名单和版本快照。
 - [x] 38 项相关测试、TypeScript、298 次真实 HTTP 请求、版本／撤回／发布门槛 SQL 回滚验证。
 - [x] 随机测试数据已精确清理；真实参考版本仍 draft／pending，普通服务默认不可用草稿。
-- [ ] P4 learningApi gateway、视频与独立 practice、Home／Profile 正式入口及真实页面验收。
+- [x] P4 learningApi／本人缓存与恢复、视频、独立 practice、Home／Profile 入口，54 项自动测试、123 次真实 HTTP 和 Web practice／视频检查。
+- [ ] P5 实际设备入口、系统生命周期、拖拽与无障碍验收；独立内容审核和发布准备。
 
 ## 2. 实施阶段状态
 
@@ -41,12 +42,12 @@
 | P1 内容契约 | 内容／作者核对／技术验证完成；独立校对 pending | 通过独立校对后才可发布；详见 CONTENT_REVIEW.md 与 P1_VERIFICATION.md |
 | P2 五页 UI | 组件／导航／开发预览／Web 验证完成；原生视觉门槛 pending | 真机五页图、返回手势、安全区、读屏与字体缩放；见 P2_VERIFICATION.md |
 | P3 数据与服务端 | 开发环境完成 | 已提交迁移／七表／RPC／恢复／API；见 P3_VERIFICATION.md；独立内容发布仍 pending |
-| P4 全链路集成 | 未开始 | learningApi；Learn／My path／Library；动画与独立 practice；主入口 |
-| P5 真机与发布 | 未开始 | 双语／无障碍／离线／回归、真机证据、获授权后的生产发布 |
+| P4 全链路集成 | 代码／开发适配器全链路验证完成 | 见 P4_VERIFICATION.md；实际设备页面验收交 P5 |
+| P5 真机与发布 | 待开始 | 双语／无障碍／离线／回归、真机证据、获授权后的生产发布 |
 
 ## 3. 下一条具体任务
 
-**下一步是 P4 全链路页面整合。** 先读 API_CONTRACT.md、P3_VERIFICATION.md、现有 requestApi 和 LearningRoomFlow，实现真实 gateway／个人数据管理，保留一次操作的请求键和网络重试状态。接教育视频、独立 Bin Action practice、Home／Profile 入口，验收空库存可学习与真实初→中→高。不要重做五页图或将 fixture 当权威成绩。P1 独立审核、P2 原生验收仍 pending；开发草稿须显式双开关且仅开发域名，正常／生产入口不能绕过门槛。
+**下一步是 P5 真机验收与发布准备。** 先读 P4_VERIFICATION.md，在真实 Android／iOS 用指定开发 API 验收 Home／Profile 入口、五页、动画、分类 tap／drag、断网重试、后台／杀进程恢复、返回、字体与读屏。浏览器鼠标拖拽未确认提交，必须在设备上核对，不能勾选已通过。同步完成真正的独立内容校对。当前生产未发布，正常服务不接受未审核草稿，开发测试需显式双开关及开发域名。用户已认可的五页布局、SDG 13 与 palette 保留。
 
 目前不需要再确认总体方向、SDG、配色、题数或等级门槛。技术命名和普通布局尺寸可按计划与实际仓库自行落实。
 
@@ -64,6 +65,9 @@
 - `src/types/learningRoom.ts`、`src/components/learning/`、`src/i18n/learning.ts`
 - `scripts/start-learning-preview.mjs`、`scripts/test-learning-room.mjs`、`server/scripts/export-learning-preview.js`
 - `docs/learning-room/verification/2026-10-05/P2_VERIFICATION.md`、`p2-web/` 截图与 manifest
+- `docs/learning-room/verification/2026-10-05/P4_VERIFICATION.md`、`p4-web/` 截图及 manifest
+- `src/services/learningApi.ts`、`learningGateway.ts`、`LearningPracticeScreen.tsx`、`WasteSortingInteraction.tsx`
+- `scripts/test-learning-gateway.mjs`、`server/scripts/verify-learning-gateway.js`、`start-learning-development.js`
 - `docs/learning-room/API_CONTRACT.md`、`verification/2026-10-05/P3_VERIFICATION.md`
 - `server/src/routes/learning.js`、`services/learningAssessment.js`、`services/learningRoom.js`、assessment test
 - `server/scripts/generate-learning-migration.js`、`prepare-learning-preflight.js`、`verify-learning-room.js`；`supabase/tests/learning_room.sql`
@@ -75,16 +79,16 @@
 
 | 项目 | 当前事实 |
 | --- | --- |
-| 新 learning 业务代码 | 内容工具＋五页组件／预览，真实考试 API／持久进度已完成开发库验证；页面 gateway 尚未连 API |
-| 学习室基础样式／图片代码 | learningTheme.ts、learningAssets.ts 已用于五页 RN 组件；正式入口尚未接入 |
+| 新 learning 业务代码 | 内容工具＋五页组件／预览，真实考试 API／持久进度已完成开发库验证；页面 gateway 已连真实 API，开发端到端验证通过 |
+| 学习室基础样式／图片代码 | learningTheme.ts、learningAssets.ts 已用于五页 RN 组件；Home／Profile 入口已接入，真机位置待验收 |
 | 正式独立 UI 图片资产 | 10 张已制作／取得；8 张生成图片＋中英官方 SDG 13，运行时合计 2,653,475 bytes |
 | learning API | 12 个鉴权路由，显式投影，不接受用户分数／passed |
 | learning 新表／RPC／trigger | 7 表、6 函数、3 trigger，RLS 与服务端写入权限已验证 |
 | 本功能 migration | 两份新文件已提交（6d0af20），开发库已应用；文件／内容 hash 见 P3_VERIFICATION.md |
 | 远程数据库检查 | 开发 ref 已核对，49 migrations；lint PASS；真实 v1 draft／pending，测试 learner／attempt 均 0 |
-| Android／iOS 功能验收 | Android bundle 导出通过；原生设备 UI／手势／读屏尚未验收，iOS 未运行 |
+| Android／iOS 功能验收 | P4 Android 正常 bundle 导出通过；原生设备 UI／手势／读屏尚未验收，iOS 未运行 |
 | 生产发布 | 未进行 |
-| App／Express 改动 | P2 preview 与双语保留；P3 挂载 learning router；App.tsx、Home／Profile 正式入口尚未接入 |
+| App／Express 改动 | P2 preview 与双语保留；P3 挂载 learning router；App.tsx、Home／Profile 入口与暂停／返回已接入 |
 
 不要将后端上下文中 existing waste learning 已在开发库验证，误记为 Learning Room 已经可用。
 

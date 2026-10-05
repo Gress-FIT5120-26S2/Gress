@@ -40,3 +40,7 @@ Attempt 继承 State，并含 status、attemptContentVersion、sources。进行�
 普通失败结果仍为 200，passed=false。未知数据库错误只返回 learning_unavailable，绝不输出 SQL、记录或凭证。撤回时未完成考试失效，已通过资格与结果保留。普通服务默认只读取 published；开发草稿例外必须双开关＋确切开发域名，production 禁用。
 
 P4 映射：gateway.load 并行 GET catalog＋state；startQuiz／resumeQuiz／submitAnswer／nextQuestion 读取 Attempt.quiz；finishQuiz 读取 Attempt.result；reviewMissed 读取 questions；markActivity／markResource PUT completion 并读取 session。需补 activityCode 参数、abandon 操作、sources 和错误处理，不能将已结算／失效考试强转成 quiz。重试键需在一次用户操作内保留；完成或设备恢复后清理定位缓存。
+
+## P4 客户端映射
+
+真实原生入口使用 src/services/learningApi.ts → requestApi，纯映射／故障测试位于 learningGateway.ts。一次操作保留 UUID 与首个 payload；next 的键绑定当前题目，响应前后核对本人身份，stateVersion 单调采纳；关闭不持久化题目或答案。recentResults 与旧考试来源快照直接来自服务器。markResource 走同一 completion 路径；practice 通过三题 finish 完成，不能直接 markActivity 绕过。接口与数据库契约未修改；实际验证与原生待验项见 verification/2026-10-05/P4_VERIFICATION.md。

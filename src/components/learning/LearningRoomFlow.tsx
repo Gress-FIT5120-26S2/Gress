@@ -1,17 +1,22 @@
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, BackHandler, Modal, PanResponder, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, Modal, PanResponder, Platform, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { PublicLearningContent } from '../../types/learningContent';
-import type { LearningOrigin, LearningRoomGateway, LearningRoute, LearningSessionView, LearningStageCode, LearningQuizView } from '../../types/learningRoom';
+import type { LearningOrigin, LearningRoomGateway, LearningRoute, LearningSessionView, LearningStageCode, LearningQuizView, LearningOutcome, LearningRecentResult } from '../../types/learningRoom';
+import { getLearningErrorCode } from '../../services/learningGateway';
+import { LearningPracticeScreen } from './LearningPracticeScreen';
+import { LearningLazyModal } from './LearningLazyModal';
 import { LearningCourseScreen } from './LearningCourseScreen';
 import { LearningHub } from './LearningHub';
 import { LearningQuizScreen } from './LearningQuizScreen';
 import { LearningResourceScreen } from './LearningResourceScreen';
 import { LearningResultScreen } from './LearningResultScreen';
 import { learningNavigationReducer } from './learningNavigation';
-import { LearningBody, LearningButton, LearningIcon, LearningPage, ui } from './LearningUi';
+import { LearningBody, LearningButton, LearningPage, ui } from './LearningUi';
 import { learningColors as c } from './learningTheme';
 import { LearningWidthContext } from './learningViewport';
+
+const loadStory = () => import('../LinearFoodWasteStory').then(m => ({ default: m.LinearFoodWasteStory }));
 
 type Props = {
   gateway: LearningRoomGateway; origin: LearningOrigin; onClose: () => void;
@@ -21,9 +26,16 @@ type Props = {
 function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded = false }: Props) {
   const { language, t } = useI18n();
   const copy = t.learning;
+  const outcomeRoute = (value: LearningOutcome): LearningRoute => {
+    if (!('question' in value)) return { name: 'result', result: value };
+    const pending = !value.feedback ? gateway.getPendingAnswer?.(value.attemptUid, value.question.questionUid) : null;
+    return { name: 'quiz', quiz: value, selectedOptionId: value.feedback?.selectedOptionId ?? pending ?? null, answerPending: Boolean(pending) };
+  };
   const [content, setContent] = useState<PublicLearningContent | null>(null);
   const [session, setSession] = useState<LearningSessionView | null>(null);
   const [loading, setLoading] = useState(true);
+  const [recentResults, setRecentResults] = useState<LearningRecentResult[]>([]);
+  const [storyVisible, setStoryVisible] = useState(false);
   const [busy, setBusy] = useState(false);
   const [containerWidth, setContainerWidth] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +49,18 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   // EN: Language changes update error copy without reloading and discarding the current learning view.
   const loadErrorCopy = useRef(copy.errorBody);
   loadErrorCopy.current = copy.errorBody;
+  const copyRef = useRef(copy); copyRef.current = copy;
+  const errorText = (value: unknown, fallback: string) => {
+    const code = getLearningErrorCode(value);
+    if (code === 'content_unavailable') return copyRef.current.unavailable;
+    if (code === 'attempt_invalidated' || code === 'attempt_not_active' || code === 'attempt_not_found' || code === 'learning_content_changed') return copyRef.current.invalidated;
+    if (code === 'learning_identity_changed' || code === 'device_credential_revoked' || code === 'invalid_device_credential') return copyRef.current.identityChanged;
+    return fallback;
+  };
+  const hydrate = () => { const value = gateway.getState?.(); if (value) { setSession(value.session); setRecentResults(value.recentResults); } };
+  const frozenSources = (uid: string) => gateway.getSources?.(uid)?.length ? gateway.getSources(uid) : content?.sources ?? [];
   const route = stack[stack.length - 1];
+  const routeRef = useRef(route); routeRef.current = route;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; requestId.current += 1; }; }, []);
 
   const load = useCallback(async () => {
@@ -45,8 +68,8 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
     inFlight.current = true; setLoading(true); setError(null);
     try {
       const value = await gateway.load();
-      if (mounted.current && requestId.current === id) { setContent(value.content); setSession(value.session); }
-    } catch { if (mounted.current && requestId.current === id) setError(loadErrorCopy.current); }
+      if (mounted.current && requestId.current === id) { setContent(value.content); setSession(value.session); setRecentResults(value.recentResults ?? []); }
+    } catch (failure) { if (mounted.current && requestId.current === id) setError(errorText(failure, loadErrorCopy.current)); }
     finally { if (mounted.current && requestId.current === id) { setLoading(false); inFlight.current = false; } }
   }, [gateway]);
   useEffect(() => { void load(); }, [load]);
@@ -55,9 +78,10 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
     requestId.current += 1; inFlight.current = false; setBusy(false); setError(null);
   }, []);
   const back = useCallback(() => {
+    if (storyVisible) { setStoryVisible(false); return; }
     cancelPendingUi();
     if (stack.length === 1) onClose(); else dispatch({ type: 'back' });
-  }, [cancelPendingUi, onClose, stack.length]);
+  }, [cancelPendingUi, onClose, stack.length, storyVisible]);
   const close = useCallback(() => { cancelPendingUi(); onClose(); }, [cancelPendingUi, onClose]);
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; }); return () => sub.remove(); }, [back]);
   const edge = useMemo(() => PanResponder.create({
@@ -72,13 +96,18 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
     if (inFlight.current) return;
     const id = ++requestId.current;
     inFlight.current = true; setBusy(true); setError(null);
-    try { const value = await operation(); if (mounted.current && requestId.current === id) apply(value); }
-    catch { if (mounted.current && requestId.current === id) setError(failure); }
+    try { const value = await operation(); if (mounted.current && requestId.current === id) { hydrate(); apply(value); } }
+    catch (error) { if (mounted.current && requestId.current === id) {
+      hydrate(); setError(errorText(error, failure));
+      const code = getLearningErrorCode(error);
+      if (code === 'attempt_invalidated' || code === 'attempt_not_active' || code === 'attempt_not_found') dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } });
+      if (code === 'learning_identity_changed') { setContent(null); setSession(null); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }
+    } }
     finally { if (mounted.current && requestId.current === id) { inFlight.current = false; setBusy(false); } }
   };
   const navigate = (next: LearningRoute) => { cancelPendingUi(); dispatch({ type: 'push', route: next }); };
-  const openQuiz = (stage: LearningStageCode, mode: LearningQuizView['mode'] = 'checkpoint') => {
-    void run(() => gateway.startQuiz(stage, mode), (quiz) => dispatch({ type: 'push', route: { name: 'quiz', quiz, selectedOptionId: null } }));
+  const openQuiz = (stage: LearningStageCode, mode: LearningQuizView['mode'] = 'checkpoint', activityCode?: string) => {
+    void run(() => gateway.startQuiz(stage, mode, activityCode), (value) => dispatch({ type: 'push', route: outcomeRoute(value) }));
   };
   const resume = () => {
     if (!session) return;
@@ -86,8 +115,30 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
     if (target.type === 'activity') navigate({ name: 'lesson', activityCode: target.activityCode });
     else if (target.type === 'checkpoint') openQuiz(target.stageCode);
     else if (target.type === 'mixed-review') openQuiz('advanced', 'mixed-review');
-    else void run(() => gateway.resumeQuiz(target.attemptUid), (quiz) => dispatch({ type: 'push', route: { name: 'quiz', quiz, selectedOptionId: null } }));
+    else void run(() => gateway.resumeQuiz(target.attemptUid), (value) => dispatch({ type: 'push', route: outcomeRoute(value) }));
   };
+  // Arthur: NarIyirm
+  // 中文：回到前台重新读取服务器游标；不覆盖已结束页面，未确认的首选仍锁定，直到服务器反馈或用户重试。
+  // EN: Refresh the server cursor on foreground without reopening finished screens; an unconfirmed first choice stays locked until feedback or retry.
+  const refresh = useRef<() => void>(() => undefined);
+  refresh.current = () => {
+    void run(async () => {
+      const value = await gateway.load();
+      const current = routeRef.current;
+      const restored = current.name === 'quiz' ? await gateway.resumeQuiz(current.quiz.attemptUid) : null;
+      return { value, restored, current };
+    }, ({ value, restored, current }) => {
+      setContent(value.content); setSession(gateway.getState?.()?.session ?? value.session); setRecentResults(gateway.getState?.()?.recentResults ?? value.recentResults ?? []);
+      if (restored && current.name === 'quiz') {
+        const next = outcomeRoute(restored);
+        if (next.name === 'quiz' && !next.quiz.feedback && current.quiz.question.questionUid === next.quiz.question.questionUid) {
+          next.selectedOptionId = current.selectedOptionId; next.answerPending = current.answerPending;
+        }
+        dispatch({ type: 'replace', route: next });
+      }
+    });
+  };
+  useEffect(() => { const sub = AppState.addEventListener('change', value => { if (value === 'active') refresh.current(); }); return () => sub.remove(); }, []);
   const present = (node: ReactNode) => {
     const body = <View style={{ flex: 1 }} onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}>
       <LearningWidthContext.Provider value={containerWidth}>{node}</LearningWidthContext.Provider>
@@ -106,6 +157,7 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
 
   let screen;
   if (route.name === 'hub') screen = <LearningHub key={`${route.segment}:${route.libraryCategory ?? 'all'}`} content={content} session={session} origin={origin}
+    recentResults={recentResults} onResult={(uid) => { void run(() => gateway.resumeQuiz(uid), value => dispatch({ type: 'push', route: outcomeRoute(value) })); }} onRefresh={() => { dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); void load(); }}
     segment={route.segment} initialCategory={route.libraryCategory} busy={busy} error={error} onClose={close}
     onSegment={(segment) => { cancelPendingUi(); dispatch({ type: 'hub', route: { name: 'hub', segment } }); }}
     onCourse={(courseCode) => navigate({ name: 'course', courseCode })} onActivity={(activityCode) => navigate({ name: 'lesson', activityCode })}
@@ -125,21 +177,31 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
         onPress={() => { void run(() => gateway.markActivity(activity.activityCode), setSession); }} disabled={busy || complete} /> : undefined}>
       <View style={ui.group}><Text style={ui.eyebrow}>{copy.lessonSummary} · {copy.minutes(activity.durationEstimate.minutes)}</Text>
         <Text accessibilityRole="header" style={ui.title}>{activity.title[language]}</Text><Text style={ui.secondary}>{activity.objective[language]}</Text></View>
+      {activity.type === 'video' ? <LearningButton label={copy.watchAnimation} onPress={() => setStoryVisible(true)} /> : null}
       <LearningBody blocks={activity.body} sources={content.sources} />
-      {activity.type === 'practice' ? <View style={ui.panel}><LearningIcon name="trash-outline" /><Text style={ui.body}>{copy.practiceBody}</Text><Text style={ui.caption}>{copy.practicePending}</Text></View> : null}
+      {activity.type === 'practice' ? <View style={ui.panel}><Text style={ui.body}>{copy.practiceBody}</Text><Text style={ui.caption}>{copy.practicePending}</Text><LearningButton label={copy.startPractice} disabled={busy} onPress={() => openQuiz(activity.stageCode, 'practice', activity.activityCode)} /></View> : null}
     </LearningPage>;
   } else if (route.name === 'quiz') {
     const quiz = route.quiz;
     const stage = content.stages.find((item) => item.stageCode === quiz.stageCode)!;
-    screen = <LearningQuizScreen key={`${quiz.attemptUid}:${quiz.question.questionUid}`} quiz={quiz} stageTitle={stage.title} selectedOptionId={route.selectedOptionId} sources={content.sources}
-      onBack={back} onClose={() => { cancelPendingUi(); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }} busy={busy} error={error}
-      onSelect={(optionId) => { if (!quiz.feedback) dispatch({ type: 'replace', route: { ...route, selectedOptionId: optionId } }); }}
-      onSubmit={() => { if (route.selectedOptionId && !quiz.feedback) void run(() => gateway.submitAnswer(quiz.attemptUid, quiz.question.questionUid, route.selectedOptionId!),
-        (value) => dispatch({ type: 'replace', route: { name: 'quiz', quiz: value, selectedOptionId: value.feedback?.selectedOptionId ?? route.selectedOptionId } }), copy.submissionError); }}
-      onNext={() => { if (!quiz.feedback) return;
-        if (quiz.questionNumber === quiz.questionCount) void run(() => gateway.finishQuiz(quiz.attemptUid), (result) => { setSession(result.session); dispatch({ type: 'replace', route: { name: 'result', result } }); });
-        else void run(() => gateway.nextQuestion(quiz.attemptUid), (value) => dispatch({ type: 'replace', route: { name: 'quiz', quiz: value, selectedOptionId: null } }));
-      }} />;
+    const submit = (option: string) => {
+      if (quiz.feedback || inFlight.current) return;
+      const selected = route.answerPending ? route.selectedOptionId : option;
+      if (!selected) return;
+      dispatch({ type: 'replace', route: { ...route, selectedOptionId: selected, answerPending: true } });
+      void run(() => gateway.submitAnswer(quiz.attemptUid, quiz.question.questionUid, selected), value => dispatch({ type: 'replace', route: outcomeRoute(value) }), copy.submissionError);
+    };
+    const next = () => {
+      if (!quiz.feedback) return;
+      void run(() => quiz.questionNumber === quiz.questionCount ? gateway.finishQuiz(quiz.attemptUid) : gateway.nextQuestion(quiz.attemptUid), value => dispatch({ type: 'replace', route: outcomeRoute(value) }));
+    };
+    const quizClose = () => { cancelPendingUi(); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); };
+    screen = quiz.mode === 'practice' ? <LearningPracticeScreen key={`${quiz.attemptUid}:${quiz.question.questionUid}`} quiz={quiz} selectedOptionId={route.selectedOptionId} selectionLocked={Boolean(route.answerPending)} sources={frozenSources(quiz.attemptUid)} busy={busy} error={error} onBack={back} onClose={quizClose} onAnswer={submit} onNext={next} />
+      : <LearningQuizScreen key={`${quiz.attemptUid}:${quiz.question.questionUid}`} quiz={quiz} stageTitle={stage.title} selectedOptionId={route.selectedOptionId} sources={frozenSources(quiz.attemptUid)} selectionLocked={route.answerPending}
+        onBack={back} onClose={quizClose} busy={busy} error={error}
+        onSelect={(id) => { if (!quiz.feedback && !route.answerPending && !busy) dispatch({ type: 'replace', route: { ...route, selectedOptionId: id } }); }}
+        onSubmit={() => { if (route.selectedOptionId) submit(route.selectedOptionId); }} onNext={next}
+        onRestart={gateway.abandonQuiz ? () => { void run(async () => { await gateway.abandonQuiz!(quiz.attemptUid); return gateway.startQuiz(quiz.stageCode, quiz.mode); }, value => dispatch({ type: 'replace', route: outcomeRoute(value) })); } : undefined} />;
   } else if (route.name === 'result') {
     const result = route.result;
     screen = <LearningResultScreen content={content} result={result} onBack={back} busy={busy} error={error}
@@ -153,10 +215,10 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
     const quiz = route.questions[route.index];
     const stage = content.stages.find((item) => item.stageCode === quiz.stageCode)!;
     screen = <LearningQuizScreen key={`review:${route.index}`} reviewing quiz={{ ...quiz, questionNumber: route.index + 1, questionCount: route.questions.length }} stageTitle={stage.title}
-      selectedOptionId={quiz.feedback?.selectedOptionId ?? null} sources={content.sources} busy={false} error={null} onBack={back} onClose={back} onSelect={() => undefined} onSubmit={() => undefined}
+      selectedOptionId={quiz.feedback?.selectedOptionId ?? null} sources={frozenSources(quiz.attemptUid)} busy={false} error={null} onBack={back} onClose={back} onSelect={() => undefined} onSubmit={() => undefined}
       onNext={() => route.index + 1 < route.questions.length ? dispatch({ type: 'replace', route: { ...route, index: route.index + 1 } }) : back()} />;
   }
-  return present(<View style={{ flex: 1 }} {...edge.panHandlers}>{screen}</View>);
+  return present(<View style={{ flex: 1 }} {...edge.panHandlers}>{screen}{storyVisible ? <LearningLazyModal load={loadStory} componentProps={{ onClose: () => setStoryVisible(false) }} onClose={() => setStoryVisible(false)} closeLabel={copy.cancel} /> : null}</View>);
 }
 
 export function LearningRoomFlow({ embedded = false, ...props }: Props) {

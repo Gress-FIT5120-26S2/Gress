@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { PublicLearningContent } from '../../types/learningContent';
-import type { LearningOrigin, LearningSegment, LearningSessionView } from '../../types/learningRoom';
+import type { LearningOrigin, LearningRecentResult, LearningSegment, LearningSessionView } from '../../types/learningRoom';
 import { LearningButton, LearningIcon, LearningImage, LearningLink, LearningPage, LearningPath, LearningProgress, ui } from './LearningUi';
 import { learningColors as c, learningStyles as s } from './learningTheme';
 import { useLearningViewport } from './learningViewport';
@@ -12,9 +12,10 @@ type Props = {
   initialCategory?: 'guide' | 'data' | 'news'; onClose: () => void; onSegment: (segment: LearningSegment) => void;
   onCourse: (code: string) => void; onActivity: (code: string) => void; onResource: (code: string) => void;
   onContinue: () => void; busy: boolean; error: string | null;
+  recentResults?: LearningRecentResult[]; onResult?: (uid: string) => void; onRefresh?: () => void;
 };
 
-export function LearningHub({ content, session, origin, segment, initialCategory, onClose, onSegment, onCourse, onActivity, onResource, onContinue, busy, error }: Props) {
+export function LearningHub({ content, session, origin, segment, initialCategory, onClose, onSegment, onCourse, onActivity, onResource, onContinue, busy, error, recentResults = [], onResult, onRefresh }: Props) {
   const { language, t } = useI18n();
   const copy = t.learning;
   const { width, fontScale } = useLearningViewport();
@@ -75,7 +76,14 @@ export function LearningHub({ content, session, origin, segment, initialCategory
     </> : segment === 'path' ? <>
       <Text accessibilityRole="header" style={ui.sectionTitle}>{copy.learningPath}</Text>
       <LearningPath content={content} session={session} onCourse={onCourse} />
-      <View style={ui.panel}><Text style={ui.secondary}>{copy.noResults}</Text></View>
+      <View style={ui.panel}><Text style={ui.sectionTitle}>{copy.recentResults}</Text>
+        {recentResults.length === 0 ? <Text style={ui.secondary}>{copy.noResults}</Text> : recentResults.map(result => {
+          const label = content.stages.find(stage => stage.stageCode === result.stageCode)!.title[language];
+          return <Pressable key={result.attemptUid} accessibilityRole="button" disabled={busy} onPress={() => onResult?.(result.attemptUid)} style={ui.listRow}>
+            <View style={ui.flex}><Text style={ui.listTitle}>{result.mode === 'practice' ? copy.handsOn : result.mode === 'mixed-review' ? copy.mixedReview : result.mode === 'review' ? copy.reviewStage(label) : copy.checkpoint(label)}</Text>
+              <Text style={ui.caption}>{result.correctCount} / {result.totalCount} · {new Date(result.submittedAt).toLocaleDateString(language === 'zh' ? 'zh-CN' : 'en-AU')}</Text></View>
+            <LearningIcon name="chevron-forward" size={18} /></Pressable>;
+        })}</View>
       <LearningButton label={continueLabel} onPress={onContinue} disabled={busy} />
     </> : <>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.filters}>
@@ -99,6 +107,7 @@ export function LearningHub({ content, session, origin, segment, initialCategory
           <LearningIcon name="chevron-forward" size={18} />
         </Pressable>)}
     </>}
+    {error && onRefresh ? <LearningLink label={copy.refreshLearning} onPress={() => { if (!busy) onRefresh(); }} /> : null}
   </LearningPage>;
 }
 

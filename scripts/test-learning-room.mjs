@@ -81,7 +81,7 @@ try {
     const { gateway } = createLearningPreview('complete');
     const before = (await gateway.load()).session;
     const view = await gateway.startQuiz('advanced', 'mixed-review');
-    assert.equal(view.questionCount, 10);
+    assert.equal(view.questionCount, 12);
     const result = await gateway.finishQuiz(view.attemptUid);
     assert.equal(result.mode, 'mixed-review');
     assert.equal(result.nextStageCode, null);

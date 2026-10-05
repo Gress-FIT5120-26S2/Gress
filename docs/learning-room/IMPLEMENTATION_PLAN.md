@@ -1,12 +1,12 @@
 # Learning Room 实施计划与跨对话基准
 
-最后更新：2026-10-05（Australia/Sydney）。当前状态：**P0 已完成；P1 内容／技术验证完成、独立校对待完成；P2 五页组件／预览已实现、原生验收待完成；P3 数据／考试 API 在开发库验证完成；下一步 P4 页面真实接入。**
+最后更新：2026-10-05（Australia/Sydney）。当前状态：**P0 已完成；P1 内容／技术验证完成、独立校对待完成；P2 五页组件／预览已实现、原生验收待完成；P3 数据／考试 API 在开发库验证完成；P4 真实 gateway／视频／practice／入口完成开发验证；下一步 P5 真机与独立审核。**
 
 ## 1. 本次授权与固定基准
 
 用户确认：「这版特别好，我就希望按照这版严格做出了，现在先根据这版效果生成一个详细的计划，这样后面切换对话也能继续做」。最初交付为可接手计划；随后用户逐阶段授权继续开发。按本计划和状态文件推进，已有视觉选择无需重新询问。
 
-后续授权更新（2026-10-05）：P0 素材、P1 内容、P2 五页组件／预览完成；本轮完成 P3 个人学习 schema、考试 API、开发迁移／lint、298 次真实 HTTP 及版本 SQL 验证。独立内容审核与原生视觉验收仍 pending，生产未发布。下一步 P4 gateway／动画与 practice／主入口，实际阶段以 IMPLEMENTATION_STATUS 和各期验证记录为准，预览 fixture 不是真实成绩。
+后续授权更新（2026-10-05）：P0 素材、P1 内容、P2 五页组件／预览完成；本轮完成 P3 个人学习 schema、考试 API、开发迁移／lint、298 次真实 HTTP 及版本 SQL 验证。独立内容审核与原生视觉验收仍 pending，生产未发布。本轮又完成 P4 gateway／动画与 practice／主入口，54 项自动测试与 123 次真实适配器 HTTP 通过。下一步 P5，实际阶段以 IMPLEMENTATION_STATUS 和各期验证记录为准，预览 fixture 不是真实成绩。
 
 ### 1.1 必须保留的决定
 
@@ -197,7 +197,7 @@ attempt 生命周期为 `in_progress → submitted`，主动放弃为 `abandoned
 
 ## 7. Express API（P3 实际契约）
 
-接口统一在 `/api/learning` 下，已挂载在既有凭证鉴权之后。页面的真实 HTTP gateway 映射留给 P4，开发 preview 仍独立运行。所有文本一次返回 zh／en，不按 language 参数动态裁剪。
+接口统一在 `/api/learning` 下，已挂载在既有凭证鉴权之后。P4 已用 learningApi／learningGateway 映射真实 HTTP，开发 preview 仍独立运行。所有文本一次返回 zh／en，不按 language 参数动态裁剪。
 
 | 方法与路径 | 请求重点 | 响应重点 |
 | --- | --- | --- |

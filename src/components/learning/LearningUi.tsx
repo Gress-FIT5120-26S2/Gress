@@ -95,9 +95,9 @@ export function LearningProgress({ value, label }: { value: number; label: strin
   </View>;
 }
 
-export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18 }: {
+export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true }: {
   backLabel: string; onBack: () => void; onClose?: () => void; brand?: boolean;
-  children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number;
+  children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number; scrollEnabled?: boolean;
 }) {
   const { t } = useI18n();
   const { width } = useLearningViewport();
@@ -126,7 +126,7 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
       {onClose ? <Pressable accessibilityRole="button" accessibilityLabel={t.learning.close} onPress={onClose} style={ui.iconButton}><LearningIcon name="close-outline" size={27} color={c.textPrimary} /></Pressable> : null}
     </View>
     <Animated.View style={{ flex: 1, opacity }}>
-      <ScrollView contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
+      <ScrollView scrollEnabled={scrollEnabled} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 20, gap: contentGap }}>
         {children}
         {error && !footer ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
