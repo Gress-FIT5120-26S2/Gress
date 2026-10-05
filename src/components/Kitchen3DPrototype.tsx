@@ -137,6 +137,9 @@ const CAMERA_FOCUS: Record<KitchenNavigationFeature, CameraFocusConfig> = {
     duration: 1320,
   },
 };
+// 中文：暂时关闭灶台点火和菜谱翻开的首页互动；改成 true 即可恢复热点和点击反应。
+// EN: Home stove-lighting and recipe-book-opening interactions are switched off for now; set to true to restore the hotspots and tap reactions.
+const STOVE_RECIPE_INTERACTIONS_ENABLED = false;
 const BURNER_ANCHORS = ['Stove_Burner_Left_Anchor', 'Stove_Burner_Right_Anchor'] as const;
 const FLAME_RING = Array.from({ length: 12 }, (_, index) => {
   const angle = (index / 12) * Math.PI * 2;
@@ -505,11 +508,11 @@ function KitchenModel({
           <FeatureHotspot hasStatus={expiringCount > 0} hitboxSize={[1.45, 2.5, 1.0]} markerOffset={[0, 1.18, 0]} onPress={() => onSelectFeature('fridge')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'fridge'} />,
           anchors.fridgeHotspot,
         ) : null}
-      {activeInteraction === null && anchors.stoveHotspot ? createPortal(
+      {STOVE_RECIPE_INTERACTIONS_ENABLED && activeInteraction === null && anchors.stoveHotspot ? createPortal(
           <FeatureHotspot hitboxSize={[1.35, 1.45, 1.0]} markerOffset={[0, 0.86, 0]} onPress={() => onSelectFeature('stove')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'stove'} />,
           anchors.stoveHotspot,
         ) : null}
-      {activeInteraction === null && anchors.recipesHotspot ? createPortal(
+      {STOVE_RECIPE_INTERACTIONS_ENABLED && activeInteraction === null && anchors.recipesHotspot ? createPortal(
           <FeatureHotspot hitboxSize={[1.8, 1.25, 1.35]} markerOffset={[0, 0.76, 0]} onPress={() => onSelectFeature('recipes')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'recipes'} />,
           anchors.recipesHotspot,
         ) : null}
@@ -869,6 +872,11 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
     registerCameraActivity();
     if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
     setPressedFeature(feature);
+
+    if ((feature === 'stove' || feature === 'recipes') && !STOVE_RECIPE_INTERACTIONS_ENABLED) {
+      setPressedFeature(null);
+      return;
+    }
 
     if (feature === 'stove') {
       onExplore?.();

@@ -45,7 +45,7 @@ const LinearFoodWasteStory = lazy(() =>
 
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
-  shopping: '#FFF1DC',
+  shopping: '#F7FBFA',
   fridge: '#E1F0EF',
   achievements: '#F5E9D6',
   profile: '#E8EEEA',
@@ -495,7 +495,7 @@ function KitchMemoApp() {
                 styles.activeScreen,
                 activeTab === 'fridge'
                   ? styles.fridgeContent
-                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements'
+                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'shopping'
                     ? styles.profileContent
                     : styles.standardContent,
                 { backgroundColor: transitionTones[activeTab] },

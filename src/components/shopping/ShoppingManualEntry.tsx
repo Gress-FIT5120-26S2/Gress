@@ -252,10 +252,10 @@ export function ShoppingManualEntry({
 
 const styles = StyleSheet.create({
   root: { flex: 1, justifyContent: 'flex-end' },
-  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(30,41,37,0.4)' },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(20,38,32,0.34)' },
   sheet: {
     maxHeight: '85%',
-    backgroundColor: '#FBFCFA',
+    backgroundColor: '#F7FBFA',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: 20,
@@ -269,12 +269,12 @@ const styles = StyleSheet.create({
   label: { marginTop: 14, marginBottom: 6, fontSize: 13, fontWeight: '700', color: '#5E7068' },
   input: {
     borderWidth: 1,
-    borderColor: '#DDE5E1',
+    borderColor: '#BFE3F3',
     borderRadius: 12,
     paddingHorizontal: 14,
     height: 48,
     fontSize: 16,
-    backgroundColor: '#F8FAF9',
+    backgroundColor: '#FFFFFF',
     color: '#173D31',
   },
   dupCard: {
@@ -303,7 +303,7 @@ const styles = StyleSheet.create({
     marginTop: 22,
     height: 52,
     borderRadius: 16,
-    backgroundColor: '#2e7d32',
+    backgroundColor: '#F58220',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -318,5 +318,5 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: '#CCC',
   },
-  kbDone: { color: '#2e7d32', fontSize: 16, fontWeight: '700' },
+  kbDone: { color: '#C95F14', fontSize: 16, fontWeight: '700' },
 });
