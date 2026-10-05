@@ -52,6 +52,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "learning:preview": "node scripts/start-learning-preview.mjs",
     "start": "concurrently --kill-others-on-fail --names api,expo --prefix-colors blue,green \"npm run server\" \"expo start\"",
     "start:clear": "concurrently --kill-others-on-fail --names api,expo --prefix-colors blue,green \"npm run server\" \"expo start --clear\"",
     "start:expo": "expo start",

@@ -2,10 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { I18nContext, type AppLanguage } from './i18nContext';
+import { learningCopy } from './i18n/learning';
 
 export type { AppLanguage } from './i18nContext';
 
 const zh = {
+  learning: learningCopy.zh,
   screens: {
     home: { eyebrow: '今晚好', title: '家里的库存怎么样？', description: '购物前，先看看家里还剩下什么。' },
     shopping: { eyebrow: '购物车', title: '带着厨房库存去购物', description: '对照家中现有库存，只购买真正需要的东西。' },
@@ -1149,6 +1151,7 @@ type TranslationShape<T> = T extends (...args: infer Arguments) => unknown
 export type Translation = TranslationShape<typeof zh>;
 
 const en: Translation = {
+  learning: learningCopy.en,
   screens: {
     home: { eyebrow: 'GOOD EVENING', title: 'How stocked is home?', description: 'See what is still at home before the next shop.' },
     shopping: { eyebrow: 'SHOPPING CART', title: 'Shop with the kitchen in mind', description: 'Compare what you need with the stock already at home.' },
@@ -2288,12 +2291,17 @@ type I18nContextValue = {
   t: Translation;
 };
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>('zh');
+export function I18nProvider({ children, initialLanguage = 'zh', persist = true }: { children: ReactNode; initialLanguage?: AppLanguage; persist?: boolean }) {
+  const [language, setLanguageState] = useState<AppLanguage>(initialLanguage);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    // Arthur: NarIyirm
+    // 中文：独立开发预览使用非持久语言，不读取或覆盖正常 App 的语言偏好。
+    // EN: Standalone development previews use a nonpersistent language without reading or overwriting normal app preferences.
+    if (!persist) { setIsReady(true); return () => { mounted = false; }; }
 
     // 中文：先恢复上次保存的语言，再挂载开场动画，避免英语用户启动时短暂看到中文。
     // EN: Restore the saved language before mounting the opener so English users never see a brief Chinese flash.
@@ -2309,11 +2317,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [persist]);
 
   const setLanguage = (nextLanguage: AppLanguage) => {
     setLanguageState(nextLanguage);
-    void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => undefined);
+    if (persist) void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => undefined);
   };
 
   const value = useMemo(() => ({ language, setLanguage, t: translations[language] }), [language]);

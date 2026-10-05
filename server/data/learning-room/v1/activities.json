@@ -1,0 +1,698 @@
+{
+  "contentVersion": "learning-room-v1",
+  "activities": [
+    {
+      "activityCode": "beginner-why-waste",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "type": "video",
+      "title": {
+        "en": "Why food gets wasted",
+        "zh": "食物为什么被浪费"
+      },
+      "objective": {
+        "en": "Notice how everyday habits can leave food unused.",
+        "zh": "发现日常习惯如何让食物未被使用。"
+      },
+      "durationEstimate": {
+        "minutes": 1,
+        "includesReflection": false,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "food-waste-linear-story",
+      "sourceRefs": [
+        "ozharvest-2025"
+      ],
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "nextActivityCode": "beginner-materials",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Watch the one-minute story, or read this summary. Food can slip out of sight while shopping and meal plans move on. Checking what is already at home creates a useful pause before buying more.",
+            "zh": "观看一分钟故事，或阅读这份摘要。购物和餐食安排不断变化，食物却可能被遗忘。多买之前先查看家里已有的食物，是一个有用的停顿。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "OzHarvest's 2025 research describes Australian households with someone under 35 discarding about 113 kg of food a year, valued at over A$1,500. This is a survey estimate for that group, not a measurement of you.",
+            "zh": "OzHarvest 2025 年研究估计，有 35 岁以下成员的澳大利亚家庭每年丢弃约 113 kg 食物，价值超过 A$1,500。这是该群体的调查估计，不是对你的测量。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Name one ingredient you already have that could be part of your next meal.",
+            "zh": "找出一种家里已有、可以用于下一餐的食材。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "ozharvest-2025"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "beginner-materials",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "type": "lesson",
+      "title": {
+        "en": "Know your materials",
+        "zh": "认识材料"
+      },
+      "objective": {
+        "en": "Identify a material before choosing its collection route.",
+        "zh": "先辨认材料，再选择收集方式。"
+      },
+      "durationEstimate": {
+        "minutes": 4,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "waste-basics-course-cover",
+      "sourceRefs": [
+        "vic-sorting",
+        "arl"
+      ],
+      "relatedActivityCodes": [
+        "beginner-bin-action"
+      ],
+      "nextActivityCode": "beginner-bin-action",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Start with what the item actually is. Food scraps, metal, paper, glass and plastics have different roles. A package can contain several of them. A silver-looking object or an illustration alone does not prove a material.",
+            "zh": "先确认物品本身是什么。食物残余、金属、纸、玻璃和塑料是不同类别；一件包装可能包含多种材料。银色外观或插图本身不能证明材质。"
+          }
+        },
+        {
+          "type": "bullet-list",
+          "items": [
+            {
+              "en": "Confirmed aluminium → metal.",
+              "zh": "已确认的铝 → 金属。"
+            },
+            {
+              "en": "Plain cardboard → paper-based material.",
+              "zh": "普通纸板 → 纸类材料。"
+            },
+            {
+              "en": "Fruit peel → food residue.",
+              "zh": "果皮 → 食物残余。"
+            },
+            {
+              "en": "Scrunchable plastic film → soft plastic, not a rigid container.",
+              "zh": "可揉团的塑料薄膜 → 软塑料，不是硬容器。"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Now check the route. Read instructions for each packaging part and the local service. A recycling triangle or plastic code does not by itself confirm that your council accepts the item. When uncertain, look it up instead of adding it to recycling.",
+            "zh": "再核对处理方式。查看各包装部件说明与当地服务。回收三角符号或塑料编号本身并不保证当地 council 接受该物品。不确定时先查，不直接塞进回收。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Example: a snack has a cardboard sleeve and a soft-plastic wrapper. Identify both parts; do not let the sleeve's recycling instruction stand in for the wrapper's.",
+            "zh": "例子：零食有纸板套和软塑料膜。应分别辨认，不能把纸板套的回收说明套用到薄膜上。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Choose one package at home. Find its parts, material clues and collection instructions. If something is missing, note what you need to check.",
+            "zh": "选一件家里的包装，找出部件、材质线索和收集说明。若信息不足，记下需要核对的内容。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-sorting",
+            "arl"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "beginner-bin-action",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "type": "practice",
+      "title": {
+        "en": "Practise with Bin Action",
+        "zh": "分类练习"
+      },
+      "objective": {
+        "en": "Apply three clearly stated collection examples.",
+        "zh": "练习三个服务条件明确的分类示例。"
+      },
+      "durationEstimate": {
+        "minutes": 2,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": null,
+      "sourceRefs": [
+        "vic-sorting",
+        "vic-fogo"
+      ],
+      "relatedActivityCodes": [],
+      "nextActivityCode": null,
+      "completionKind": "verified-practice",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Practise with an empty aluminium can, a banana peel and a clean cardboard box. Each question states what the example service accepts. Choose by tapping a bin, or use the drag interaction when available.",
+            "zh": "练习空铝罐、香蕉皮和干净纸箱。每题会说明示例服务接受什么。可以点选桶，或在可用时拖拽物品。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Read the explanation after each first answer. A demonstration retry helps you learn, but does not replace the recorded first answer. Finish all three feedback steps to complete this activity.",
+            "zh": "首次作答后阅读解释。再次演示有助于学习，但不会改写首次答案。确认三题反馈后完成此活动。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "This practice uses teaching items. It does not consume fridge stock or count as a real disposal. Your Beginner checkpoint remains a separate six-question assessment.",
+            "zh": "练习使用教学物品，不消耗冰箱库存，也不算真实投放。初级 checkpoint 是另外的六题测验。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "What detail in the collection instructions changed your decision?",
+            "zh": "收集说明中的哪个细节影响了你的选择？"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-sorting",
+            "vic-fogo"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "intermediate-components",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "type": "lesson",
+      "title": {
+        "en": "One item, several materials",
+        "zh": "一件物品，多种材料"
+      },
+      "objective": {
+        "en": "Read and separate packaging components appropriately.",
+        "zh": "正确阅读并分清包装部件。"
+      },
+      "durationEstimate": {
+        "minutes": 3,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "packaging-recycling-cover",
+      "sourceRefs": [
+        "arl",
+        "vic-sorting",
+        "vic-reuse",
+        "vic-glass"
+      ],
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "nextActivityCode": "intermediate-clean-streams",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "One product does not always mean one disposal instruction. A box, inner wrap and lid may have different instructions. Find the name of each part, then read the instruction attached to that part.",
+            "zh": "一个产品不一定只有一种处理说明。盒、内膜和盖子可能各有要求。先找到部件名称，再阅读属于该部件的说明。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "The Australasian Recycling Label distinguishes recyclable, conditionally recyclable and not recyclable components. A condition may require preparation or a collection route. Do not skip it or apply one part's symbol to everything.",
+            "zh": "Australasian Recycling Label 区分可回收、有条件可回收和不可回收部件。条件可能要求准备步骤或特定收集方式，不能跳过，也不能把一个部件的标识当作全部包装的说明。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Example: after safely using the food in a tub, separate any residue from the packaging. Check the tub and lid instructions. For glass jar lids, the council's rules can differ; do not assume every lid stays on or off.",
+            "zh": "例子：安全使用盒中食物后，将残余与包装分开，查看盒身与盖子的说明。玻璃罐盖的 council 规则可能不同，不要认为所有盖子都应保留或取下。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Read a multi-part package. Can you name the instruction for every part? Only separate parts in the way the instructions require.",
+            "zh": "阅读一个多部件包装。你能说出每个部件的要求吗？只按说明要求分离。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "arl",
+            "vic-sorting",
+            "vic-reuse",
+            "vic-glass"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "intermediate-clean-streams",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "type": "lesson",
+      "title": {
+        "en": "Keep recycling useful",
+        "zh": "避免回收污染"
+      },
+      "objective": {
+        "en": "Prepare accepted items without contaminating a collection.",
+        "zh": "按要求准备可接受物品，避免污染收集流。"
+      },
+      "durationEstimate": {
+        "minutes": 4,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "packaging-recycling-cover",
+      "sourceRefs": [
+        "vic-sorting",
+        "vic-fogo",
+        "vic-glass"
+      ],
+      "relatedActivityCodes": [
+        "intermediate-local-guide"
+      ],
+      "nextActivityCode": "intermediate-local-guide",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "A collection stream works best when it contains the items the service expects. Extra food, plastic bags or the wrong material can make recovery harder. Preparation follows the receiving service, not a universal ritual.",
+            "zh": "收集流中最好只包含该服务预期接收的物品。多余食物、塑料袋或错误材料可能妨碍回收。准备方式以接收服务为准，并非处处一样。"
+          }
+        },
+        {
+          "type": "bullet-list",
+          "items": [
+            {
+              "en": "Empty accepted containers; rinse if needed.",
+              "zh": "倒空可接受的容器，必要时冲洗。"
+            },
+            {
+              "en": "Keep mixed-recycling items loose where the service requires it.",
+              "zh": "服务要求散放时，不将混合回收物装袋。"
+            },
+            {
+              "en": "Keep paper/cardboard clean and dry; tissues are different.",
+              "zh": "纸与纸板保持干净、干燥；纸巾需区别处理。"
+            },
+            {
+              "en": "Remove packaging and fruit stickers from FOGO scraps.",
+              "zh": "从 FOGO 食物残余中去掉包装和水果贴纸。"
+            }
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Example: a used yogurt tub and a banana peel are not one waste item. The remaining food needs its accepted organics route; the empty tub needs its own material and collection check.",
+            "zh": "例子：用过的酸奶盒与香蕉皮不是同一种废弃物。剩余食物应核对合适的有机物收集方式；空盒需另外核对材质和收集要求。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Find one preparation step you can make easier with a small kitchen routine.",
+            "zh": "找出一个可以通过厨房小习惯更容易完成的准备步骤。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-sorting",
+            "vic-fogo",
+            "vic-glass"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "intermediate-local-guide",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "type": "lesson",
+      "title": {
+        "en": "Find the right collection",
+        "zh": "找到正确收集方式"
+      },
+      "objective": {
+        "en": "Verify a current collection service for a specific item.",
+        "zh": "为具体物品核实有效的收集服务。"
+      },
+      "durationEstimate": {
+        "minutes": 3,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "packaging-recycling-cover",
+      "sourceRefs": [
+        "vic-sorting",
+        "vic-glass",
+        "cds-vic"
+      ],
+      "relatedActivityCodes": [],
+      "nextActivityCode": null,
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Victoria's guide is a starting point, not proof that your home has every service. Check the council or private waste provider for the address. Service availability, glass separation and lid instructions can differ.",
+            "zh": "Victoria 指引是起点，不能证明你的住所拥有所有服务。应按地址查看 council 或私人垃圾服务商。服务是否提供、玻璃是否分收以及盖子要求都可能不同。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Soft-plastic collections can change. Confirm a service is active and accepts the exact item before using it. A photograph, an old post or a recycling triangle is not enough.",
+            "zh": "软塑料收集安排会变化。使用之前确认服务正在运行，并接受该具体物品。照片、旧帖或回收三角符号都不足以保证。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "CDS Vic is a separate option for eligible drink containers. Use its official eligibility check and current refund-point finder. Ordinary jars and other containers do not become eligible simply because they are glass or metal.",
+            "zh": "CDS Vic 是符合条件饮料容器的另一种选择。应使用官方资格查询与有效退费点地图。普通罐子或其他容器不会仅因为是玻璃或金属就自动符合条件。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Find the provider serving your home. Write down one item rule you had to look up rather than guess.",
+            "zh": "找到服务你住所的提供方，记下一项你需要查而非猜的物品规则。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-sorting",
+            "vic-glass",
+            "cds-vic"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "advanced-plan-first",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "type": "lesson",
+      "title": {
+        "en": "Use what you have",
+        "zh": "先用已有食物"
+      },
+      "objective": {
+        "en": "Build one meal and shopping list around existing food.",
+        "zh": "围绕已有食物安排一餐和购物清单。"
+      },
+      "durationEstimate": {
+        "minutes": 3,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "preventing-waste-cover",
+      "sourceRefs": [
+        "vic-planning",
+        "ozharvest-2025",
+        "vic-storage"
+      ],
+      "relatedActivityCodes": [
+        "advanced-storage"
+      ],
+      "nextActivityCode": "advanced-storage",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Start before the shop. Look through the fridge, freezer and pantry, then choose ingredients that need using soon while still safe. A simple use-first area keeps them visible.",
+            "zh": "从购物前开始。查看冰箱、冷冻室和储物柜，优先考虑仍安全且需要尽快使用的食物。简单的优先使用区可以让它们更可见。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Plan for the people who will actually eat. Link meals that share ingredients, and add only missing items to the list. A bulk bargain is not useful if it exceeds what you can use.",
+            "zh": "按实际就餐人数计划。安排能共用食材的餐食，只把缺少的物品加到清单。如果买得超过能使用的量，大包装优惠也未必有用。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Example: you have carrots and half a tub of an ingredient. Plan a meal around them before choosing a recipe that requires a new shop. When plans change, review perishables again and make a safe storage plan.",
+            "zh": "例子：已有胡萝卜和半盒食材时，先围绕它们计划一餐，再考虑需要重新购物的菜谱。安排改变后，再查看易腐食物并制定安全储存计划。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Plan one meal using what you already have. List only what is missing, and check portions.",
+            "zh": "用已有食物计划一餐，只列出缺少的物品，并核对份量。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-planning",
+            "ozharvest-2025",
+            "vic-storage"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "advanced-storage",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "type": "lesson",
+      "title": {
+        "en": "Store with care",
+        "zh": "合理储存"
+      },
+      "objective": {
+        "en": "Use date labels and storage instructions safely.",
+        "zh": "安全理解日期标签与储存说明。"
+      },
+      "durationEstimate": {
+        "minutes": 4,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "preventing-waste-cover",
+      "sourceRefs": [
+        "fsanz-dates",
+        "fsanz-safety",
+        "vic-storage"
+      ],
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "nextActivityCode": "advanced-climate",
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Use-by is a safety limit: do not eat food after that date. Best-before mainly concerns quality. It is not a promise that any food is safe regardless of storage or condition.",
+            "zh": "Use-by 是安全期限：过期后不要食用。Best-before 主要涉及品质，并不保证任何储存方式、任何状态下的食物都安全。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Follow the product's storage and preparation instructions. Keep perishable food refrigerated at 5°C or colder. Thaw frozen perishable food in the fridge or with a microwave rather than at room temperature.",
+            "zh": "遵循产品的储存和准备说明。易腐食物应冷藏在 5°C 或更低温度；冷冻易腐食物应在冰箱或用微波炉解冻，不采用室温解冻。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Label and date freezer portions so they are identifiable. Visibility helps you remember food, but must not replace safe cold storage. Do not invent a longer use-by date or rely only on a normal smell.",
+            "zh": "标注冷冻份量的名称和日期，方便辨认。让食物可见有助于记得使用，但不能替代安全冷藏。不要自行延长 use-by 日期，也不要只凭气味正常作判断。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Read one food label. Identify the date type and storage instructions, and decide a safe plan before the relevant limit.",
+            "zh": "阅读一个食品标签，辨认日期类型和储存要求，在相应期限前安排安全使用。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "fsanz-dates",
+            "fsanz-safety",
+            "vic-storage"
+          ]
+        }
+      ]
+    },
+    {
+      "activityCode": "advanced-climate",
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "type": "lesson",
+      "title": {
+        "en": "Waste & climate action",
+        "zh": "浪费与气候行动"
+      },
+      "objective": {
+        "en": "Connect waste prevention to evidence and SDG 13.3.",
+        "zh": "将减废与证据及 SDG 13.3 联系起来。"
+      },
+      "durationEstimate": {
+        "minutes": 4,
+        "includesReflection": true,
+        "basis": {
+          "en": "Estimated lesson and activity time; no timer.",
+          "zh": "课程与活动预计时间；没有倒计时。"
+        }
+      },
+      "mediaAssetKey": "waste-climate-cover",
+      "sourceRefs": [
+        "unfccc-2024",
+        "unep-index-2024",
+        "sdg13",
+        "vic-fogo"
+      ],
+      "relatedActivityCodes": [],
+      "nextActivityCode": null,
+      "completionKind": "explicit-confirmation",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Food uses land, water and energy before it is eaten. Preventing edible waste helps avoid wasting those inputs. Suitable organics collection handles unavoidable scraps; it cannot undo the resources already used.",
+            "zh": "食物在食用前就需要土地、水和能源。避免可食用食物浪费也关注这些投入。合适的有机物收集可以处理无法避免的残余，却不能撤销已经投入的资源。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Read climate data with its scope. UNFCCC's 2024 article links food loss and waste to 8–10% of annual global greenhouse gas emissions. This includes both loss and waste, globally; it is not a percentage saved by this learner.",
+            "zh": "阅读气候数据时保留范围。UNFCCC 2024 年文章将食物损失和浪费与全球年度温室气体排放的 8–10% 联系起来。它同时涵盖损失与浪费、范围为全球，并非本学习者节省的比例。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "SDG 13.3 includes climate education and awareness. These lessons and reflection support that educational direction. Quiz results measure learning performance, not national curriculum indicators or personal carbon savings.",
+            "zh": "SDG 13.3 包含气候教育与意识提升。课程和反思符合这一教育方向。测验成绩反映学习表现，不测量国家课程指标或个人减排量。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "Try it in your kitchen",
+            "zh": "在你的厨房试一试"
+          },
+          "text": {
+            "en": "Choose one prevention habit for this week. Describe the action you will take without claiming a measured emissions saving.",
+            "zh": "为本周选一个预防浪费的习惯，说明要做的行动，不把它写成已经测量的减排量。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "unfccc-2024",
+            "unep-index-2024",
+            "sdg13",
+            "vic-fogo"
+          ]
+        }
+      ]
+    }
+  ]
+}

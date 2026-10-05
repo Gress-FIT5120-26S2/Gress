@@ -1,0 +1,257 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "learning-room-v1",
+  "status": "draft",
+  "projectSdg": {
+    "goal": 13,
+    "target": "13.3"
+  },
+  "languages": [
+    "en",
+    "zh"
+  ],
+  "stages": [
+    {
+      "stageCode": "beginner",
+      "title": {
+        "en": "Beginner",
+        "zh": "初级"
+      },
+      "courseCode": "waste-basics",
+      "questionCount": 6,
+      "passPercent": 80,
+      "minimumCorrect": 5,
+      "minimumBankSize": 12,
+      "nextStageCode": "intermediate",
+      "blueprint": [
+        {
+          "topicCode": "materials",
+          "count": 2
+        },
+        {
+          "topicCode": "sorting",
+          "count": 2
+        },
+        {
+          "topicCode": "causes",
+          "count": 1
+        },
+        {
+          "topicCode": "climate-basics",
+          "count": 1
+        }
+      ]
+    },
+    {
+      "stageCode": "intermediate",
+      "title": {
+        "en": "Intermediate",
+        "zh": "中级"
+      },
+      "courseCode": "packaging-recycling",
+      "questionCount": 8,
+      "passPercent": 80,
+      "minimumCorrect": 7,
+      "minimumBankSize": 16,
+      "nextStageCode": "advanced",
+      "blueprint": [
+        {
+          "topicCode": "components",
+          "count": 2
+        },
+        {
+          "topicCode": "clean-streams",
+          "count": 2
+        },
+        {
+          "topicCode": "local-collection",
+          "count": 2
+        },
+        {
+          "topicCode": "reuse-resources",
+          "count": 2
+        }
+      ]
+    },
+    {
+      "stageCode": "advanced",
+      "title": {
+        "en": "Advanced",
+        "zh": "高级"
+      },
+      "courseCode": "preventing-waste",
+      "questionCount": 10,
+      "passPercent": 80,
+      "minimumCorrect": 8,
+      "minimumBankSize": 20,
+      "nextStageCode": null,
+      "blueprint": [
+        {
+          "topicCode": "planning",
+          "count": 3
+        },
+        {
+          "topicCode": "storage-safety",
+          "count": 2
+        },
+        {
+          "topicCode": "prevention-priority",
+          "count": 2
+        },
+        {
+          "topicCode": "climate-evidence",
+          "count": 3
+        }
+      ]
+    }
+  ],
+  "courses": [
+    {
+      "courseCode": "waste-basics",
+      "stageCode": "beginner",
+      "title": {
+        "en": "Waste basics",
+        "zh": "浪费基础"
+      },
+      "summary": {
+        "en": "Learn what waste is, then practise sorting it.",
+        "zh": "了解浪费，再练习辨认和分类。"
+      },
+      "objective": {
+        "en": "By the end, you can identify waste materials.",
+        "zh": "学完后，你能辨认常见废弃物材料。"
+      },
+      "coverAssetKey": "waste-basics-course-cover",
+      "activityCodes": [
+        "beginner-why-waste",
+        "beginner-materials",
+        "beginner-bin-action"
+      ],
+      "relatedResourceCodes": [
+        "waste-climate-sdg13",
+        "local-sorting-guide"
+      ]
+    },
+    {
+      "courseCode": "packaging-recycling",
+      "stageCode": "intermediate",
+      "title": {
+        "en": "Packaging & recycling",
+        "zh": "包装与回收"
+      },
+      "summary": {
+        "en": "Separate parts, avoid contamination and check the right collection.",
+        "zh": "分清包装部件、避免污染，找到合适的收集服务。"
+      },
+      "objective": {
+        "en": "By the end, you can check each packaging component and its collection route.",
+        "zh": "学完后，你能核对每个包装部件及其收集方式。"
+      },
+      "coverAssetKey": "packaging-recycling-cover",
+      "activityCodes": [
+        "intermediate-components",
+        "intermediate-clean-streams",
+        "intermediate-local-guide"
+      ],
+      "relatedResourceCodes": [
+        "materials-and-components",
+        "local-sorting-guide"
+      ]
+    },
+    {
+      "courseCode": "preventing-waste",
+      "stageCode": "advanced",
+      "title": {
+        "en": "Preventing waste",
+        "zh": "减少浪费"
+      },
+      "summary": {
+        "en": "Use what you have, store with care and understand the climate link.",
+        "zh": "先用已有食物、注意储存，理解浪费与气候的联系。"
+      },
+      "objective": {
+        "en": "By the end, you can plan a practical waste prevention action.",
+        "zh": "学完后，你能制定可行的减废行动。"
+      },
+      "coverAssetKey": "preventing-waste-cover",
+      "activityCodes": [
+        "advanced-plan-first",
+        "advanced-storage",
+        "advanced-climate"
+      ],
+      "relatedResourceCodes": [
+        "plan-before-shopping",
+        "date-labels-and-storage",
+        "waste-climate-sdg13"
+      ]
+    }
+  ],
+  "libraryTopics": [
+    {
+      "topicCode": "waste-basics",
+      "title": {
+        "en": "Waste basics",
+        "zh": "浪费基础"
+      }
+    },
+    {
+      "topicCode": "recycling",
+      "title": {
+        "en": "Recycling",
+        "zh": "回收"
+      }
+    },
+    {
+      "topicCode": "preventing-waste",
+      "title": {
+        "en": "Preventing waste",
+        "zh": "减少浪费"
+      }
+    },
+    {
+      "topicCode": "waste-climate",
+      "title": {
+        "en": "Waste & climate",
+        "zh": "浪费与气候"
+      }
+    }
+  ],
+  "media": [
+    {
+      "mediaAssetKey": "food-waste-linear-story",
+      "type": "video",
+      "durationSeconds": 60,
+      "assetPath": "assets/story/food-waste/kitchmemo-food-waste-linear-60s.mp4",
+      "posterPath": "assets/story/food-waste/poster.png",
+      "sourceRefs": [
+        "ozharvest-2025"
+      ]
+    }
+  ],
+  "assessmentRules": {
+    "answerKind": "single-choice",
+    "timeLimitSeconds": null,
+    "firstAnswerFinal": true,
+    "gradingAuthority": "server",
+    "unlockAuthority": "atomic-finish",
+    "requiredActivitiesBeforeCheckpoint": false,
+    "courseReadingRequiresUnlock": false,
+    "personalProgress": true,
+    "addsSharedXp": false,
+    "changesInventory": false,
+    "reviewCanUnlock": false,
+    "practiceCanUnlock": false,
+    "percentageRounding": "display-only",
+    "completionAfterAdvanced": "mixed-review"
+  },
+  "errorCodes": [
+    "invalid_input",
+    "learning_stage_locked",
+    "attempt_not_found",
+    "attempt_not_active",
+    "answer_already_submitted",
+    "attempt_incomplete",
+    "content_unavailable",
+    "learning_unavailable"
+  ]
+}

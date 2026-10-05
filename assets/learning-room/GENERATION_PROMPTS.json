@@ -1,0 +1,87 @@
+{
+  "version": 1,
+  "createdAt": "2026-10-05",
+  "generator": "Built-in image_gen; referenced approved app-palette-v2 screen per asset",
+  "assets": [
+    {
+      "key": "waste-basics-still-life",
+      "sourceGeneratedFilename": "exec-7313f390-6f4b-418a-81d2-f26f670658ba.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/01-learning-room.png",
+      "prompt": "Create ONE standalone app image asset matching only the still-life on the right side of the pale-blue continue-learning card in this approved reference screen. Reference role: visual style and exact object composition only. Tall folded plain brown kraft carton on left behind, plain upright silver aluminium beverage can behind on right, one ripe red tomato with green stem in foreground, small green herb sprig lying bottom right. Premium photorealistic natural studio light, realistic paper and metal texture, mild soft contact shadow. Keep group compact and complete with small safe margins. Actual transparent background outside objects and soft shadow. No card, no phone, no screen, no UI, no letters, no logo, no watermark. Portrait composition, around 2:3.",
+      "transparent": true,
+      "original": "originals/waste-basics-still-life.png",
+      "runtime": "waste-basics-still-life.png",
+      "maxWidth": 640
+    },
+    {
+      "key": "waste-basics-course-cover",
+      "sourceGeneratedFilename": "exec-9876d300-741b-4f45-b1d9-a8189053b836.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/02-course-detail.png",
+      "prompt": "Create ONE standalone wide editorial kitchen photograph reproducing the course cover only from this approved screen. Leafy kale left, tomatoes left foreground, red-yellow apple middle, carrot across foreground, clear cylindrical oat jar with wooden lid near center right, plain ridged empty tin can, clear milk bottle with mint green cap behind right, neutral pulp egg carton at right foreground, folded linen bottom left. White marble counter, ivory tile and pale wood chopping board background, soft daylight, restrained natural colors. Match object arrangement, warmth and camera perspective of reference cover. Landscape 2:1, all props within frame. No UI, rounded frame, phone, lettering, labels, logos, watermark.",
+      "transparent": false,
+      "original": "originals/waste-basics-course-cover.png",
+      "runtime": "waste-basics-course-cover.webp",
+      "maxWidth": 1200
+    },
+    {
+      "key": "empty-aluminium-can",
+      "sourceGeneratedFilename": "exec-36dee004-cdfd-4b5d-8185-41f8c457c23c.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/03-quiz-question.png",
+      "prompt": "Create ONE standalone isolated photorealistic plain EMPTY aluminium beverage can matching the can in this quiz reference. Silver brushed unprinted metal, upright three-quarter view, top slightly visible with open pull-tab aperture, realistic slender standard soda can proportions, smooth cylindrical side, rolled top and bottom rim. Small soft contact shadow. Actual transparent background, entire can visible centered with safe margins, portrait 2:3. Match reference natural light and object size proportions. No UI, text, graphics, branding, phone or background scene.",
+      "transparent": true,
+      "original": "originals/empty-aluminium-can.png",
+      "runtime": "empty-aluminium-can.png",
+      "maxWidth": 640
+    },
+    {
+      "key": "learning-complete-seal",
+      "sourceGeneratedFilename": "exec-900a8eb9-a094-4232-af5c-a72fddd90eb1.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/04-quiz-progression.png",
+      "prompt": "Create ONE standalone botanical lesson completion seal matching only the top seal in this approved result screen. Soft very pale blue circular disc, delicate realistic green eucalyptus-like stems and tiny cream blossoms arranged as loose open wreath, centered medium deep green circle with clean bold white check. Match reference gentle airy watercolor / realistic botanical detail, elegant restrained style. Square composition, disc fully contained with small transparent margin. Actual transparent background outside disc. No UI, phone, text, numbers, ribbons, gold coins, trophy or watermark. This is a learning confirmation illustration.",
+      "transparent": true,
+      "original": "originals/learning-complete-seal.png",
+      "runtime": "learning-complete-seal.png",
+      "maxWidth": 512
+    },
+    {
+      "key": "waste-climate-cover",
+      "sourceGeneratedFilename": "exec-f33374af-2a87-49df-8155-dceda0fa49c7.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/05-reading-sdg.png",
+      "prompt": "Create ONE standalone wide editorial kitchen photograph matching only the food cover in this approved climate lesson screen. Large crinkled brown kraft grocery bag at left filled with kale, bread loaf and long spring onions; fresh carrots across foreground, red tomatoes, parsley and dark green cucumber plus cut purple onion at bottom right; ceramic bowl with spotted ripe bananas far right. Pale neutral plaster backsplash and off-white stone countertop, soft natural daylight, realistic understated still-life photography. Preserve reference arrangement, warm neutral tones and 2:1 landscape framing. No screen, rounded frame, UI, lettering, labels, logos or watermark.",
+      "transparent": false,
+      "original": "originals/waste-climate-cover.png",
+      "runtime": "waste-climate-cover.webp",
+      "maxWidth": 1200
+    },
+    {
+      "key": "learning-leaf-sprig",
+      "sourceGeneratedFilename": "exec-608e2045-3e21-46df-a4b2-144c4f198ff4.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/01-learning-room.png",
+      "prompt": "Create ONE standalone botanical sprig matching only the decorative green leafy sprig at lower-left of the SDG teaser in this approved mobile reference. A gently diagonal thin brown-green stem with about seven natural lance-shaped green leaves, clear delicate veins, refined hand-painted botanical realism, muted sage/forest greens, no flowers. Entire sprig with safe margins, portrait 2:3. Actual transparent background. No badge, lettering, phone, UI, circle, shadow rectangle or watermark.",
+      "transparent": true,
+      "original": "originals/learning-leaf-sprig.png",
+      "runtime": "learning-leaf-sprig.png",
+      "maxWidth": 640
+    },
+    {
+      "key": "packaging-recycling-cover",
+      "sourceGeneratedFilename": "exec-a326da54-b3a1-4c63-aef2-a9561dc07b62.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/02-course-detail.png",
+      "prompt": "Create ONE standalone wide kitchen photograph for the intermediate Packaging & recycling course, visually in the same photographic family as the cover in this reference. On a white marble counter arrange a plain clean aluminium can, clear empty glass jar with its lid placed separately, plain transparent rigid plastic container and its lid separately, neatly folded plain kraft cardboard, a clean glass bottle. White tile and pale wood board behind, soft left daylight, balanced modest still-life, natural restrained color and realistic textures. Landscape 2:1, no clutter, no garbage pile. No UI, phone, text, symbols, logos, labels or watermark.",
+      "transparent": false,
+      "original": "originals/packaging-recycling-cover.png",
+      "runtime": "packaging-recycling-cover.webp",
+      "maxWidth": 1200
+    },
+    {
+      "key": "preventing-waste-cover",
+      "sourceGeneratedFilename": "exec-d85b0980-3394-4024-a5ec-14adb93b2a90.png",
+      "reference": "docs/art-direction/learning-room/2026-10-05-app-palette-v2/05-reading-sdg.png",
+      "prompt": "Create ONE standalone wide kitchen photograph for the advanced Preventing waste course in the same photographic family as the grocery cover in this reference. Tidy pale kitchen counter with reusable clear glass food containers holding fresh carrots, kale and tomatoes, a small bowl of apples, folded linen and a plain open brown paper grocery bag behind. Show planning and using existing ingredients through modest portions, no diagrams. Soft natural daylight, cream tile, light wood details, premium realistic editorial photography, muted fresh green and warm neutral tones. Landscape 2:1. No UI, phone, lettering, labels, logos, fake calendar, statistics or watermark.",
+      "transparent": false,
+      "original": "originals/preventing-waste-cover.png",
+      "runtime": "preventing-waste-cover.webp",
+      "maxWidth": 1200
+    }
+  ]
+}

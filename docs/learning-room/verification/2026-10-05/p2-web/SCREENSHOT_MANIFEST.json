@@ -1,0 +1,81 @@
+{
+  "date": "2026-10-05",
+  "platform": "React Native Web in Codex IAB",
+  "browserViewport": {
+    "width": 430,
+    "height": 960
+  },
+  "simulatedInsets": {
+    "top": 44,
+    "bottom": 24
+  },
+  "nativeAcceptance": false,
+  "captures": [
+    {
+      "file": "01-hub.jpg",
+      "sha256": "e58747550b59138db4ca88b9c200b7bf48e9dadcc347d1658e345994fb37562b",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-course.jpg",
+      "sha256": "3f71570f62fb579d5ce8700ebb7161fd42c8feac6661b1ad35814d8c523b9d96",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "02-course-scrolled.jpg",
+      "sha256": "594085af236c1e48c79eaf65c535454c5939acec0a5a1409ef71213a023da0ce",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "03-quiz.jpg",
+      "sha256": "bf8d74384c659ff102b8b0896f8bde3ae0b1c7850a6bb11dc96ed105ed139351",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "04-result.jpg",
+      "sha256": "1018df14fd1e1a7dc41d7810e83fa2488ed2f7327b0b0a231ad2443356d2cdbe",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "04-result-scrolled.jpg",
+      "sha256": "099e4c5e8b18d883d794c681188a67da11a8198a0b2557fa4ade386c42d1e792",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "05-resource.jpg",
+      "sha256": "31ed3d06e7eb59f4753de9426f3b96bba9466979ef7e7210f3c38d69ecc234cb",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "05-resource-scrolled.jpg",
+      "sha256": "59ce01b8ae2267af02c7dccd2658aaf7ed7b4ab38a33a4593115f5a5caa58a22",
+      "width": 390,
+      "height": 844
+    },
+    {
+      "file": "06-quiz-zh-narrow.jpg",
+      "sha256": "24b92e6b6a95c11f3c04cb73e9feb672237d556f9c9c1dd79247cf9092237c73",
+      "width": 320,
+      "height": 667
+    },
+    {
+      "file": "06-quiz-zh-scrolled.jpg",
+      "sha256": "9e4e025a7bcaf156c8b45233515789b4214a668f62e910889d2d88eaf7c3d307",
+      "width": 320,
+      "height": 667
+    },
+    {
+      "file": "07-hub-zh-narrow.jpg",
+      "sha256": "c8c86df6e406d51dea22800ff969a3f098158bef0a74ccd4f27b8ba89b52142c",
+      "width": 320,
+      "height": 667
+    }
+  ]
+}
