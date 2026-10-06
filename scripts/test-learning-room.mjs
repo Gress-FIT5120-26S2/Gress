@@ -7,13 +7,14 @@ import { test } from 'node:test';
 import ts from 'typescript';
 
 // Arthur: NarIyirm
-// 中文：离线测试只编译纯导航与开发适配器，检查返回历史及复习隔离，不启动 App 或模拟真实判分。
-// EN: Offline tests compile only pure navigation and the development adapter, checking history and review isolation without starting the App or simulating real grading.
+// 中文：离线测试编译纯导航、手势回调与开发适配器，检查真实触摸起点／返回历史及复习隔离，不模拟权威判分。
+// EN: Offline tests compile navigation, gesture callbacks and the development adapter, checking actual touch origins, history and review isolation without simulating authoritative grading.
 const tempRoot = os.tmpdir();
 const testDir = await mkdtemp(path.join(tempRoot, 'kitchmemo-learning-ui-'));
 try {
   for (const [source, target] of [
     ['src/components/learning/learningNavigation.ts', 'learningNavigation.mjs'],
+    ['src/components/learning/learningBackGesture.ts', 'learningBackGesture.mjs'],
     ['src/components/learning/dev/learningPreviewContent.ts', 'learningPreviewContent.mjs'],
     ['src/components/learning/dev/learningFixtures.ts', 'learningFixtures.mjs'],
   ]) {
@@ -23,9 +24,80 @@ try {
     await writeFile(path.join(testDir, target), outputText);
   }
   const { learningNavigationReducer: reduce } = await import(pathToFileURL(path.join(testDir, 'learningNavigation.mjs')).href);
+  const { createLearningBackGesture } = await import(pathToFileURL(path.join(testDir, 'learningBackGesture.mjs')).href);
   const { createLearningPreview } = await import(pathToFileURL(path.join(testDir, 'learningFixtures.mjs')).href);
   const hub = { name: 'hub', segment: 'library' };
   const resource = { name: 'resource', resourceCode: 'waste-climate-sdg13' };
+
+  // Arthur: NarIyirm
+  // 中文：复现 RN 在 grant 前 x0=0 的状态，按开始／捕获／授权／释放顺序验证，不把鼠标预览当成原生验收。
+  // EN: Reproduce RN's pre-grant x0=0 and exercise start/capture/grant/release order without treating mouse previews as native verification.
+  const touch = (...positions) => ({ nativeEvent: { touches: positions.map(pageX => ({ pageX })) } });
+  const drag = (dx = 100, dy = 0, numberActiveTouches = 1) => ({ x0: 0, y0: 0, dx, dy, numberActiveTouches });
+  const setupGesture = (initialEnabled = true) => {
+    let enabled = initialEnabled; let backs = 0;
+    const callbacks = createLearningBackGesture({ isEnabled: () => enabled, onBack: () => { backs += 1; } });
+    return { callbacks, backs: () => backs, enable: value => { enabled = value; } };
+  };
+  await test('Library root swipes never return to a different primary tab, even from the edge', () => {
+    const { callbacks: g, backs } = setupGesture(false);
+    for (const x of [12, 180]) {
+      g.onStartShouldSetPanResponderCapture(touch(x), drag(0));
+      assert.equal(g.onMoveShouldSetPanResponderCapture(touch(x + 100), drag()), false);
+      g.onPanResponderGrant(touch(x + 100), drag());
+      g.onPanResponderRelease(touch(), drag());
+    }
+    assert.equal(backs(), 0);
+  });
+  await test('Pre-grant x0=0 cannot turn a central horizontal scroll into edge Back', () => {
+    const { callbacks: g, backs } = setupGesture();
+    g.onStartShouldSetPanResponderCapture(touch(180), drag(0));
+    assert.equal(g.onMoveShouldSetPanResponderCapture(touch(280), drag()), false);
+    g.onPanResponderGrant(touch(280), drag());
+    g.onPanResponderRelease(touch(), drag());
+    assert.equal(backs(), 0);
+  });
+  await test('A real single-finger left-edge swipe returns once after ownership', () => {
+    const { callbacks: g, backs } = setupGesture();
+    assert.equal(g.onStartShouldSetPanResponderCapture(touch(12), drag(0)), false);
+    assert.equal(g.onMoveShouldSetPanResponderCapture(touch(34), drag(22)), true);
+    g.onPanResponderGrant(touch(34), drag(0));
+    g.onPanResponderRelease(touch(), drag(90));
+    g.onPanResponderRelease(touch(), drag(90));
+    assert.equal(backs(), 1);
+  });
+  await test('Leftward, vertical and short edge gestures cannot return', () => {
+    const { callbacks: g, backs } = setupGesture();
+    for (const movement of [drag(-100), drag(10), drag(25, 40)]) {
+      g.onStartShouldSetPanResponderCapture(touch(12), drag(0));
+      assert.equal(g.onMoveShouldSetPanResponderCapture(touch(12), movement), false);
+    }
+    g.onStartShouldSetPanResponderCapture(touch(12), drag(0));
+    g.onPanResponderGrant(touch(34), drag(0));
+    g.onPanResponderRelease(touch(), drag(40));
+    assert.equal(backs(), 0);
+  });
+  await test('Cancellation and an extra finger invalidate an owned edge gesture', () => {
+    const { callbacks: g, backs } = setupGesture();
+    g.onStartShouldSetPanResponderCapture(touch(12), drag(0));
+    g.onPanResponderGrant(touch(34), drag(0));
+    g.onPanResponderTerminate(touch(), drag());
+    g.onPanResponderRelease(touch(), drag());
+    g.onStartShouldSetPanResponderCapture(touch(12), drag(0));
+    g.onPanResponderGrant(touch(34), drag(0));
+    g.onPanResponderStart(touch(34, 120), drag(0, 0, 2));
+    assert.equal(g.onMoveShouldSetPanResponderCapture(touch(140), drag()), false);
+    g.onPanResponderRelease(touch(), drag());
+    assert.equal(backs(), 0);
+  });
+  await test('Changing the route or opening video before release suppresses stale Back', () => {
+    const { callbacks: g, backs, enable } = setupGesture();
+    g.onStartShouldSetPanResponderCapture(touch(12), drag(0));
+    g.onPanResponderGrant(touch(34), drag(0));
+    enable(false);
+    g.onPanResponderRelease(touch(), drag());
+    assert.equal(backs(), 0);
+  });
 
   await test('Back returns to the originating hub segment without mutating history', () => {
     const history = [hub, resource];

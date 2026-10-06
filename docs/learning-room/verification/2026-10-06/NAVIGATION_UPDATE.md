@@ -21,7 +21,7 @@ npm start
 - 名称：中文「学堂」，英文「Learn」；底部书本图标，位于 Fridge 与 Achievements 之间。
 - Home 教育按钮与 Profile 学习行已移除。原首页视频／3D 热点保留。
 - activeTab=learn 时按需加载 LearningRoomEntry，Flow 嵌入页面；加载与失败界面也在页面内，底栏可切换。
-- 根页只显示品牌与标题，不再显示错误的 Home／Profile 返回按钮。内部返回走局部栈，根页 Android Back／iOS 边缘返回回到进入前的主 Tab；原生交互仍待验收。
+- 根页只显示品牌与标题，不再显示错误的 Home／Profile 返回按钮。内部返回走局部栈，根页 Android Back 回到进入前的主 Tab。后续同日手势修复禁用主 Tab 根页的 iOS 滑动返回，详见 GESTURE_ISOLATION.md；原生交互仍待验收。
 - 内容预留统一 dock 高度（Android 104、iOS 118）；学习页不重复增加底部安全区。提交按钮位于底栏上方。
 - 进入关闭助手／首页故事，厨房自然随主 Tab 暂停。切离卸载本人适配器，重新进入从真实服务器恢复；视频仍用全屏 Modal。
 - Tablist 和 selected 语义已补齐；六项短标签适应小屏。

@@ -4,6 +4,8 @@
 
 最新用户修订：独立「学堂 / Learn」主 Tab 已替代 Home／Profile 学习入口与全屏学习 Modal。默认 `npm start`／`npm run server` 已使用指定开发库草稿启动器；`npm run server:start` 和生产仍仅接受 published。请先读 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)，不要照旧文档还原五 Tab 或误判 content_unavailable 为路由未挂载。
 
+同日手势修复：Library 横向主题栏会被旧 iOS 滑动返回 capture 错认成边缘返回（grant 前 x0=0）。独立学堂根页已禁用滑动返回；子页使用真实 touch pageX、单指和完整生命周期判断。见 [GESTURE_ISOLATION.md](verification/2026-10-06/GESTURE_ISOLATION.md)。不要恢复旧的 gesture.x0 <= 24 判断；原生滚动／返回仍需 Expo Go 验收。
+
 ## 1. 三句话说明当前任务
 
 用户已认可 `docs/art-direction/learning-room/2026-10-05-app-palette-v2/` 的五张效果图，并要求后续严格按图实现。项目主线是 **SDG 13 Climate Action**，配色匹配现有 Fridge／Achievements。**P0、P1 内容／技术验证、P2 五页组件／预览、P3 个人数据与考试 API、P4 真实适配器／入口／视频／practice 已完成开发验证**；独立内容审核与 P5 原生验收仍待完成。
