@@ -1,5 +1,5 @@
 import { allowDraftLearning, projectLearningResponse, selectLearningQuestions } from './learningAssessment.js';
-import { validateNoPrivateFields } from './learningContent.js';
+import { validateNoPrivateFields } from './learningPublicPayload.js';
 
 export function createLearningRoomService(database, environment = process.env) {
   const allowDraft = allowDraftLearning(environment);

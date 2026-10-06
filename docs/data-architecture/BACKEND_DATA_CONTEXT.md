@@ -868,6 +868,8 @@ GET /api/achievements
 
 ## 14.3 Learning Room 个人教学与考试（2026-10-05）
 
+2026-10-06 Vercel 构建修复：`learningRoom.js` 的运行时公开字段校验改为导入独立纯 JS 模块 `learningPublicPayload.js`，内容工具 `learningContent.js` 继续复用并重新导出同一校验函数。运行时不再导入会读取 Expo 素材的内容工具，避免 Vercel 文件追踪将 `learningAssets.ts` 纳入后端构建并继承根目录 Expo tsconfig。修复后 Vercel CLI 所带 `@vercel/nft` 对 Express 入口的追踪不含前端源码、素材或非依赖 TypeScript；22 项后端学习测试通过。此修复不改变 API、数据库或内容发布契约；线上重新构建尚未执行。
+
 2026-10-06 本地启动修复：根目录 `npm start`／`npm run server` 使用 `dev:learning`，在不修改 env 文件的前提下设置双草稿开关，并强制校验指定开发库和非 production。根目录 `npm run server:start`／生产入口仍为 published-only。API、RPC、schema 与内容发布状态均未更改；独立审核仍 pending。Expo 导航入口已改为「学堂 / Learn」独立主 Tab。启动验证可运行 `npm --prefix server run verify:learning-gateway -- --development-startup`，启动本轮临时 API 子进程并清理随机记录。
 
 此功能与既有 consume 分类题分开，主线为 SDG 13／13.3。新增 `20261005010000_learning_room_assessment.sql` 与 `20261005011000_learning_room_draft.sql`；两份文件已在 Git 提交 6d0af20 保存，并成功应用到开发库。预演回滚、38 项相关测试、298 次真实 HTTP 请求、追加版本／审核 SQL 回滚验证和远程 lint 均通过；测试 learner／attempt 余量为零，真实 v1 仍 draft／pending。生产未应用。

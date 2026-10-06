@@ -2,6 +2,9 @@ import { createHash } from 'node:crypto';
 import { readFile, access } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { validateNoPrivateFields } from './learningPublicPayload.js';
+
+export { validateNoPrivateFields } from './learningPublicPayload.js';
 
 export const LEARNING_CONTENT_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../data/learning-room/v1');
 const projectRoot = path.resolve(LEARNING_CONTENT_ROOT, '../../../..');
@@ -11,8 +14,6 @@ const stageRules = [
   ['intermediate', 8, 7, 16, 'advanced'],
   ['advanced', 10, 8, 20, null],
 ];
-const forbiddenPublicKeys = new Set(['correctOptionId', 'isCorrect', 'questionSnapshot', 'privateQuestionBank', 'questionBank', 'questionCodes',
-  'correct_option_id', 'is_correct', 'question_snapshot', 'private_question_bank', 'question_bank', 'question_codes', 'explanation']);
 
 export async function readLearningContent(directory = LEARNING_CONTENT_ROOT) {
   const values = await Promise.all(contentFiles.map(async (name) => JSON.parse(await readFile(path.join(directory, `${name}.json`), 'utf8'))));
@@ -229,15 +230,6 @@ export function validateLearningContent(bundle, { assetKeys, release = false, to
   }
   return { ok: errors.length === 0, errors, contentHash: learningContentHash(bundle),
     counts: { courses: courses.size, activities: activities.size, resources: resources.size, questions: questions.size, sources: sources.size } };
-}
-
-export function validateNoPrivateFields(value, errors = [], location = 'public') {
-  if (!value || typeof value !== 'object') return errors;
-  for (const [key, child] of Object.entries(value)) {
-    if (forbiddenPublicKeys.has(key)) errors.push(`${location}.${key}: private assessment field`);
-    validateNoPrivateFields(child, errors, `${location}.${key}`);
-  }
-  return errors;
 }
 
 // Arthur: NarIyirm
