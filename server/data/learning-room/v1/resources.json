@@ -1,0 +1,697 @@
+{
+  "contentVersion": "learning-room-v1",
+  "resources": [
+    {
+      "resourceCode": "waste-climate-sdg13",
+      "contentVersion": "learning-room-v1",
+      "category": "data",
+      "title": {
+        "en": "Less waste. More climate action.",
+        "zh": "减少浪费，参与气候行动。"
+      },
+      "summary": {
+        "en": "Understand food waste's climate connection and the scope of global estimates.",
+        "zh": "理解食物浪费的气候联系与全球估计的范围。"
+      },
+      "whyItMatters": {
+        "en": "A climate fact becomes useful when you know what it measures.",
+        "zh": "知道事实测量了什么，才更容易用它理解行动。"
+      },
+      "publisher": "UNFCCC",
+      "sourceUrl": "https://unfccc.int/news/food-loss-and-waste-account-for-8-10-of-annual-global-greenhouse-gas-emissions-cost-usd-1-trillion",
+      "publishedAt": "2024-09-30",
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "relatedCourseCodes": [
+        "waste-basics",
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "waste-climate"
+      ],
+      "coverAssetKey": "waste-climate-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "fact",
+          "value": {
+            "en": "8–10%",
+            "zh": "8–10%"
+          },
+          "text": {
+            "en": "of global greenhouse gas emissions are linked to food loss and waste.",
+            "zh": "全球温室气体排放与食物损失和浪费有关的比例。"
+          },
+          "scope": {
+            "en": "Annual global emissions; food loss and food waste combined. Cited by UNFCCC on 30 September 2024.",
+            "zh": "全球年度排放；同时涵盖食物损失和食物浪费。UNFCCC 于 2024 年 9 月 30 日引用。"
+          },
+          "sourceRefs": [
+            "unfccc-2024"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Producing food uses energy. Wasting it wastes those resources too.",
+            "zh": "生产食物需要能源。浪费食物，也浪费了这些资源。"
+          }
+        },
+        {
+          "type": "sdg-callout",
+          "goal": 13,
+          "target": "13.3",
+          "assetKey": "sdg-13-climate-action",
+          "title": {
+            "en": "SDG 13.3",
+            "zh": "SDG 13.3"
+          },
+          "text": {
+            "en": "Learn. Understand. Take action.",
+            "zh": "学习、理解、行动。"
+          },
+          "detail": {
+            "en": "Climate education and awareness.",
+            "zh": "气候教育与意识提升。"
+          },
+          "sourceRefs": [
+            "sdg13"
+          ],
+          "attributionRequired": true
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Plan one meal using what you already have.",
+            "zh": "用家里已有的食物计划一餐。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "unfccc-2024"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "unfccc-2024",
+        "sdg13"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "climate-feature",
+      "relatedNewsCodes": [
+        "news-zero-waste-2026"
+      ],
+      "statistics": {
+        "measurementPeriod": "Annual global estimate cited in 2024; underlying estimation period not specified in this article",
+        "populationScope": {
+          "en": "Global food loss and food waste",
+          "zh": "全球食物损失与食物浪费"
+        },
+        "units": "percent of annual global GHG emissions",
+        "includes": [
+          "food loss",
+          "food waste"
+        ],
+        "excludes": [
+          "personal measured emissions saving"
+        ],
+        "methodologyNote": {
+          "en": "The article cites a range, not a personal estimate or a measurement from 2026.",
+          "zh": "文章引用的是范围估计，不是个人估计或 2026 年测量。"
+        }
+      }
+    },
+    {
+      "resourceCode": "global-food-waste-evidence",
+      "contentVersion": "learning-room-v1",
+      "category": "data",
+      "title": {
+        "en": "Read the food waste numbers",
+        "zh": "读懂食物浪费数据"
+      },
+      "summary": {
+        "en": "Separate the data year, publication year and sectors covered.",
+        "zh": "区分统计年份、发布年份与覆盖领域。"
+      },
+      "whyItMatters": {
+        "en": "Scope prevents a global estimate being mistaken for household or personal waste.",
+        "zh": "保留范围，避免把全球估计误当作家庭或个人浪费。"
+      },
+      "publisher": "UNEP",
+      "sourceUrl": "https://www.unep.org/news-and-stories/press-release/world-squanders-over-1-billion-meals-day-un-report",
+      "publishedAt": "2024-03-27",
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "relatedCourseCodes": [
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "waste-climate"
+      ],
+      "coverAssetKey": "waste-climate-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "fact",
+          "value": {
+            "en": "1.05 billion tonnes",
+            "zh": "10.5 亿吨"
+          },
+          "text": {
+            "en": "Estimated food waste at consumer levels in 2022.",
+            "zh": "2022 年消费端食物废弃物估计量。"
+          },
+          "scope": {
+            "en": "Retail, food service and households, including inedible parts; report released in 2024.",
+            "zh": "涵盖零售、餐饮服务和家庭，并包含不可食用部分；报告于 2024 年发布。"
+          },
+          "sourceRefs": [
+            "unep-index-2024"
+          ]
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "The observation year is 2022. The report date is 2024. Neither makes the estimate a reading of your kitchen today.",
+            "zh": "统计年份是 2022 年，报告年份是 2024 年；它们都不能让这个数值变成对你今天厨房的测量。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "When sharing a number, include its year, unit and scope.",
+            "zh": "分享数据时，一起注明年份、单位和范围。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "unep-index-2024"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "unep-index-2024"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard",
+      "statistics": {
+        "measurementPeriod": "2022",
+        "populationScope": {
+          "en": "Global retail, food service and households",
+          "zh": "全球零售、餐饮服务与家庭"
+        },
+        "units": "tonnes",
+        "includes": [
+          "inedible parts",
+          "edible food waste"
+        ],
+        "excludes": [
+          "upstream pre-retail food loss"
+        ],
+        "methodologyNote": {
+          "en": "UNEP Food Waste Index Report 2024 estimate, not household waste alone.",
+          "zh": "UNEP Food Waste Index Report 2024 估计，不只涵盖家庭。"
+        }
+      }
+    },
+    {
+      "resourceCode": "local-sorting-guide",
+      "contentVersion": "learning-room-v1",
+      "category": "guide",
+      "title": {
+        "en": "Check your collection first",
+        "zh": "先核对收集服务"
+      },
+      "summary": {
+        "en": "Use Victoria's guide as a starting point, then verify your provider.",
+        "zh": "从 Victoria 指引开始，再核对你的服务提供方。"
+      },
+      "whyItMatters": {
+        "en": "The same material may have different local collection instructions.",
+        "zh": "相同材料在不同地区可能有不同收集要求。"
+      },
+      "publisher": "Victoria Environment (DEECA)",
+      "sourceUrl": "https://www.environment.vic.gov.au/household-waste-recycling/sort-waste-recycling",
+      "publishedAt": null,
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "relatedCourseCodes": [
+        "waste-basics",
+        "packaging-recycling"
+      ],
+      "topicCodes": [
+        "recycling"
+      ],
+      "coverAssetKey": "packaging-recycling-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Find the service for your address. Councils and private providers can differ, including separate glass or food-organics services.",
+            "zh": "找到服务你住所的提供方。Council 与私人服务商可能不同，包括单独玻璃或厨余收集。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Do not infer a local rule from bin colour or a material symbol. If a route is unclear, check the specific item before putting it in recycling.",
+            "zh": "不要根据桶色或材料符号推断当地规则。处理方式不明时，先查具体物品再投回收。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Look up one uncertain package using your current council or provider guide.",
+            "zh": "用当前 council 或服务商指引查询一件不确定的包装。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-sorting"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard"
+    },
+    {
+      "resourceCode": "materials-and-components",
+      "contentVersion": "learning-room-v1",
+      "category": "guide",
+      "title": {
+        "en": "Read every packaging part",
+        "zh": "阅读每个包装部件"
+      },
+      "summary": {
+        "en": "A box, wrap and lid can have different instructions.",
+        "zh": "盒、薄膜与盖子可能各有处理说明。"
+      },
+      "whyItMatters": {
+        "en": "Following component instructions helps avoid contamination.",
+        "zh": "按部件说明处理，有助于减少污染。"
+      },
+      "publisher": "Australian Government DCCEEW",
+      "sourceUrl": "https://www.dcceew.gov.au/environment/protection/waste/packaging/australasian-recycling-label",
+      "publishedAt": null,
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "relatedCourseCodes": [
+        "waste-basics",
+        "packaging-recycling"
+      ],
+      "topicCodes": [
+        "recycling"
+      ],
+      "coverAssetKey": "packaging-recycling-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Match each component name to its label. A conditional instruction matters as much as the recycling symbol.",
+            "zh": "将每个部件名称与对应标签匹配。有条件说明与回收符号一样重要。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "If you cannot confirm an item's acceptance, check rather than adding an uncertain item to recycling.",
+            "zh": "不能确认是否接受时，应先查，不把不确定的物品加入回收。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Find the instruction for both the container and its lid.",
+            "zh": "找出容器和盖子分别对应的说明。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "arl"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "arl"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard"
+    },
+    {
+      "resourceCode": "plan-before-shopping",
+      "contentVersion": "learning-room-v1",
+      "category": "guide",
+      "title": {
+        "en": "Build a use-first meal",
+        "zh": "计划优先使用的一餐"
+      },
+      "summary": {
+        "en": "Check existing food and buy only the missing ingredients.",
+        "zh": "查看已有食物，只购买缺少的食材。"
+      },
+      "whyItMatters": {
+        "en": "Small planning choices address waste before it happens.",
+        "zh": "小的计划选择，可以在浪费发生前发挥作用。"
+      },
+      "publisher": "Victoria Environment (DEECA)",
+      "sourceUrl": "https://www.environment.vic.gov.au/household-waste-recycling/reduce-waste/food-waste/planning-shopping",
+      "publishedAt": null,
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "relatedCourseCodes": [
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "preventing-waste"
+      ],
+      "coverAssetKey": "preventing-waste-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Check fridge, freezer and pantry. Make a visible use-first area for food that needs attention while still safe.",
+            "zh": "查看冰箱、冷冻室和储物柜。为仍安全、需要优先使用的食物安排可见区域。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Choose portions for the people who will eat, and meals that can share ingredients. Update the plan when your week changes.",
+            "zh": "按实际人数安排份量，并选择能共用食材的餐食。每周安排变化时更新计划。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Write a short shopping list from one meal built around existing food.",
+            "zh": "从一餐以已有食物为主的计划，写出简短购物清单。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-planning"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard"
+    },
+    {
+      "resourceCode": "date-labels-and-storage",
+      "contentVersion": "learning-room-v1",
+      "category": "guide",
+      "title": {
+        "en": "Safety first, waste less",
+        "zh": "安全优先，减少浪费"
+      },
+      "summary": {
+        "en": "Understand use-by, best-before and required storage.",
+        "zh": "理解 use-by、best-before 与必要储存条件。"
+      },
+      "whyItMatters": {
+        "en": "Reducing waste must respect food safety.",
+        "zh": "减少浪费必须尊重食品安全。"
+      },
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/consumer/labelling/dates",
+      "publishedAt": null,
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "relatedCourseCodes": [
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "preventing-waste"
+      ],
+      "coverAssetKey": "preventing-waste-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Do not eat food past its use-by date. Best-before mainly concerns quality, while condition and storage remain relevant.",
+            "zh": "不要食用超过 use-by 日期的食物。Best-before 主要涉及品质，食物状态与储存条件仍需考虑。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "Follow the label's storage and preparation directions. A date alone cannot account for inappropriate storage.",
+            "zh": "遵循标签的储存和准备说明，日期本身不能弥补不当储存。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Check a label's date type and storage directions before making a use-first plan.",
+            "zh": "安排优先使用计划前，查看标签的日期类型与储存要求。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "fsanz-dates"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "fsanz-dates"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard"
+    },
+    {
+      "resourceCode": "news-zero-waste-2026",
+      "contentVersion": "learning-room-v1",
+      "category": "news",
+      "title": {
+        "en": "Zero Waste Day puts food waste in focus",
+        "zh": "零废弃日聚焦食物浪费"
+      },
+      "summary": {
+        "en": "UNEP's 30 March 2026 announcement places food waste at the centre of this year's awareness day.",
+        "zh": "UNEP 2026 年 3 月 30 日公告，将食物浪费作为当年宣传日的重点。"
+      },
+      "whyItMatters": {
+        "en": "Connect an everyday prevention habit with wider climate education.",
+        "zh": "把日常预防习惯与更广泛的气候教育联系起来。"
+      },
+      "publisher": "UNEP",
+      "sourceUrl": "https://www.unep.org/news-and-stories/press-release/food-waste-focus-world-marks-international-day-zero-waste",
+      "publishedAt": "2026-03-30",
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "relatedCourseCodes": [
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "waste-climate"
+      ],
+      "coverAssetKey": "waste-climate-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "The announcement discusses food waste across homes, businesses and cities. It highlights awareness and practical prevention as part of wider environmental action.",
+            "zh": "公告讨论了家庭、企业与城市层面的食物浪费，强调意识提升与实际预防在环境行动中的作用。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Choose a prevention habit to discuss with someone at home.",
+            "zh": "选择一个预防浪费的习惯，与家里的人交流。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "unep-zero-waste-2026"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "unep-zero-waste-2026"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard",
+      "newsContext": "dated-announcement"
+    },
+    {
+      "resourceCode": "news-cds-vic-2026",
+      "contentVersion": "learning-room-v1",
+      "category": "news",
+      "title": {
+        "en": "Victoria reports a container-return milestone",
+        "zh": "Victoria 公布容器回收里程碑"
+      },
+      "summary": {
+        "en": "On 4 April 2026, the Victorian Government reported more than 3 billion container returns through CDS Vic.",
+        "zh": "2026 年 4 月 4 日，Victoria 政府报告 CDS Vic 容器累计回收超过 30 亿个。"
+      },
+      "whyItMatters": {
+        "en": "A separate collection scheme has eligibility rules as well as public results.",
+        "zh": "专门收集计划既有资格规则，也有公开成果。"
+      },
+      "publisher": "Premier of Victoria",
+      "sourceUrl": "https://www.premier.vic.gov.au/real-savings-victorians-through-recycling",
+      "publishedAt": "2026-04-04",
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "relatedCourseCodes": [
+        "packaging-recycling"
+      ],
+      "topicCodes": [
+        "recycling"
+      ],
+      "coverAssetKey": "packaging-recycling-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "This is a government-reported cumulative milestone at the publication date. It is not this app's return count or a live total.",
+            "zh": "这是政府在发布日期报告的累计里程碑，并非本 App 的回收计数或实时总量。"
+          }
+        },
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "For a return you plan today, use CDS Vic's current eligibility and refund-point information.",
+            "zh": "如果计划今天退回容器，请查看 CDS Vic 当前的资格与退费点信息。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Check whether one drink container is eligible before planning a return.",
+            "zh": "计划退回前，核对一个饮料容器是否符合条件。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "vic-cds-news-2026"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "vic-cds-news-2026",
+        "cds-vic"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard",
+      "newsContext": "dated-announcement"
+    },
+    {
+      "resourceCode": "news-date-labels-2024",
+      "contentVersion": "learning-room-v1",
+      "category": "news",
+      "title": {
+        "en": "Why food date labels cause confusion",
+        "zh": "食品日期标签为何容易混淆"
+      },
+      "summary": {
+        "en": "In a 31 October 2024 article, FSANZ explained the difference between safety and quality date marks.",
+        "zh": "FSANZ 于 2024 年 10 月 31 日的文章解释了安全与品质日期标记的区别。"
+      },
+      "whyItMatters": {
+        "en": "This historical article gives context for the storage lesson; it is not a new rule.",
+        "zh": "这篇历史文章为储存课程提供背景，不代表新规则。"
+      },
+      "publisher": "Food Standards Australia New Zealand",
+      "sourceUrl": "https://www.foodstandards.gov.au/news/we-hear-you-lets-clear-confusion-around-food-date-labels",
+      "publishedAt": "2024-10-31",
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "relatedCourseCodes": [
+        "preventing-waste"
+      ],
+      "topicCodes": [
+        "preventing-waste"
+      ],
+      "coverAssetKey": "preventing-waste-cover",
+      "summaryKind": "kitchmemo-editorial-summary",
+      "body": [
+        {
+          "type": "paragraph",
+          "text": {
+            "en": "The article distinguishes use-by from best-before. Read current FSANZ guidance and product storage instructions when deciding how to handle food.",
+            "zh": "文章区分 use-by 和 best-before。处理食物时应结合 FSANZ 当前指引与产品储存说明。"
+          }
+        },
+        {
+          "type": "reflection",
+          "title": {
+            "en": "One action this week",
+            "zh": "本周的一项行动"
+          },
+          "text": {
+            "en": "Explain the two date types in your own words, without saying smell overrides use-by.",
+            "zh": "用自己的话解释两类日期，但不要说气味可以推翻 use-by。"
+          }
+        },
+        {
+          "type": "source",
+          "sourceRefs": [
+            "fsanz-date-news-2024"
+          ]
+        }
+      ],
+      "sourceRefs": [
+        "fsanz-date-news-2024",
+        "fsanz-dates"
+      ],
+      "completionKind": "explicit-confirmation",
+      "readerLayout": "standard",
+      "newsContext": "historical-background"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "capturedAt": "2026-10-05T12:05:53.644Z",
+  "kind": "React Native Web UI preview; no saved progress; not a native-device capture",
+  "canvasSizes": {
+    "english": [
+      390,
+      844
+    ],
+    "chinese": [
+      320,
+      667
+    ]
+  },
+  "screenshots": [
+    {
+      "file": "practice-en.jpg",
+      "width": 430,
+      "height": 960,
+      "bytes": 28553,
+      "sha256": "e5f508b00541769b6c07cb8b687efcf25fa40fc68165609043a1d087c2f5b425"
+    },
+    {
+      "file": "practice-feedback-en.jpg",
+      "width": 430,
+      "height": 960,
+      "bytes": 31661,
+      "sha256": "8771db4e22a09c0e59c3b6b0de8d8b453fc660e759658dc360599226832e8459"
+    },
+    {
+      "file": "practice-zh-320.jpg",
+      "width": 360,
+      "height": 800,
+      "bytes": 24639,
+      "sha256": "44604ea093cec99cd25e9a2b185a9367651ee22876b038555dd41928f21d8147"
+    },
+    {
+      "file": "video-paused.jpg",
+      "width": 1280,
+      "height": 720,
+      "bytes": 29311,
+      "sha256": "c2af48db3459afb893a8e7c52dc3ae4ed889b92f9f20c7e62a5aa2d0a5c36de7"
+    }
+  ]
+}

@@ -9,7 +9,8 @@ import { getApiHealth } from './src/services/apiClient';
 import { fetchNotificationPreferences, fetchNotifications } from './src/services/notificationApi';
 import { KITCHEN_MODEL_ASSET } from './src/assets/kitchenModel';
 import { SPOONIE_MODEL_ASSET } from './src/assets/spoonieModel';
-import { FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
+import { APP_TAB_DOCK_HEIGHT, FloatingTabBar, type AppTab } from './src/components/FloatingTabBar';
+import { LearningLazyModal } from './src/components/learning/LearningLazyModal';
 import { HomeAmbientOverlay } from './src/components/HomeAmbientOverlay';
 import { FridgeScreen, type FridgeFilter } from './src/components/FridgeScreen';
 import { countExpiringBatches, getInventorySnapshot, type InventorySnapshot } from './src/services/inventoryApi';
@@ -43,10 +44,15 @@ const LinearFoodWasteStory = lazy(() =>
   import('./src/components/LinearFoodWasteStory').then((module) => ({ default: module.LinearFoodWasteStory })),
 );
 
+// Arthur: NarIyirm
+// 中文：学堂作为独立 Tab 按需加载；切走时销毁本人适配器，再次进入从服务器恢复。
+// EN: Load Learn on demand as a primary tab; leaving disposes its personal adapter, and re-entry restores from the server.
+const loadLearningRoom = () => import('./src/components/learning/LearningRoomEntry').then(m => ({ default: m.LearningRoomEntry }));
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
   shopping: '#F7FBFA',
   fridge: '#E1F0EF',
+  learn: '#F7FBFA',
   achievements: '#F5E9D6',
   profile: '#E8EEEA',
   notifications: '#F7E9DA',
@@ -98,6 +104,11 @@ function KitchMemoApp() {
   const [showHomeInteractionHint, setShowHomeInteractionHint] = useState(true);
   const [firstUseJourneyState, setFirstUseJourneyState] = useState<FirstUseJourneyState>('checking');
   const [storyVisible, setStoryVisible] = useState(false);
+  // Arthur: NarIyirm
+  // 中文：学堂根页的系统返回回到进入前的主 Tab；课程／测验内部先走自己的返回栈。
+  // EN: Back from the Learn root returns to the previous primary tab; lessons/quizzes first follow their local back stack.
+  const learningReturnTab = useRef<AppTab>('home');
+  const closeLearning = useCallback(() => setActiveTab(learningReturnTab.current), []);
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
   const transitionInProgressRef = useRef(false);
@@ -495,7 +506,7 @@ function KitchMemoApp() {
                 styles.activeScreen,
                 activeTab === 'fridge'
                   ? styles.fridgeContent
-                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'shopping'
+                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'learn' || activeTab === 'shopping'
                     ? styles.profileContent
                     : styles.standardContent,
                 { backgroundColor: transitionTones[activeTab] },
@@ -513,6 +524,10 @@ function KitchMemoApp() {
                 />
               ) : activeTab === 'shopping' ? (
                 <ShoppingScreen />
+              ) : activeTab === 'learn' ? (
+                <View style={styles.learningContent}>
+                  <LearningLazyModal load={loadLearningRoom} embedded componentProps={{ origin: 'tab' as const, embedded: true, onClose: closeLearning }} onClose={closeLearning} />
+                </View>
               ) : activeTab === 'notifications' ? (
                 <NotificationInbox
                   initialNotificationId={notificationTargetId}
@@ -581,6 +596,10 @@ function KitchMemoApp() {
             // EN: Home shares the time-interpolated 3D sky colour with the bottom safe area while other screens keep a stable light navigation base.
             bottomMaskColor={activeTab === 'home' ? kitchenLighting.background : '#F7FBFA'}
             onChange={(tab) => {
+              if (tab === 'learn' && activeTab !== 'learn') {
+                learningReturnTab.current = activeTab === 'notifications' ? notificationReturnTab : activeTab;
+                setAssistantVisible(false); setStoryVisible(false);
+              }
               if (tab === 'fridge') setFridgeFocusFilter(null);
               setActiveTab(tab);
             }}
@@ -657,6 +676,10 @@ const styles = StyleSheet.create({
   activeScreen: { flex: 1 },
   fridgeContent: { paddingHorizontal: 0, paddingTop: 0 },
   profileContent: { paddingHorizontal: 0, paddingTop: 0 },
+  // Arthur: NarIyirm
+  // 中文：课程 CTA 与分类操作在主导航上方结束，底部安全区由 dock 统一占用。
+  // EN: Lesson actions and sorting controls end above the primary dock, which owns the bottom safe area.
+  learningContent: { flex: 1, paddingBottom: APP_TAB_DOCK_HEIGHT },
   standardContent: { paddingHorizontal: 24, paddingTop: 82 },
   chromeLayer: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 10 },
   transitionOverlay: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 20 },

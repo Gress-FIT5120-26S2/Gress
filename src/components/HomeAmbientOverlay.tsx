@@ -139,6 +139,6 @@ const styles = StyleSheet.create({
   mailGlassDay: { borderColor: 'rgba(255,255,255,0.68)', backgroundColor: 'rgba(255,255,255,0.28)' },
   mailBadge: { position: 'absolute', top: -5, right: -5, minWidth: 22, height: 22, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 5, borderRadius: 11, borderWidth: 2, borderColor: '#F7FBFA', backgroundColor: '#F06B24' },
   mailBadgeText: { color: '#FFFFFF', fontSize: 10, fontWeight: '900', lineHeight: 13 },
-  interactionHint: { position: 'absolute', right: 24, bottom: '18%', left: 24, alignItems: 'center' },
+  interactionHint: { position: 'absolute', left: 24, right: 24, bottom: '18%', alignItems: 'center' },
   interactionHintText: { fontSize: 13, fontWeight: '600', lineHeight: 18, letterSpacing: 0.15 },
 });

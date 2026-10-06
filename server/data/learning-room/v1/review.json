@@ -1,0 +1,747 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "learning-room-v1",
+  "authoringReview": {
+    "reviewedAt": "2026-10-05",
+    "reviewer": "Codex primary agent",
+    "status": "source-checked",
+    "method": "Primary-source check and a separate editorial pass by the author; not an independent review."
+  },
+  "independentReview": {
+    "status": "pending",
+    "reviewer": null,
+    "reviewedAt": null,
+    "approvedContentHash": null,
+    "note": "The content plan requires independent proofreading. No independent reviewer or sub-agent was requested or used."
+  },
+  "questions": [
+    {
+      "questionCode": "b-material-can",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Aluminium belongs to the metal group. Its material and its collection route are separate checks.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-material-cardboard",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Cardboard is a paper-based material; food contamination or added layers may change disposal instructions.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-material-peel",
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A peel is an organic food residue. Check whether your service accepts it before choosing a bin.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-material-film",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Flexible film is soft plastic, with collection rules different from many rigid containers.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-sort-can",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "In this example, the mixed recycling service accepts empty aluminium beverage cans.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-sort-peel",
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Use the food-organics route specified in the question; keep packaging out.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-sort-box",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The example accepts this cardboard. Flatten it and keep food residue out.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-sort-unknown",
+      "sourceRefs": [
+        "arl",
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A guess can contaminate a collection stream. Look for component instructions and local acceptance.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-cause-double-buy",
+      "sourceRefs": [
+        "ozharvest-2025"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "An inventory check helps match purchases to what is actually needed.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-cause-forgotten",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A visible use-first area makes it easier to plan around existing food.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-climate-resources",
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Growing and supplying food uses resources. Preventing waste addresses those inputs as well.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "b-climate-learning",
+      "sourceRefs": [
+        "sdg13"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Target 13.3 includes climate education and awareness; a pass is a learning result.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-components-label",
+      "sourceRefs": [
+        "arl"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A multi-part package can require different routes for different components.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-components-food",
+      "sourceRefs": [
+        "vic-fogo",
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Food and its container are different components; follow the appropriate route for each.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-components-lids",
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Lid requirements vary; check the service accepting the jar.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-components-conditional",
+      "sourceRefs": [
+        "arl"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The condition is part of the instruction, not an optional detail.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-clean-loose",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Keep accepted containers loose rather than bagged for this service.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-clean-residue",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Removing food reduces contamination; rinse when needed.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-clean-paper",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The guide separates clean paper/cardboard from tissues and food-soiled paper.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-clean-sticker",
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Non-food items can contaminate organic collections.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-local-soft",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Soft-plastic arrangements change. Verify an active service instead of relying on old advice.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-local-glass",
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Use the separate service specified; it helps protect other recyclables from broken glass.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-local-deposit",
+      "sourceRefs": [
+        "cds-vic"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The scheme covers eligible drink containers; not every container qualifies.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-local-baking-glass",
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Heat-resistant glassware differs from container glass; the bottle/jar stream is not suitable.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-reuse-bag",
+      "sourceRefs": [
+        "vic-single-use"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Repeated use makes the reusable item replace additional single-use items.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-reuse-jar",
+      "sourceRefs": [
+        "vic-reuse"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Reuse must be safe and suitable; avoid repurposing containers into unsafe uses.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-reuse-clean-stream",
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A cleaner stream makes recovery easier; separation itself is not proof a new product was made.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "i-reuse-donate",
+      "sourceRefs": [
+        "vic-reuse"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Only pass on items suitable for someone else to use.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-stocktake",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A stocktake across storage areas reveals what you already have.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-use-soon",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Planning around existing ingredients reduces the chance they are forgotten.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-portions",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Matching portions to attendance helps avoid unwanted leftovers.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-offer",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A lower unit price does not make unused food useful; plan quantities you can use.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-shared-ingredient",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Linking meals around shared ingredients gives the remainder a purpose.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-plan-change",
+      "sourceRefs": [
+        "vic-planning",
+        "vic-storage"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A flexible plan keeps existing food visible when routines change.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-storage-use-by",
+      "sourceRefs": [
+        "fsanz-dates",
+        "fsanz-safety"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Use-by is a safety limit. Smell does not override it.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-storage-best-before",
+      "sourceRefs": [
+        "fsanz-dates"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Best-before concerns quality. Storage instructions and food condition still matter.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-storage-label",
+      "sourceRefs": [
+        "fsanz-dates"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Date marks rely on appropriate storage; follow the product's instructions.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-storage-thaw",
+      "sourceRefs": [
+        "fsanz-safety"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Avoid room-temperature thawing; use the fridge or microwave as instructed.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-priority-prevent",
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Prevention avoids creating the surplus; sorting deals with it after it exists.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-priority-safe-reuse",
+      "sourceRefs": [
+        "vic-reuse",
+        "vic-single-use"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Useful reuse combines repeated use with safety and suitability.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-priority-fogo",
+      "sourceRefs": [
+        "vic-fogo",
+        "unfccc-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Organics collection helps handle scraps, while avoiding edible waste remains a separate goal.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-priority-scrap-vs-food",
+      "sourceRefs": [
+        "vic-planning",
+        "vic-fogo"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Use edible food where safe; separately route unavoidable scraps through an accepted service.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-range",
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The estimate combines food loss and waste globally, not a personal saving.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-year",
+      "sourceRefs": [
+        "unep-index-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The observation period and publication date are different fields.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-sectors",
+      "sourceRefs": [
+        "unep-index-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "This estimate covers those three consumer-level sectors and includes inedible parts.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-sdg",
+      "sourceRefs": [
+        "sdg13"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "The app contributes educational content; it does not certify UN indicators.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-result",
+      "sourceRefs": [
+        "sdg13",
+        "unfccc-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "A score records assessment performance. Environmental outcomes require separate evidence.",
+      "independentStatus": "pending"
+    },
+    {
+      "questionCode": "a-evidence-resources",
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "checkedAt": "2026-10-05",
+      "checks": [
+        "primary-source-support",
+        "unique-best-answer-in-stated-context",
+        "bilingual-meaning",
+        "first-answer-only"
+      ],
+      "evidenceNote": "Food carries upstream resource inputs as well as disposal impacts.",
+      "independentStatus": "pending"
+    }
+  ]
+}

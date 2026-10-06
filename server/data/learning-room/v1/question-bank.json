@@ -1,0 +1,2574 @@
+{
+  "schemaVersion": 1,
+  "contentVersion": "learning-room-v1",
+  "questions": [
+    {
+      "questionCode": "b-material-can",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "materials",
+      "prompt": {
+        "en": "A container is confirmed to be aluminium. Which material group fits?",
+        "zh": "一个容器已确认由铝制成。它属于哪类材料？"
+      },
+      "options": [
+        {
+          "optionId": "metal",
+          "label": {
+            "en": "Metal",
+            "zh": "金属"
+          }
+        },
+        {
+          "optionId": "plastic",
+          "label": {
+            "en": "Plastic",
+            "zh": "塑料"
+          }
+        },
+        {
+          "optionId": "organic",
+          "label": {
+            "en": "Food scraps",
+            "zh": "食物残余"
+          }
+        }
+      ],
+      "correctOptionId": "metal",
+      "explanation": {
+        "en": "Aluminium belongs to the metal group. Its material and its collection route are separate checks.",
+        "zh": "铝属于金属。材料类型与收集方式需要分别判断。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-material-cardboard",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "materials",
+      "prompt": {
+        "en": "An uncoated cardboard sleeve belongs to which material group?",
+        "zh": "未覆膜的纸板套属于哪类材料？"
+      },
+      "options": [
+        {
+          "optionId": "glass",
+          "label": {
+            "en": "Glass",
+            "zh": "玻璃"
+          }
+        },
+        {
+          "optionId": "metal",
+          "label": {
+            "en": "Metal",
+            "zh": "金属"
+          }
+        },
+        {
+          "optionId": "paper",
+          "label": {
+            "en": "Paper and cardboard",
+            "zh": "纸与纸板"
+          }
+        }
+      ],
+      "correctOptionId": "paper",
+      "explanation": {
+        "en": "Cardboard is a paper-based material; food contamination or added layers may change disposal instructions.",
+        "zh": "纸板是纸类材料；食品污染或其他附加层可能改变处理要求。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-material-peel",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "materials",
+      "prompt": {
+        "en": "What is a banana peel best described as?",
+        "zh": "香蕉皮最适合归为哪一类？"
+      },
+      "options": [
+        {
+          "optionId": "paper",
+          "label": {
+            "en": "Paper fibre",
+            "zh": "纸纤维"
+          }
+        },
+        {
+          "optionId": "food",
+          "label": {
+            "en": "Food scraps",
+            "zh": "食物残余"
+          }
+        },
+        {
+          "optionId": "packaging",
+          "label": {
+            "en": "Packaging",
+            "zh": "包装"
+          }
+        }
+      ],
+      "correctOptionId": "food",
+      "explanation": {
+        "en": "A peel is an organic food residue. Check whether your service accepts it before choosing a bin.",
+        "zh": "果皮是有机食物残余。选桶前仍需确认收集服务是否接受。"
+      },
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-material-film",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "materials",
+      "prompt": {
+        "en": "A thin plastic wrapper scrunches into a ball. What type of packaging is it?",
+        "zh": "一层薄塑料包装可以揉成团。它是哪类包装？"
+      },
+      "options": [
+        {
+          "optionId": "soft",
+          "label": {
+            "en": "Soft plastic",
+            "zh": "软塑料"
+          }
+        },
+        {
+          "optionId": "rigid",
+          "label": {
+            "en": "Rigid plastic",
+            "zh": "硬塑料"
+          }
+        },
+        {
+          "optionId": "paper",
+          "label": {
+            "en": "Paper",
+            "zh": "纸"
+          }
+        }
+      ],
+      "correctOptionId": "soft",
+      "explanation": {
+        "en": "Flexible film is soft plastic, with collection rules different from many rigid containers.",
+        "zh": "可揉团的塑料薄膜属于软塑料，收集规则与许多硬塑料容器不同。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-sort-can",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "sorting",
+      "prompt": {
+        "en": "Where should an empty aluminium can go?",
+        "zh": "空铝罐应该投放到哪里？"
+      },
+      "options": [
+        {
+          "optionId": "recycling",
+          "label": {
+            "en": "Recycling",
+            "zh": "回收"
+          }
+        },
+        {
+          "optionId": "food-organics",
+          "label": {
+            "en": "Food organics",
+            "zh": "厨余"
+          }
+        },
+        {
+          "optionId": "general",
+          "label": {
+            "en": "General waste",
+            "zh": "一般垃圾"
+          }
+        }
+      ],
+      "correctOptionId": "recycling",
+      "explanation": {
+        "en": "In this example, the mixed recycling service accepts empty aluminium beverage cans.",
+        "zh": "本示例的混合回收服务接受空铝饮料罐。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example: this mixed recycling service accepts empty aluminium beverage cans; no refund option is being compared.",
+        "zh": "Victoria 教学示例：此混合回收服务接受空铝饮料罐；本题不比较退费收集点。"
+      },
+      "relatedActivityCodes": [
+        "beginner-bin-action"
+      ],
+      "imageAssetKey": "empty-aluminium-can",
+      "status": "active"
+    },
+    {
+      "questionCode": "b-sort-peel",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "sorting",
+      "prompt": {
+        "en": "Your FOGO service accepts fruit peels. Where does a plain banana peel belong?",
+        "zh": "你的 FOGO 服务接受果皮。不带包装的香蕉皮应去哪里？"
+      },
+      "options": [
+        {
+          "optionId": "general",
+          "label": {
+            "en": "General waste",
+            "zh": "一般垃圾"
+          }
+        },
+        {
+          "optionId": "organics",
+          "label": {
+            "en": "Food and garden organics",
+            "zh": "食物与园林有机物"
+          }
+        },
+        {
+          "optionId": "recycling",
+          "label": {
+            "en": "Mixed recycling",
+            "zh": "混合回收"
+          }
+        }
+      ],
+      "correctOptionId": "organics",
+      "explanation": {
+        "en": "Use the food-organics route specified in the question; keep packaging out.",
+        "zh": "按题目指定的厨余收集方式处理，不夹带包装。"
+      },
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "beginner-bin-action"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-sort-box",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "sorting",
+      "prompt": {
+        "en": "This service accepts clean, dry cardboard. Where does an empty plain cardboard box go?",
+        "zh": "此服务接受干净、干燥的纸板。空的普通纸箱应该去哪里？"
+      },
+      "options": [
+        {
+          "optionId": "recycling",
+          "label": {
+            "en": "Mixed recycling",
+            "zh": "混合回收"
+          }
+        },
+        {
+          "optionId": "organics",
+          "label": {
+            "en": "Food organics",
+            "zh": "厨余"
+          }
+        },
+        {
+          "optionId": "general",
+          "label": {
+            "en": "General waste",
+            "zh": "一般垃圾"
+          }
+        }
+      ],
+      "correctOptionId": "recycling",
+      "explanation": {
+        "en": "The example accepts this cardboard. Flatten it and keep food residue out.",
+        "zh": "本示例接受这种纸板。压平纸箱，并去掉食物残余。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "beginner-bin-action"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-sort-unknown",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "sorting",
+      "prompt": {
+        "en": "You cannot identify a package's material or collection instructions. What should you do first?",
+        "zh": "无法确认包装材料或收集说明时，应该先做什么？"
+      },
+      "options": [
+        {
+          "optionId": "recycle",
+          "label": {
+            "en": "Assume it belongs in recycling",
+            "zh": "直接认为它可以回收"
+          }
+        },
+        {
+          "optionId": "organics",
+          "label": {
+            "en": "Assume it is compostable",
+            "zh": "直接认为它可以堆肥"
+          }
+        },
+        {
+          "optionId": "check",
+          "label": {
+            "en": "Check the label and local guide",
+            "zh": "查看标签与当地指引"
+          }
+        }
+      ],
+      "correctOptionId": "check",
+      "explanation": {
+        "en": "A guess can contaminate a collection stream. Look for component instructions and local acceptance.",
+        "zh": "猜测可能污染收集流，应查看各部件说明及当地接受范围。"
+      },
+      "sourceRefs": [
+        "arl",
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "No material or local collection is known.",
+        "zh": "本题尚未确认材料或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "beginner-materials"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-cause-double-buy",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "causes",
+      "prompt": {
+        "en": "You buy spinach, then find an unopened bag at home. Which habit could prevent this?",
+        "zh": "买回菠菜后才发现家里已有一袋未打开的。哪个习惯能帮助避免？"
+      },
+      "options": [
+        {
+          "optionId": "bin",
+          "label": {
+            "en": "Buy only products with longer shelf-life labels",
+            "zh": "只买标示保质期更长的产品"
+          }
+        },
+        {
+          "optionId": "check",
+          "label": {
+            "en": "Check existing food before shopping",
+            "zh": "购物前查看已有食物"
+          }
+        },
+        {
+          "optionId": "more",
+          "label": {
+            "en": "Buy a larger bag next time",
+            "zh": "下次买更大的包装"
+          }
+        }
+      ],
+      "correctOptionId": "check",
+      "explanation": {
+        "en": "An inventory check helps match purchases to what is actually needed.",
+        "zh": "查看库存有助于让购买量符合实际需要。"
+      },
+      "sourceRefs": [
+        "ozharvest-2025"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-why-waste"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-cause-forgotten",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "causes",
+      "prompt": {
+        "en": "Food is repeatedly forgotten behind newer groceries. Which change helps?",
+        "zh": "食物总被新买的东西挡住、遗忘。哪种调整有帮助？"
+      },
+      "options": [
+        {
+          "optionId": "visible",
+          "label": {
+            "en": "Keep soon-needed food visible",
+            "zh": "让近期需使用的食物可见"
+          }
+        },
+        {
+          "optionId": "back",
+          "label": {
+            "en": "Move older food further back",
+            "zh": "把旧食物移到更深处"
+          }
+        },
+        {
+          "optionId": "duplicates",
+          "label": {
+            "en": "Replace the item before checking its date",
+            "zh": "查看日期前就先买替代品"
+          }
+        }
+      ],
+      "correctOptionId": "visible",
+      "explanation": {
+        "en": "A visible use-first area makes it easier to plan around existing food.",
+        "zh": "可见的优先使用区让你更容易用已有食物安排餐食。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-why-waste"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-climate-resources",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "climate-basics",
+      "prompt": {
+        "en": "Why is avoiding edible food waste relevant to climate action?",
+        "zh": "为什么避免可食用食物被浪费与气候行动有关？"
+      },
+      "options": [
+        {
+          "optionId": "only-bin",
+          "label": {
+            "en": "It affects only disposal, not production inputs",
+            "zh": "只涉及丢弃，不涉及生产投入"
+          }
+        },
+        {
+          "optionId": "no-link",
+          "label": {
+            "en": "Food production has no climate link",
+            "zh": "食物生产与气候没有联系"
+          }
+        },
+        {
+          "optionId": "resources",
+          "label": {
+            "en": "It avoids wasting production resources too",
+            "zh": "也避免浪费生产投入的资源"
+          }
+        }
+      ],
+      "correctOptionId": "resources",
+      "explanation": {
+        "en": "Growing and supplying food uses resources. Preventing waste addresses those inputs as well.",
+        "zh": "生产和供应食物需要资源。预防浪费也关注这些投入。"
+      },
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-why-waste"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "b-climate-learning",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "beginner",
+      "topicCode": "climate-basics",
+      "prompt": {
+        "en": "What is this Learning Room's link to SDG 13.3?",
+        "zh": "学习室与 SDG 13.3 的联系是什么？"
+      },
+      "options": [
+        {
+          "optionId": "measurement",
+          "label": {
+            "en": "Automatic measurement of personal emissions",
+            "zh": "自动测量个人排放"
+          }
+        },
+        {
+          "optionId": "education",
+          "label": {
+            "en": "Climate education and awareness",
+            "zh": "气候教育与意识提升"
+          }
+        },
+        {
+          "optionId": "certification",
+          "label": {
+            "en": "It measures the climate impact of each answer",
+            "zh": "它测量每次回答的气候影响"
+          }
+        }
+      ],
+      "correctOptionId": "education",
+      "explanation": {
+        "en": "Target 13.3 includes climate education and awareness; a pass is a learning result.",
+        "zh": "13.3 包含气候教育与意识提升；通过测验代表学习成果。"
+      },
+      "sourceRefs": [
+        "sdg13"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "beginner-why-waste"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-components-label",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "components",
+      "prompt": {
+        "en": "A pack has separate box, wrap and lid instructions. How should you read them?",
+        "zh": "包装上分别标有盒、薄膜和盖子的说明。应该怎样阅读？"
+      },
+      "options": [
+        {
+          "optionId": "each",
+          "label": {
+            "en": "Read each component's instruction",
+            "zh": "分别阅读每个部件的说明"
+          }
+        },
+        {
+          "optionId": "largest",
+          "label": {
+            "en": "Use only the largest part's instruction",
+            "zh": "只按最大部件的说明处理"
+          }
+        },
+        {
+          "optionId": "same",
+          "label": {
+            "en": "Give every part the same destination",
+            "zh": "让所有部件去同一处"
+          }
+        }
+      ],
+      "correctOptionId": "each",
+      "explanation": {
+        "en": "A multi-part package can require different routes for different components.",
+        "zh": "多部件包装的不同部件可能需要不同处理方式。"
+      },
+      "sourceRefs": [
+        "arl"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-components-food",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "components",
+      "prompt": {
+        "en": "A tub contains uneaten food. What should happen before sorting its empty packaging?",
+        "zh": "一个容器里还有未吃完的食物。分类空包装前应做什么？"
+      },
+      "options": [
+        {
+          "optionId": "together",
+          "label": {
+            "en": "Send both to packaging recycling",
+            "zh": "一起放入包装回收"
+          }
+        },
+        {
+          "optionId": "food-bin",
+          "label": {
+            "en": "Sort by the container's outside material alone",
+            "zh": "只按容器外部材料分类"
+          }
+        },
+        {
+          "optionId": "separate",
+          "label": {
+            "en": "Separate food from packaging",
+            "zh": "把食物与包装分开"
+          }
+        }
+      ],
+      "correctOptionId": "separate",
+      "explanation": {
+        "en": "Food and its container are different components; follow the appropriate route for each.",
+        "zh": "食物与容器是不同组成部分，应分别按各自规则处理。"
+      },
+      "sourceRefs": [
+        "vic-fogo",
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-components-lids",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "components",
+      "prompt": {
+        "en": "For a glass jar lid, what determines whether it stays attached for collection?",
+        "zh": "回收玻璃罐时，是否保留盖子由什么决定？"
+      },
+      "options": [
+        {
+          "optionId": "always-off",
+          "label": {
+            "en": "Always remove every lid everywhere",
+            "zh": "任何地区都一律取下"
+          }
+        },
+        {
+          "optionId": "local",
+          "label": {
+            "en": "Your council's specific instructions",
+            "zh": "当地 council 的具体指引"
+          }
+        },
+        {
+          "optionId": "always-on",
+          "label": {
+            "en": "Always leave every lid attached",
+            "zh": "所有盖子一律留着"
+          }
+        }
+      ],
+      "correctOptionId": "local",
+      "explanation": {
+        "en": "Lid requirements vary; check the service accepting the jar.",
+        "zh": "不同服务对盖子的要求不同，应核对接收玻璃罐的服务。"
+      },
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-components-conditional",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "components",
+      "prompt": {
+        "en": "A component is labelled conditionally recyclable. What must you do?",
+        "zh": "一个包装部件标为有条件可回收。你需要做什么？"
+      },
+      "options": [
+        {
+          "optionId": "follow",
+          "label": {
+            "en": "Follow the stated preparation or collection instruction",
+            "zh": "遵循指定的准备或收集要求"
+          }
+        },
+        {
+          "optionId": "automatic",
+          "label": {
+            "en": "Use any recycling bin automatically",
+            "zh": "直接投入任意回收桶"
+          }
+        },
+        {
+          "optionId": "whole",
+          "label": {
+            "en": "Apply the label to the whole product",
+            "zh": "把该标签当作整个产品的说明"
+          }
+        }
+      ],
+      "correctOptionId": "follow",
+      "explanation": {
+        "en": "The condition is part of the instruction, not an optional detail.",
+        "zh": "条件本身就是处理说明的一部分，并非可忽略的细节。"
+      },
+      "sourceRefs": [
+        "arl"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-clean-loose",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "clean-streams",
+      "prompt": {
+        "en": "This mixed recycling service asks for loose containers. How should you present them?",
+        "zh": "此混合回收服务要求容器散放。你应如何投放？"
+      },
+      "options": [
+        {
+          "optionId": "bag",
+          "label": {
+            "en": "Tied inside a plastic bag",
+            "zh": "扎进塑料袋"
+          }
+        },
+        {
+          "optionId": "food",
+          "label": {
+            "en": "Packed with leftover food",
+            "zh": "连剩余食物一起放"
+          }
+        },
+        {
+          "optionId": "loose",
+          "label": {
+            "en": "Empty and loose, without a plastic bag",
+            "zh": "倒空后散放，不装塑料袋"
+          }
+        }
+      ],
+      "correctOptionId": "loose",
+      "explanation": {
+        "en": "Keep accepted containers loose rather than bagged for this service.",
+        "zh": "本服务要求可接受的容器散放，而非装袋。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-clean-residue",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "clean-streams",
+      "prompt": {
+        "en": "A recyclable food can still has food inside. Which preparation matches Victoria's guide?",
+        "zh": "可回收食品罐里还有食物。哪种准备符合 Victoria 指引？"
+      },
+      "options": [
+        {
+          "optionId": "seal",
+          "label": {
+            "en": "Seal the food inside with extra plastic",
+            "zh": "用额外塑料把食物封在里面"
+          }
+        },
+        {
+          "optionId": "empty",
+          "label": {
+            "en": "Empty it and rinse if needed",
+            "zh": "倒空，必要时冲洗"
+          }
+        },
+        {
+          "optionId": "leave",
+          "label": {
+            "en": "Leave the food inside for sorting machines",
+            "zh": "把食物留给分拣机器处理"
+          }
+        }
+      ],
+      "correctOptionId": "empty",
+      "explanation": {
+        "en": "Removing food reduces contamination; rinse when needed.",
+        "zh": "去掉食物有助于减少污染，必要时冲洗。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-clean-paper",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "clean-streams",
+      "prompt": {
+        "en": "Which item fits this service's clean, dry paper/cardboard recycling rule?",
+        "zh": "哪个物品符合此服务对干净、干燥纸类的回收要求？"
+      },
+      "options": [
+        {
+          "optionId": "box",
+          "label": {
+            "en": "A dry, unsoiled cardboard box",
+            "zh": "干燥、未沾污的纸箱"
+          }
+        },
+        {
+          "optionId": "tissue",
+          "label": {
+            "en": "A used tissue",
+            "zh": "用过的纸巾"
+          }
+        },
+        {
+          "optionId": "grease",
+          "label": {
+            "en": "A food-soiled paper towel",
+            "zh": "沾有食物的厨房纸"
+          }
+        }
+      ],
+      "correctOptionId": "box",
+      "explanation": {
+        "en": "The guide separates clean paper/cardboard from tissues and food-soiled paper.",
+        "zh": "指引将干净纸板与纸巾、食品污染纸类区分处理。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-clean-sticker",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "clean-streams",
+      "prompt": {
+        "en": "Your FOGO service accepts fruit scraps. What should you remove from a peel first?",
+        "zh": "你的 FOGO 服务接受水果残余。投放果皮前应先去掉什么？"
+      },
+      "options": [
+        {
+          "optionId": "nothing",
+          "label": {
+            "en": "Nothing; packaging breaks down with food",
+            "zh": "不必去掉，包装会和食物一起分解"
+          }
+        },
+        {
+          "optionId": "peel",
+          "label": {
+            "en": "Add a bag to keep the peel contained",
+            "zh": "加一个袋子装住果皮"
+          }
+        },
+        {
+          "optionId": "sticker",
+          "label": {
+            "en": "The produce sticker and packaging",
+            "zh": "水果贴纸与包装"
+          }
+        }
+      ],
+      "correctOptionId": "sticker",
+      "explanation": {
+        "en": "Non-food items can contaminate organic collections.",
+        "zh": "非食物物品可能污染有机物收集。"
+      },
+      "sourceRefs": [
+        "vic-fogo"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-local-soft",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "local-collection",
+      "prompt": {
+        "en": "No household soft-plastic collection is confirmed. What should you check?",
+        "zh": "尚未确认家用软塑料收集服务。应该核对什么？"
+      },
+      "options": [
+        {
+          "optionId": "colour",
+          "label": {
+            "en": "Use its plastic code as confirmation",
+            "zh": "用塑料编号确认"
+          }
+        },
+        {
+          "optionId": "service",
+          "label": {
+            "en": "An active local collection or drop-off service",
+            "zh": "当地正在运行的收集或投放服务"
+          }
+        },
+        {
+          "optionId": "old",
+          "label": {
+            "en": "Assume an old supermarket scheme still operates",
+            "zh": "认为以前的超市收集一直有效"
+          }
+        }
+      ],
+      "correctOptionId": "service",
+      "explanation": {
+        "en": "Soft-plastic arrangements change. Verify an active service instead of relying on old advice.",
+        "zh": "软塑料收集安排会变化，应核实有效服务，而不是沿用旧建议。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-local-guide"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-local-glass",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "local-collection",
+      "prompt": {
+        "en": "Your council provides a separate glass service for jars. Where should an accepted empty jar go?",
+        "zh": "当地 council 为玻璃罐提供单独收集服务。符合要求的空玻璃罐应该去哪里？"
+      },
+      "options": [
+        {
+          "optionId": "glass",
+          "label": {
+            "en": "The separate glass service",
+            "zh": "单独玻璃收集服务"
+          }
+        },
+        {
+          "optionId": "mixed",
+          "label": {
+            "en": "Mixed recycling regardless of instructions",
+            "zh": "无视说明投入混合回收"
+          }
+        },
+        {
+          "optionId": "fogo",
+          "label": {
+            "en": "Food organics",
+            "zh": "厨余"
+          }
+        }
+      ],
+      "correctOptionId": "glass",
+      "explanation": {
+        "en": "Use the separate service specified; it helps protect other recyclables from broken glass.",
+        "zh": "按题目指定的单独服务处理，有助于防止碎玻璃污染其他回收物。"
+      },
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-local-guide"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-local-deposit",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "local-collection",
+      "prompt": {
+        "en": "Before taking a drink container for a CDS Vic refund, what should you verify?",
+        "zh": "把饮料容器带去 CDS Vic 退费前，应核对什么？"
+      },
+      "options": [
+        {
+          "optionId": "all",
+          "label": {
+            "en": "Assume every glass container qualifies",
+            "zh": "认为所有玻璃容器都符合"
+          }
+        },
+        {
+          "optionId": "size",
+          "label": {
+            "en": "Check its material only",
+            "zh": "只查看材质"
+          }
+        },
+        {
+          "optionId": "eligible",
+          "label": {
+            "en": "Its eligibility and a current refund point",
+            "zh": "容器资格与有效退费点"
+          }
+        }
+      ],
+      "correctOptionId": "eligible",
+      "explanation": {
+        "en": "The scheme covers eligible drink containers; not every container qualifies.",
+        "zh": "该计划只接受符合条件的饮料容器，并非所有容器都可以退费。"
+      },
+      "sourceRefs": [
+        "cds-vic"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-local-guide"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-local-baking-glass",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "local-collection",
+      "prompt": {
+        "en": "Can a glass baking dish be treated like an accepted glass drink bottle in Victoria's bottle/jar recycling?",
+        "zh": "在 Victoria 的瓶罐玻璃回收中，玻璃烤盘可以和符合要求的饮料瓶一样处理吗？"
+      },
+      "options": [
+        {
+          "optionId": "unbroken",
+          "label": {
+            "en": "Yes, if it is unbroken and empty",
+            "zh": "可以，只要它完整且已倒空"
+          }
+        },
+        {
+          "optionId": "different",
+          "label": {
+            "en": "No; check the disposal route for that item",
+            "zh": "不可以；查看该物品的处理方式"
+          }
+        },
+        {
+          "optionId": "same",
+          "label": {
+            "en": "Yes; all glass is the same for collection",
+            "zh": "可以，所有玻璃的收集方式相同"
+          }
+        }
+      ],
+      "correctOptionId": "different",
+      "explanation": {
+        "en": "Heat-resistant glassware differs from container glass; the bottle/jar stream is not suitable.",
+        "zh": "耐热玻璃器具不同于瓶罐玻璃，不适合瓶罐回收流。"
+      },
+      "sourceRefs": [
+        "vic-sorting"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-local-guide"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-reuse-bag",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "reuse-resources",
+      "prompt": {
+        "en": "You already own a usable reusable shopping bag. Which action avoids more single-use waste?",
+        "zh": "你已有一个可用的购物袋。哪种做法能减少一次性废弃物？"
+      },
+      "options": [
+        {
+          "optionId": "reuse",
+          "label": {
+            "en": "Bring it and use it again",
+            "zh": "带上并继续使用"
+          }
+        },
+        {
+          "optionId": "replace",
+          "label": {
+            "en": "Buy a new reusable bag every trip",
+            "zh": "每次购物都买一个新环保袋"
+          }
+        },
+        {
+          "optionId": "leave-home",
+          "label": {
+            "en": "Leave it at home and take a new checkout bag",
+            "zh": "把它留在家里，结账时另拿购物袋"
+          }
+        }
+      ],
+      "correctOptionId": "reuse",
+      "explanation": {
+        "en": "Repeated use makes the reusable item replace additional single-use items.",
+        "zh": "反复使用才能让可重复使用物品替代更多一次性物品。"
+      },
+      "sourceRefs": [
+        "vic-single-use"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-reuse-jar",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "reuse-resources",
+      "prompt": {
+        "en": "When reusing a container for food, what matters most?",
+        "zh": "将容器重复用于盛装食物时，最重要的是什么？"
+      },
+      "options": [
+        {
+          "optionId": "appearance",
+          "label": {
+            "en": "It looks attractive, regardless of previous contents",
+            "zh": "外观漂亮即可，不看原先装什么"
+          }
+        },
+        {
+          "optionId": "rinse-only",
+          "label": {
+            "en": "A rinse makes any container suitable for food",
+            "zh": "冲洗一下就能让任何容器适合盛装食品"
+          }
+        },
+        {
+          "optionId": "suitable",
+          "label": {
+            "en": "It is clean and suitable for that food use",
+            "zh": "它干净且适合这种食品用途"
+          }
+        }
+      ],
+      "correctOptionId": "suitable",
+      "explanation": {
+        "en": "Reuse must be safe and suitable; avoid repurposing containers into unsafe uses.",
+        "zh": "重复使用应安全、合适，不能让容器承担不安全的用途。"
+      },
+      "sourceRefs": [
+        "vic-reuse"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-reuse-clean-stream",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "reuse-resources",
+      "prompt": {
+        "en": "Why can separating accepted glass from mixed recycling help other materials?",
+        "zh": "为什么将可接受的玻璃与混合回收分开，有助于其他材料？"
+      },
+      "options": [
+        {
+          "optionId": "erase",
+          "label": {
+            "en": "It removes the need to check local services",
+            "zh": "不再需要查看当地服务"
+          }
+        },
+        {
+          "optionId": "protect",
+          "label": {
+            "en": "It reduces broken glass contaminating paper and plastic",
+            "zh": "减少碎玻璃混入纸类与塑料"
+          }
+        },
+        {
+          "optionId": "count",
+          "label": {
+            "en": "It counts every jar as a new product immediately",
+            "zh": "立即把每个罐子算成新产品"
+          }
+        }
+      ],
+      "correctOptionId": "protect",
+      "explanation": {
+        "en": "A cleaner stream makes recovery easier; separation itself is not proof a new product was made.",
+        "zh": "更干净的收集流有助于回收；完成分离不等于已经制成新产品。"
+      },
+      "sourceRefs": [
+        "vic-glass"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "Victoria teaching example. Follow the stated service conditions; local council rules may differ.",
+        "zh": "Victoria 教学示例。按题目说明的服务条件判断；各 council 规则可能不同。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-clean-streams"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "i-reuse-donate",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "intermediate",
+      "topicCode": "reuse-resources",
+      "prompt": {
+        "en": "You no longer need a reusable lunch container. What is a suitable reuse option?",
+        "zh": "你不再需要一个可重复使用的饭盒。哪种再利用方式合适？"
+      },
+      "options": [
+        {
+          "optionId": "safe",
+          "label": {
+            "en": "Offer it only if clean, safe and usable",
+            "zh": "只在干净、安全、可用时转给别人"
+          }
+        },
+        {
+          "optionId": "damaged",
+          "label": {
+            "en": "Donate it even if damaged and unsafe",
+            "zh": "损坏、不安全也捐出"
+          }
+        },
+        {
+          "optionId": "mixed",
+          "label": {
+            "en": "Place it in mixed recycling without checking",
+            "zh": "不核对就投入混合回收"
+          }
+        }
+      ],
+      "correctOptionId": "safe",
+      "explanation": {
+        "en": "Only pass on items suitable for someone else to use.",
+        "zh": "只应转交适合他人继续使用的物品。"
+      },
+      "sourceRefs": [
+        "vic-reuse"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "No local disposal instruction is implied.",
+        "zh": "本题不代表当地投放指引。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-stocktake",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "Before making a shopping list, which check best prevents duplicate purchases?",
+        "zh": "写购物清单前，哪项检查最能避免重复购买？"
+      },
+      "options": [
+        {
+          "optionId": "only-price",
+          "label": {
+            "en": "Check only discounts",
+            "zh": "只查看折扣"
+          }
+        },
+        {
+          "optionId": "replace",
+          "label": {
+            "en": "List replacements from memory",
+            "zh": "凭记忆列出要补买的食物"
+          }
+        },
+        {
+          "optionId": "all-storage",
+          "label": {
+            "en": "Check fridge, freezer and pantry",
+            "zh": "查看冰箱、冷冻室和储物柜"
+          }
+        }
+      ],
+      "correctOptionId": "all-storage",
+      "explanation": {
+        "en": "A stocktake across storage areas reveals what you already have.",
+        "zh": "查看各储存区域能了解已有食物。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-use-soon",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "You have vegetables that need using soon and remain safe. Which meal plan fits best?",
+        "zh": "你有一些仍安全、但需要尽快使用的蔬菜。哪种餐食计划最好？"
+      },
+      "options": [
+        {
+          "optionId": "later",
+          "label": {
+            "en": "Wait until all new groceries are finished",
+            "zh": "先吃完全部新买的食物再考虑"
+          }
+        },
+        {
+          "optionId": "use-existing",
+          "label": {
+            "en": "Choose a meal using those vegetables",
+            "zh": "选择能用到这些蔬菜的一餐"
+          }
+        },
+        {
+          "optionId": "new-recipe",
+          "label": {
+            "en": "Buy different vegetables for every recipe",
+            "zh": "每道菜都另买新蔬菜"
+          }
+        }
+      ],
+      "correctOptionId": "use-existing",
+      "explanation": {
+        "en": "Planning around existing ingredients reduces the chance they are forgotten.",
+        "zh": "围绕已有食材计划餐食，能减少遗忘。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-portions",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "Two people will be away tonight. What should change in your dinner plan?",
+        "zh": "今晚有两个人不在家吃饭。应如何调整晚餐计划？"
+      },
+      "options": [
+        {
+          "optionId": "adjust",
+          "label": {
+            "en": "Adjust portions for those who will eat",
+            "zh": "按实际就餐人数调整份量"
+          }
+        },
+        {
+          "optionId": "usual",
+          "label": {
+            "en": "Cook the usual portions with no leftover plan",
+            "zh": "照常做且不安排剩菜用途"
+          }
+        },
+        {
+          "optionId": "extra",
+          "label": {
+            "en": "Add extra portions because ingredients are available",
+            "zh": "有食材就增加份量"
+          }
+        }
+      ],
+      "correctOptionId": "adjust",
+      "explanation": {
+        "en": "Matching portions to attendance helps avoid unwanted leftovers.",
+        "zh": "按就餐人数安排份量，有助于避免多余剩菜。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-offer",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "A bulk offer costs less per unit, but you cannot use it safely in time. What best prevents waste?",
+        "zh": "大包装单价更低，但你无法及时安全用完。怎样更能避免浪费？"
+      },
+      "options": [
+        {
+          "optionId": "unit-price",
+          "label": {
+            "en": "Choose the biggest pack for its unit price",
+            "zh": "只看单价，选最大包装"
+          }
+        },
+        {
+          "optionId": "bin-later",
+          "label": {
+            "en": "Buy it and decide what to discard later",
+            "zh": "先买，再决定扔哪些"
+          }
+        },
+        {
+          "optionId": "need",
+          "label": {
+            "en": "Buy only an amount you can use",
+            "zh": "只买能用完的量"
+          }
+        }
+      ],
+      "correctOptionId": "need",
+      "explanation": {
+        "en": "A lower unit price does not make unused food useful; plan quantities you can use.",
+        "zh": "单价低不等于食物能被用掉，应按可使用的数量购买。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-shared-ingredient",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "A recipe uses half a tub of an ingredient. What makes a useful plan for the remainder?",
+        "zh": "一道菜只用半盒食材。怎样安排剩下部分更有帮助？"
+      },
+      "options": [
+        {
+          "optionId": "untracked",
+          "label": {
+            "en": "Leave it unlabelled at the back",
+            "zh": "不做记录，放到后面"
+          }
+        },
+        {
+          "optionId": "second-meal",
+          "label": {
+            "en": "Plan another meal using it within safe storage limits",
+            "zh": "在安全储存期限内安排另一餐使用"
+          }
+        },
+        {
+          "optionId": "buy-another",
+          "label": {
+            "en": "Buy another tub for the next recipe",
+            "zh": "下道菜再买一盒"
+          }
+        }
+      ],
+      "correctOptionId": "second-meal",
+      "explanation": {
+        "en": "Linking meals around shared ingredients gives the remainder a purpose.",
+        "zh": "让不同餐食共用食材，可为剩余部分安排用途。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-plan-change",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "planning",
+      "prompt": {
+        "en": "Your week's plans change after shopping. What is the best next step?",
+        "zh": "购物后本周安排改变了。下一步怎样做最好？"
+      },
+      "options": [
+        {
+          "optionId": "review",
+          "label": {
+            "en": "Review perishables and update meals or safe storage plans",
+            "zh": "查看易腐食物，调整餐食或安全储存安排"
+          }
+        },
+        {
+          "optionId": "ignore",
+          "label": {
+            "en": "Keep the original plan without checking food",
+            "zh": "不查看食物，照原计划放着"
+          }
+        },
+        {
+          "optionId": "new-shop",
+          "label": {
+            "en": "Start a new shop before checking existing food",
+            "zh": "还没看已有食物就重新购物"
+          }
+        }
+      ],
+      "correctOptionId": "review",
+      "explanation": {
+        "en": "A flexible plan keeps existing food visible when routines change.",
+        "zh": "安排改变时，灵活调整能让已有食物继续被关注。"
+      },
+      "sourceRefs": [
+        "vic-planning",
+        "vic-storage"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-storage-use-by",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "storage-safety",
+      "prompt": {
+        "en": "A food is past its use-by date. It smells normal. What should you do?",
+        "zh": "食物已过 use-by 日期，但闻起来正常。应该怎么办？"
+      },
+      "options": [
+        {
+          "optionId": "smell",
+          "label": {
+            "en": "Use smell alone to decide it is safe",
+            "zh": "只凭气味判定安全"
+          }
+        },
+        {
+          "optionId": "relabel",
+          "label": {
+            "en": "Cook it longer to override the date",
+            "zh": "延长烹饪时间以替代日期限制"
+          }
+        },
+        {
+          "optionId": "do-not-eat",
+          "label": {
+            "en": "Do not eat it",
+            "zh": "不要食用"
+          }
+        }
+      ],
+      "correctOptionId": "do-not-eat",
+      "explanation": {
+        "en": "Use-by is a safety limit. Smell does not override it.",
+        "zh": "Use-by 是安全期限，气味不能替代这一限制。"
+      },
+      "sourceRefs": [
+        "fsanz-dates",
+        "fsanz-safety"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-storage"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-storage-best-before",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "storage-safety",
+      "prompt": {
+        "en": "What does a best-before date mainly describe?",
+        "zh": "Best-before 日期主要说明什么？"
+      },
+      "options": [
+        {
+          "optionId": "opened",
+          "label": {
+            "en": "The day the pack was opened",
+            "zh": "包装被打开的日期"
+          }
+        },
+        {
+          "optionId": "quality",
+          "label": {
+            "en": "Expected food quality",
+            "zh": "预期食品品质"
+          }
+        },
+        {
+          "optionId": "same",
+          "label": {
+            "en": "The same safety cutoff as use-by",
+            "zh": "与 use-by 相同的安全截止"
+          }
+        }
+      ],
+      "correctOptionId": "quality",
+      "explanation": {
+        "en": "Best-before concerns quality. Storage instructions and food condition still matter.",
+        "zh": "Best-before 主要涉及品质，仍需注意储存说明和食物状态。"
+      },
+      "sourceRefs": [
+        "fsanz-dates"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-storage"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-storage-label",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "storage-safety",
+      "prompt": {
+        "en": "A label says keep refrigerated after opening. What should you follow?",
+        "zh": "标签要求开封后冷藏。应怎样做？"
+      },
+      "options": [
+        {
+          "optionId": "label",
+          "label": {
+            "en": "Follow that storage instruction",
+            "zh": "遵循这项储存要求"
+          }
+        },
+        {
+          "optionId": "date-only",
+          "label": {
+            "en": "Use the date alone regardless of storage",
+            "zh": "只看日期，不考虑储存"
+          }
+        },
+        {
+          "optionId": "room",
+          "label": {
+            "en": "Keep it on the counter to remember it",
+            "zh": "为了记得使用而放在室温台面"
+          }
+        }
+      ],
+      "correctOptionId": "label",
+      "explanation": {
+        "en": "Date marks rely on appropriate storage; follow the product's instructions.",
+        "zh": "日期标记以适当储存为前提，应遵循产品说明。"
+      },
+      "sourceRefs": [
+        "fsanz-dates"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-storage"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-storage-thaw",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "storage-safety",
+      "prompt": {
+        "en": "How should frozen perishable food be thawed according to FSANZ?",
+        "zh": "按 FSANZ 指引，冷冻易腐食物应如何解冻？"
+      },
+      "options": [
+        {
+          "optionId": "counter",
+          "label": {
+            "en": "At room temperature all day",
+            "zh": "在室温下放一整天"
+          }
+        },
+        {
+          "optionId": "sun",
+          "label": {
+            "en": "Move it to a warm spot to speed thawing",
+            "zh": "移到温暖处加快解冻"
+          }
+        },
+        {
+          "optionId": "cold",
+          "label": {
+            "en": "In the fridge or using a microwave",
+            "zh": "在冰箱里或使用微波炉"
+          }
+        }
+      ],
+      "correctOptionId": "cold",
+      "explanation": {
+        "en": "Avoid room-temperature thawing; use the fridge or microwave as instructed.",
+        "zh": "避免室温解冻，按指引使用冰箱或微波炉。"
+      },
+      "sourceRefs": [
+        "fsanz-safety"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-storage"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-priority-prevent",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "prevention-priority",
+      "prompt": {
+        "en": "You can either buy less surplus food or improve sorting of the surplus later. Which prevents the waste first?",
+        "zh": "可以少买多余食物，也可以事后更好地分类多余食物。哪项先预防浪费？"
+      },
+      "options": [
+        {
+          "optionId": "package",
+          "label": {
+            "en": "Change the surplus food's packaging",
+            "zh": "更换多余食物的包装"
+          }
+        },
+        {
+          "optionId": "less",
+          "label": {
+            "en": "Buy only what you can use",
+            "zh": "只买能使用的食物"
+          }
+        },
+        {
+          "optionId": "sort",
+          "label": {
+            "en": "Buy the surplus and sort it later",
+            "zh": "先买多余食物，再分类"
+          }
+        }
+      ],
+      "correctOptionId": "less",
+      "explanation": {
+        "en": "Prevention avoids creating the surplus; sorting deals with it after it exists.",
+        "zh": "预防减少多余食物的产生；分类是在产生之后处理。"
+      },
+      "sourceRefs": [
+        "vic-planning"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-plan-first"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-priority-safe-reuse",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "prevention-priority",
+      "prompt": {
+        "en": "Which is a sensible way to reduce packaging waste at lunch?",
+        "zh": "哪种做法能合理减少午餐包装废弃物？"
+      },
+      "options": [
+        {
+          "optionId": "suitable",
+          "label": {
+            "en": "Use an existing clean, food-suitable reusable container",
+            "zh": "使用已有、干净、适合食品的可重复使用容器"
+          }
+        },
+        {
+          "optionId": "rinse-any",
+          "label": {
+            "en": "Rinse any available container without checking food suitability",
+            "zh": "冲洗任意现有容器，不查看是否适合盛装食品"
+          }
+        },
+        {
+          "optionId": "single-use",
+          "label": {
+            "en": "Buy single-use packs labelled recyclable for each lunch",
+            "zh": "每餐购买标有可回收的一次性包装"
+          }
+        }
+      ],
+      "correctOptionId": "suitable",
+      "explanation": {
+        "en": "Useful reuse combines repeated use with safety and suitability.",
+        "zh": "有效再利用兼顾重复使用、安全和适用性。"
+      },
+      "sourceRefs": [
+        "vic-reuse",
+        "vic-single-use"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "intermediate-components"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-priority-fogo",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "prevention-priority",
+      "prompt": {
+        "en": "What can a suitable FOGO service do for unavoidable food scraps?",
+        "zh": "合适的 FOGO 服务可以怎样处理无法避免的食物残余？"
+      },
+      "options": [
+        {
+          "optionId": "all-packaging",
+          "label": {
+            "en": "Collect all food packaging with the scraps",
+            "zh": "将所有食品包装与残余一起收集"
+          }
+        },
+        {
+          "optionId": "replace-plan",
+          "label": {
+            "en": "Replace meal planning by composting unused food",
+            "zh": "将未用食物堆肥，以此替代餐食计划"
+          }
+        },
+        {
+          "optionId": "compost",
+          "label": {
+            "en": "Collect them for composting",
+            "zh": "收集它们用于堆肥"
+          }
+        }
+      ],
+      "correctOptionId": "compost",
+      "explanation": {
+        "en": "Organics collection helps handle scraps, while avoiding edible waste remains a separate goal.",
+        "zh": "有机物收集有助于处理残余；避免可食用食物浪费仍是另一项目标。"
+      },
+      "sourceRefs": [
+        "vic-fogo",
+        "unfccc-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-priority-scrap-vs-food",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "prevention-priority",
+      "prompt": {
+        "en": "Which plan addresses both prevention and unavoidable scraps?",
+        "zh": "哪种计划兼顾预防浪费与无法避免的残余？"
+      },
+      "options": [
+        {
+          "optionId": "all-bin",
+          "label": {
+            "en": "Treat usable food and packaging as one waste item",
+            "zh": "把可用食物与包装当成同一废弃物"
+          }
+        },
+        {
+          "optionId": "both",
+          "label": {
+            "en": "Use edible ingredients, then check an accepted route for scraps",
+            "zh": "先使用可食用食材，再核对残余的接收方式"
+          }
+        },
+        {
+          "optionId": "all-compost",
+          "label": {
+            "en": "Send usable ingredients and scraps directly to compost",
+            "zh": "把可用食材和残余都直接堆肥"
+          }
+        }
+      ],
+      "correctOptionId": "both",
+      "explanation": {
+        "en": "Use edible food where safe; separately route unavoidable scraps through an accepted service.",
+        "zh": "在安全前提下使用可食用食物，再单独按合适服务处理无法避免的残余。"
+      },
+      "sourceRefs": [
+        "vic-planning",
+        "vic-fogo"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "AU-VIC",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-range",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "UNFCCC's 8–10% estimate refers to which scope?",
+        "zh": "UNFCCC 的 8–10% 估计对应哪个范围？"
+      },
+      "options": [
+        {
+          "optionId": "global",
+          "label": {
+            "en": "Annual global greenhouse gas emissions linked to food loss and waste",
+            "zh": "与食物损失及浪费有关的全球年度温室气体排放"
+          }
+        },
+        {
+          "optionId": "household",
+          "label": {
+            "en": "Only emissions from household food bins",
+            "zh": "仅家庭厨余桶产生的排放"
+          }
+        },
+        {
+          "optionId": "personal",
+          "label": {
+            "en": "This learner's personal emissions reduction",
+            "zh": "本学习者的个人减排量"
+          }
+        }
+      ],
+      "correctOptionId": "global",
+      "explanation": {
+        "en": "The estimate combines food loss and waste globally, not a personal saving.",
+        "zh": "该估计涵盖全球食物损失与浪费，并非个人节省量。"
+      },
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-year",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "A report released in 2024 estimates food waste in 2022. Which year belongs with the measured amount?",
+        "zh": "2024 年发布的报告估计了 2022 年食物浪费量。统计数值应注明哪一年？"
+      },
+      "options": [
+        {
+          "optionId": "publication",
+          "label": {
+            "en": "2024 only",
+            "zh": "只标 2024 年"
+          }
+        },
+        {
+          "optionId": "current",
+          "label": {
+            "en": "The current app year",
+            "zh": "当前 App 使用年份"
+          }
+        },
+        {
+          "optionId": "measurement",
+          "label": {
+            "en": "2022, with 2024 as the publication year",
+            "zh": "2022 年，并另注明 2024 年发布"
+          }
+        }
+      ],
+      "correctOptionId": "measurement",
+      "explanation": {
+        "en": "The observation period and publication date are different fields.",
+        "zh": "统计时期与发布日期是不同字段。"
+      },
+      "sourceRefs": [
+        "unep-index-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-sectors",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "The UNEP 2022 estimate of 1.05 billion tonnes covers which sectors?",
+        "zh": "UNEP 对 2022 年 10.5 亿吨食物废弃物的估计涵盖哪些领域？"
+      },
+      "options": [
+        {
+          "optionId": "farms",
+          "label": {
+            "en": "Farms only",
+            "zh": "仅农场"
+          }
+        },
+        {
+          "optionId": "sectors",
+          "label": {
+            "en": "Retail, food service and households",
+            "zh": "零售、餐饮服务和家庭"
+          }
+        },
+        {
+          "optionId": "homes",
+          "label": {
+            "en": "Households only",
+            "zh": "仅家庭"
+          }
+        }
+      ],
+      "correctOptionId": "sectors",
+      "explanation": {
+        "en": "This estimate covers those three consumer-level sectors and includes inedible parts.",
+        "zh": "该估计涵盖这三个消费端领域，并包含不可食用部分。"
+      },
+      "sourceRefs": [
+        "unep-index-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-sdg",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "Which activity most directly fits SDG 13.3 in this app?",
+        "zh": "本 App 中哪项活动最直接对应 SDG 13.3？"
+      },
+      "options": [
+        {
+          "optionId": "learn",
+          "label": {
+            "en": "Learning how waste relates to climate and reflecting on action",
+            "zh": "学习浪费与气候的关系并思考行动"
+          }
+        },
+        {
+          "optionId": "sorting-only",
+          "label": {
+            "en": "Counting returned containers without climate learning",
+            "zh": "只统计退回容器数量，不涉及气候学习"
+          }
+        },
+        {
+          "optionId": "carbon-score",
+          "label": {
+            "en": "Using the quiz score as a personal carbon reduction figure",
+            "zh": "把测验成绩当作个人减排数值"
+          }
+        }
+      ],
+      "correctOptionId": "learn",
+      "explanation": {
+        "en": "The app contributes educational content; it does not certify UN indicators.",
+        "zh": "App 提供教育内容，不认证联合国指标。"
+      },
+      "sourceRefs": [
+        "sdg13"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-result",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "What can a completed waste quiz demonstrate on its own?",
+        "zh": "单凭完成一次 waste 测验，能说明什么？"
+      },
+      "options": [
+        {
+          "optionId": "tonnes",
+          "label": {
+            "en": "Measured tonnes of food saved",
+            "zh": "已测量的食物节省吨数"
+          }
+        },
+        {
+          "optionId": "carbon",
+          "label": {
+            "en": "A verified personal carbon reduction",
+            "zh": "经过验证的个人减排量"
+          }
+        },
+        {
+          "optionId": "learning",
+          "label": {
+            "en": "A recorded learning result",
+            "zh": "一项已记录的学习结果"
+          }
+        }
+      ],
+      "correctOptionId": "learning",
+      "explanation": {
+        "en": "A score records assessment performance. Environmental outcomes require separate evidence.",
+        "zh": "成绩记录测验表现；环境效果需要另行取得证据。"
+      },
+      "sourceRefs": [
+        "sdg13",
+        "unfccc-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    },
+    {
+      "questionCode": "a-evidence-resources",
+      "revision": 1,
+      "contentVersion": "learning-room-v1",
+      "stageCode": "advanced",
+      "topicCode": "climate-evidence",
+      "prompt": {
+        "en": "Why does food waste matter before it reaches a bin?",
+        "zh": "为什么食物还未进入垃圾桶，浪费就已涉及环境问题？"
+      },
+      "options": [
+        {
+          "optionId": "packaging-only",
+          "label": {
+            "en": "Only packaging has used resources",
+            "zh": "只有包装消耗了资源"
+          }
+        },
+        {
+          "optionId": "inputs",
+          "label": {
+            "en": "Growing and supplying it already used land, water and energy",
+            "zh": "种植和供应已投入土地、水和能源"
+          }
+        },
+        {
+          "optionId": "only-disposal",
+          "label": {
+            "en": "All environmental impacts begin at disposal",
+            "zh": "所有环境影响都始于丢弃"
+          }
+        }
+      ],
+      "correctOptionId": "inputs",
+      "explanation": {
+        "en": "Food carries upstream resource inputs as well as disposal impacts.",
+        "zh": "食物既涉及上游资源投入，也涉及处置影响。"
+      },
+      "sourceRefs": [
+        "unfccc-2024"
+      ],
+      "reviewedAt": "2026-10-05",
+      "regionCode": "global",
+      "serviceAssumptions": {
+        "en": "A teaching scenario; no personal emissions saving or council service is assumed.",
+        "zh": "教学情景；不预设个人减排量或当地收集服务。"
+      },
+      "relatedActivityCodes": [
+        "advanced-climate"
+      ],
+      "imageAssetKey": null,
+      "status": "active"
+    }
+  ],
+  "practice": [
+    {
+      "activityCode": "beginner-bin-action",
+      "questionCodes": [
+        "b-sort-can",
+        "b-sort-peel",
+        "b-sort-box"
+      ],
+      "questionCount": 3
+    }
+  ],
+  "mixedReview": {
+    "questionCount": 12,
+    "perStage": 4,
+    "canUnlock": false
+  }
+}

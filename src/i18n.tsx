@@ -2,19 +2,22 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { View } from 'react-native';
 import { I18nContext, type AppLanguage } from './i18nContext';
+import { learningCopy } from './i18n/learning';
 
 export type { AppLanguage } from './i18nContext';
 
 const zh = {
+  learning: learningCopy.zh,
   screens: {
     home: { eyebrow: '今晚好', title: '家里的库存怎么样？', description: '购物前，先看看家里还剩下什么。' },
     shopping: { eyebrow: '购物车', title: '带着厨房库存去购物', description: '对照家中现有库存，只购买真正需要的东西。' },
     fridge: { eyebrow: '我的冰箱', title: '让食材始终看得见', description: '在好食材被浪费之前，及时掌握新鲜状态。' },
+    learn: { eyebrow: '气候行动', title: '学堂', description: '从分类到减少浪费，循序学习并解锁新的阶段。' },
     achievements: { eyebrow: '厨房成果', title: '点滴习惯汇成改变', description: '查看共享冰箱的等级、临期挽救与成就进度。' },
     profile: { eyebrow: '我的厨房', title: '打造属于你的厨房', description: '设置偏好、饮食习惯和日常目标。' },
     notifications: { eyebrow: '厨房信箱', title: '一些温和的提醒', description: '在一个安静的地方查看食材、购物和共享厨房动态。' },
   },
-  tabs: { home: '首页', shopping: '购物车', fridge: '冰箱', achievements: '成果', profile: '我的' },
+  tabs: { home: '首页', shopping: '购物车', fridge: '冰箱', learn: '学堂', achievements: '成果', profile: '我的' },
   status: {
     connecting: '正在连接后端…',
     connected: '服务已连接',
@@ -1151,15 +1154,17 @@ type TranslationShape<T> = T extends (...args: infer Arguments) => unknown
 export type Translation = TranslationShape<typeof zh>;
 
 const en: Translation = {
+  learning: learningCopy.en,
   screens: {
     home: { eyebrow: 'GOOD EVENING', title: 'How stocked is home?', description: 'See what is still at home before the next shop.' },
     shopping: { eyebrow: 'SHOPPING CART', title: 'Shop with the kitchen in mind', description: 'Compare what you need with the stock already at home.' },
     fridge: { eyebrow: 'MY FRIDGE', title: 'Keep food in view', description: 'Track freshness before good ingredients go to waste.' },
+    learn: { eyebrow: 'CLIMATE ACTION', title: 'Learn', description: 'Learn to sort and prevent waste, one stage at a time.' },
     achievements: { eyebrow: 'KITCHEN WINS', title: 'Small habits add up', description: 'See this shared fridge’s level, near-expiry rescues, and achievement progress.' },
     profile: { eyebrow: 'MY KITCHEN', title: 'Make it yours', description: 'Set your preferences, diets, and everyday goals.' },
     notifications: { eyebrow: 'KITCHEN MAIL', title: 'A gentle heads-up', description: 'Freshness, shopping, and shared-home updates in one quiet place.' },
   },
-  tabs: { home: 'Home', shopping: 'Cart', fridge: 'Fridge', achievements: 'Wins', profile: 'Me' },
+  tabs: { home: 'Home', shopping: 'Cart', fridge: 'Fridge', learn: 'Learn', achievements: 'Wins', profile: 'Me' },
   status: {
     connecting: 'Connecting to the server…',
     connected: 'Service connected',
@@ -2292,12 +2297,17 @@ type I18nContextValue = {
   t: Translation;
 };
 
-export function I18nProvider({ children }: { children: ReactNode }) {
-  const [language, setLanguageState] = useState<AppLanguage>('zh');
+export function I18nProvider({ children, initialLanguage = 'zh', persist = true }: { children: ReactNode; initialLanguage?: AppLanguage; persist?: boolean }) {
+  const [language, setLanguageState] = useState<AppLanguage>(initialLanguage);
   const [isReady, setIsReady] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+
+    // Arthur: NarIyirm
+    // 中文：独立开发预览使用非持久语言，不读取或覆盖正常 App 的语言偏好。
+    // EN: Standalone development previews use a nonpersistent language without reading or overwriting normal app preferences.
+    if (!persist) { setIsReady(true); return () => { mounted = false; }; }
 
     // 中文：先恢复上次保存的语言，再挂载开场动画，避免英语用户启动时短暂看到中文。
     // EN: Restore the saved language before mounting the opener so English users never see a brief Chinese flash.
@@ -2313,11 +2323,11 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [persist]);
 
   const setLanguage = (nextLanguage: AppLanguage) => {
     setLanguageState(nextLanguage);
-    void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => undefined);
+    if (persist) void AsyncStorage.setItem(LANGUAGE_STORAGE_KEY, nextLanguage).catch(() => undefined);
   };
 
   const value = useMemo(() => ({ language, setLanguage, t: translations[language] }), [language]);
