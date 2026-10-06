@@ -3,7 +3,6 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -77,7 +76,6 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
     );
   }
 
-  const openTastePlaceholder = () => Alert.alert(copy.tastePlaceholderTitle, copy.tastePlaceholderBody);
   return (
     <View style={styles.screen}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -153,15 +151,9 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
           <ProfileRow
             detail={copy.replayOnboardingDetail}
             icon="refresh-circle-outline"
+            isLast
             onPress={() => setReplayVisible(true)}
             title={copy.replayOnboardingTitle}
-          />
-          <ProfileRow
-            detail={copy.tastePlaceholderDetail}
-            icon="leaf-outline"
-            isLast
-            onPress={openTastePlaceholder}
-            title={copy.tastePlaceholderTitle}
           />
         </View>
 

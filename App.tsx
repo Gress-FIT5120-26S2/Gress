@@ -50,7 +50,7 @@ const LinearFoodWasteStory = lazy(() =>
 const loadLearningRoom = () => import('./src/components/learning/LearningRoomEntry').then(m => ({ default: m.LearningRoomEntry }));
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
-  shopping: '#FFF1DC',
+  shopping: '#F7FBFA',
   fridge: '#E1F0EF',
   learn: '#F7FBFA',
   achievements: '#F5E9D6',
@@ -506,7 +506,7 @@ function KitchMemoApp() {
                 styles.activeScreen,
                 activeTab === 'fridge'
                   ? styles.fridgeContent
-                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'learn'
+                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'learn' || activeTab === 'shopping'
                     ? styles.profileContent
                     : styles.standardContent,
                 { backgroundColor: transitionTones[activeTab] },

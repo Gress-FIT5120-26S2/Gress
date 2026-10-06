@@ -37,7 +37,7 @@ import {
   RestockSuggestion,
 } from '../../services/cartApi';
 import { getInventorySnapshot, type InventoryBatch } from '../../services/inventoryApi';
-import { subscribeToSync } from '../../services/realtimeSync';
+import { notifyLocalSync, subscribeToSync } from '../../services/realtimeSync';
 import { ShoppingAddSheet } from './ShoppingAddSheet';
 import { ShoppingCheckoutReview } from './ShoppingCheckoutReview';
 import { ShoppingInventoryPeek } from './ShoppingInventoryPeek';
@@ -286,6 +286,15 @@ function RestockView() {
     await Promise.all(targets.map((i) => addOne(i)));
   }, [items, selectedUids, isAlreadyInCart, addOne]);
 
+  // 中文：一键把所有还没进购物车的建议全部加入。
+  // EN: One tap adds every suggestion that isn't in the cart yet.
+  const addAll = useCallback(async () => {
+    const targets = items.filter((i) => !isAlreadyInCart(i));
+    setSelectedUids(new Set());
+    await Promise.all(targets.map((i) => addOne(i)));
+  }, [items, isAlreadyInCart, addOne]);
+  const addableCount = items.filter((i) => !isAlreadyInCart(i)).length;
+
   const toggleSelect = (uid: string) => {
     setSelectedUids((prev) => {
       const next = new Set(prev);
@@ -316,6 +325,14 @@ function RestockView() {
     <View style={styles.grow}>
       {/* 批量加入按钮复用购物车结账用的动画组件 */}
       <AnimatedCheckoutButton count={selectedUids.size} label={t.shopping.addSelected} onPress={() => void addSelected()} />
+      {addableCount > 0 ? (
+        <Pressable
+          style={({ pressed }) => [styles.bulkBtn, pressed && styles.pressedDim]}
+          onPress={() => void addAll()}
+        >
+          <Text style={styles.bulkBtnText}>{t.shopping.addAll(addableCount)}</Text>
+        </Pressable>
+      ) : null}
       <FlatList
         data={items}
         keyExtractor={(i) => i.rule_uid}
@@ -375,6 +392,7 @@ function CartView() {
   const [checkoutVisible, setCheckoutVisible] = useState(false);
   const [peekVisible, setPeekVisible] = useState(false);
   const [pendingDelete, setPendingDelete] = useState<CartItem | null>(null);
+  const [clearConfirm, setClearConfirm] = useState(false);
   const [editingItem, setEditingItem] = useState<CartItem | null>(null);
   // 中文：确认删除时不在关掉确认 Modal 的同一帧里改 items，等它关完再改，避免跟 Modal
   //       拆除的原生过渡撞在一起（这类撞车在 iOS 上出现过 EXC_BAD_ACCESS 崩溃）。
@@ -522,6 +540,16 @@ function CartView() {
     }
   };
 
+  // 中文：清空购物车：先乐观清空，再逐条删除；有失败就重新拉取对齐。
+  // EN: Clear the cart: empty it optimistically, delete each row, and reload if any delete fails.
+  const onClearAll = async () => {
+    const snapshot = items;
+    setItems([]);
+    const results = await Promise.allSettled(snapshot.map((i) => deleteCartItem(i.item_uid, false)));
+    notifyLocalSync(['cart']);
+    if (results.some((r) => r.status === 'rejected')) void load().catch(() => undefined);
+  };
+
   // after checkout stocks some items, drop them from the cart
   const handleStocked = async (stockedUids: string[]) => {
     for (const uid of stockedUids) {
@@ -554,6 +582,14 @@ function CartView() {
 
       {/* 每个购物车项都能结账，按钮只反映购物车是否为空 */}
       <AnimatedCheckoutButton count={items.length} label={t.shopping.checkout.open} onPress={() => setCheckoutVisible(true)} />
+      {items.length > 0 ? (
+        <Pressable
+          style={({ pressed }) => [styles.clearBtn, pressed && styles.pressedDim]}
+          onPress={() => setClearConfirm(true)}
+        >
+          <Text style={styles.clearBtnText}>{t.shopping.clearAll}</Text>
+        </Pressable>
+      ) : null}
 
       <FlatList
         data={items}
@@ -649,6 +685,20 @@ function CartView() {
         />
       ) : null}
 
+      {clearConfirm ? (
+        <DeleteConfirmCard
+          title={t.shopping.clearTitle}
+          body={t.shopping.clearBody(items.length)}
+          confirmLabel={t.shopping.clearConfirm}
+          onCancel={() => setClearConfirm(false)}
+          onConfirm={() => {
+            setClearConfirm(false);
+            if (pendingDeleteTimer.current) clearTimeout(pendingDeleteTimer.current);
+            pendingDeleteTimer.current = setTimeout(() => { void onClearAll(); }, 350);
+          }}
+        />
+      ) : null}
+
       {/* tapping a cart row reopens this same "add to cart" form, pre-filled, to edit it */}
       <ShoppingManualEntry
         visible={editingItem !== null}
@@ -728,10 +778,16 @@ function AnimatedCheckoutButton({
 // ---- 删除确认卡片：全屏 Modal，遮罩用原生 fade，卡片自己弹一下缩放 ----
 function DeleteConfirmCard({
   itemName,
+  title,
+  body,
+  confirmLabel,
   onCancel,
   onConfirm,
 }: {
-  itemName: string;
+  itemName?: string;
+  title?: string;
+  body?: string;
+  confirmLabel?: string;
   onCancel: () => void;
   onConfirm: () => void;
 }) {
@@ -756,8 +812,8 @@ function DeleteConfirmCard({
             { transform: [{ scale: entrance.interpolate({ inputRange: [0, 1], outputRange: [0.88, 1] }) }] },
           ]}
         >
-          <Text style={styles.confirmTitle}>{t.shopping.deleteTitle}</Text>
-          <Text style={styles.confirmBody}>{t.shopping.deleteBody(itemName)}</Text>
+          <Text style={styles.confirmTitle}>{title ?? t.shopping.deleteTitle}</Text>
+          <Text style={styles.confirmBody}>{body ?? t.shopping.deleteBody(itemName ?? '')}</Text>
           <View style={styles.confirmActions}>
             <Pressable
               style={({ pressed }) => [styles.cancelBtn, pressed && styles.pressedDim]}
@@ -769,7 +825,7 @@ function DeleteConfirmCard({
               style={({ pressed }) => [styles.confirmDeleteBtn, pressed && styles.pressedDim]}
               onPress={onConfirm}
             >
-              <Text style={styles.confirmDeleteText}>{t.shopping.deleteConfirm}</Text>
+              <Text style={styles.confirmDeleteText}>{confirmLabel ?? t.shopping.deleteConfirm}</Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -779,60 +835,82 @@ function DeleteConfirmCard({
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1 },
+  // 中文：跟冰箱页/个人页对齐：同一个页面底色、18px 水平边距、白色连续圆角卡片、橙色主按钮。
+  // EN: Aligned with the fridge/profile pages: same page ground, 18px side padding, white continuous-corner cards, orange primary actions.
+  container: { flex: 1, paddingHorizontal: 18, paddingTop: 64, backgroundColor: '#F7FBFA' },
   spinner: { marginTop: 24 },
   grow: { flex: 1 },
   pager: { flex: 1 },
-  eyebrow: { color: '#D47B21', fontSize: 11, fontWeight: '800', letterSpacing: 1.4 },
+  eyebrow: { color: '#3C6659', fontSize: 14, fontWeight: '700' },
   toggle: {
     flexDirection: 'row',
-    backgroundColor: 'rgba(70,91,81,0.10)',
-    borderRadius: 12,
+    backgroundColor: '#E8F0ED',
+    borderRadius: 14,
+    borderCurve: 'continuous',
     padding: 4,
-    marginBottom: 16,
+    marginBottom: 14,
   },
-  toggleNoTitle: { marginTop: 14 },
-  toggleBtn: { flex: 1, paddingVertical: 9, borderRadius: 9, alignItems: 'center' },
+  toggleNoTitle: { marginTop: 12 },
+  toggleBtn: { flex: 1, minHeight: 38, justifyContent: 'center', borderRadius: 11, alignItems: 'center' },
   toggleActive: { backgroundColor: '#FFFFFF' },
   toggleIndicator: {
     position: 'absolute',
     top: 4,
     bottom: 4,
     left: 4,
-    borderRadius: 9,
+    borderRadius: 11,
+    borderCurve: 'continuous',
     backgroundColor: '#FFFFFF',
-    shadowColor: '#173D31',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.12,
-    shadowRadius: 4,
-    elevation: 2,
+    boxShadow: '0 2px 6px rgba(23, 61, 49, 0.1)',
   },
-  toggleText: { color: '#6b7c76', fontWeight: '700', fontSize: 14 },
-  toggleTextActive: { color: '#2e7d32' },
-  listContent: { paddingBottom: 120 },
+  toggleText: { color: '#61766D', fontWeight: '800', fontSize: 14 },
+  toggleTextActive: { color: '#173D31' },
+  listContent: { gap: 10, paddingBottom: 130 },
   cartActions: { flexDirection: 'row', gap: 10, marginBottom: 12 },
-  addBtn: {
-    flex: 1,
-    height: 44,
+  bulkBtn: {
+    minHeight: 44,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#2e7d32',
-    borderRadius: 10,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#F58220',
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
   },
-  addBtnText: {width:'100%', textAlign:'center', color: '#fff', fontWeight: '700' },
+  bulkBtnText: { color: '#C95F14', fontSize: 14, fontWeight: '800' },
+  clearBtn: {
+    alignSelf: 'flex-end',
+    minHeight: 34,
+    justifyContent: 'center',
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    borderRadius: 11,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFF0F1',
+  },
+  clearBtnText: { color: '#B5454D', fontSize: 12.5, fontWeight: '800' },
+  addBtn: {
+    flex: 1,
+    minHeight: 46,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#F58220',
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    boxShadow: '0 7px 16px rgba(245, 130, 32, 0.24)',
+  },
+  addBtnText: { width: '100%', textAlign: 'center', color: '#FFFFFF', fontWeight: '800', fontSize: 14 },
   checkoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    height: 50,
+    minHeight: 50,
     marginBottom: 12,
     borderRadius: 14,
-    shadowColor: '#C9550A',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.28,
-    shadowRadius: 10,
-    elevation: 4,
+    borderCurve: 'continuous',
+    boxShadow: '0 7px 16px rgba(201, 85, 10, 0.22)',
   },
   checkoutText: { color: '#fff', fontWeight: '800', fontSize: 15 },
   checkoutBadge: {
@@ -848,81 +926,88 @@ const styles = StyleSheet.create({
   row: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 12,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(70,91,81,0.15)',
+    minHeight: 64,
+    paddingVertical: 10,
+    paddingHorizontal: 14,
+    borderRadius: 15,
+    borderCurve: 'continuous',
+    backgroundColor: '#FFFFFF',
   },
-  name: { fontSize: 16, color: '#244A3E' },
-  sub: { fontSize: 13, color: '#718078', marginTop: 3 },
+  name: { fontSize: 15, color: '#183B30', fontWeight: '800' },
+  sub: { fontSize: 12, color: '#61766D', fontWeight: '600', marginTop: 3 },
   check: { marginRight: 10 },
-  checkMark: { fontSize: 20, color: '#2e7d32' },
+  checkMark: { fontSize: 20, color: '#168A6B' },
   checkMarkDisabled: { color: '#B7C2BC' },
   qtyBox: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
     marginHorizontal: 8,
+    paddingHorizontal: 6,
+    minHeight: 34,
+    borderRadius: 11,
+    borderCurve: 'continuous',
+    backgroundColor: '#F0F8F6',
   },
   qtyBtnHit: { borderRadius: 8 },
-  qtyBtn: { fontSize: 20, color: '#2e7d32', fontWeight: '800', width: 22, textAlign: 'center' },
+  qtyBtn: { fontSize: 19, color: '#C95F14', fontWeight: '800', width: 22, textAlign: 'center' },
   qtyInput: {
     width: 40,
     textAlign: 'center',
     fontSize: 15,
-    color: '#244A3E',
-    fontWeight: '700',
+    color: '#173D31',
+    fontWeight: '800',
     paddingVertical: 2,
   },
-  unitText: { width: 44, marginRight: 4, fontSize: 13, color: '#718078', fontWeight: '600' },
-  qtyHintText: { paddingBottom: 8, paddingLeft: 4, color: '#C96E1A', fontSize: 12, fontWeight: '700' },
-  removeHit: { borderRadius: 8 },
-  remove: { color: '#c62828', fontSize: 16, paddingHorizontal: 6 },
-  pressedDim: { opacity: 0.68, transform: [{ scale: 0.97 }] },
+  unitText: { width: 44, marginRight: 4, fontSize: 12.5, color: '#61766D', fontWeight: '700' },
+  qtyHintText: { paddingTop: 4, paddingLeft: 6, color: '#C96E1A', fontSize: 12, fontWeight: '700' },
+  removeHit: { width: 30, height: 30, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: '#FFF1E3' },
+  remove: { color: '#C95F14', fontSize: 13, fontWeight: '800' },
+  pressedDim: { opacity: 0.76, transform: [{ scale: 0.97 }] },
   confirmLayer: {
     ...StyleSheet.absoluteFill,
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: 28,
-    backgroundColor: 'rgba(23,32,29,0.4)',
+    backgroundColor: 'rgba(20,38,32,0.34)',
   },
   confirmCard: {
     width: '100%',
     borderRadius: 22,
-    backgroundColor: '#FBFCFA',
+    borderCurve: 'continuous',
+    backgroundColor: '#F7FBFA',
     padding: 22,
     gap: 10,
-    shadowColor: '#173D31',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.18,
-    shadowRadius: 20,
-    elevation: 8,
+    boxShadow: '0 10px 24px rgba(23, 61, 49, 0.18)',
   },
   confirmTitle: { fontSize: 18, fontWeight: '800', color: '#173D31' },
-  confirmBody: { fontSize: 14, color: '#5A6E66', lineHeight: 20 },
+  confirmBody: { fontSize: 14, color: '#5E756D', lineHeight: 20 },
   confirmActions: { flexDirection: 'row', gap: 10, marginTop: 12 },
   cancelBtn: {
-    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#EDF1EF',
+    flex: 1, minHeight: 48, borderRadius: 14, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#E8F0ED',
   },
   cancelText: { color: '#315C51', fontSize: 15, fontWeight: '800' },
   confirmDeleteBtn: {
-    flex: 1, height: 48, borderRadius: 14, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: '#C62828',
+    flex: 1, minHeight: 48, borderRadius: 14, borderCurve: 'continuous', alignItems: 'center', justifyContent: 'center',
+    backgroundColor: '#D45B62',
   },
   confirmDeleteText: { color: '#fff', fontSize: 15, fontWeight: '800' },
   smallBtn: {
+    minHeight: 34,
+    justifyContent: 'center',
     paddingHorizontal: 14,
-    paddingVertical: 7,
-    backgroundColor: '#2e7d32',
-    borderRadius: 8,
+    backgroundColor: '#F58220',
+    borderRadius: 11,
+    borderCurve: 'continuous',
   },
-  smallBtnText: { color: '#fff', fontSize: 13, fontWeight: '700' },
-  smallBtnAdded: { backgroundColor: '#E3F1E4' },
-  smallBtnTextAdded: { color: '#2e7d32' },
-  empty: { textAlign: 'center', color: '#718078', marginTop: 40 },
+  smallBtnText: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  smallBtnAdded: { backgroundColor: '#E1F5EF' },
+  smallBtnTextAdded: { color: '#168A6B' },
+  empty: { textAlign: 'center', color: '#61766D', fontSize: 13, marginTop: 40 },
   peekBtn: {
-    flex: 1, height: 44, justifyContent: 'center', alignItems: 'center',
-    backgroundColor: '#168ACB', borderRadius: 10,
+    flex: 1, minHeight: 46, justifyContent: 'center', alignItems: 'center',
+    borderWidth: 1, borderColor: '#BFE3F3', backgroundColor: '#EAF7FD', borderRadius: 14, borderCurve: 'continuous',
   },
-  peekText: {width:'100%', textAlign:'center', color: '#fff', fontWeight: '700', fontSize: 13 },
+  peekText: { width: '100%', textAlign: 'center', color: '#24566E', fontWeight: '800', fontSize: 13 },
 });
