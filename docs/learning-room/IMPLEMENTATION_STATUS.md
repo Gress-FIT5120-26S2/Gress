@@ -4,6 +4,8 @@
 
 最新入口为底部「学堂 / Learn」，位于冰箱与成果之间；旧 Home／Profile 入口已移除。`npm start`／`npm run server` 默认开启指定开发库的草稿例外，`server:start`／生产仍仅读 published。交接优先读 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)。历史 P0–P4 文档中的五 Tab／二级 Modal 是当时实现记录，已被本次用户修订替代。
 
+同日追加修复：Library 主题横滚误触发 iOS 返回的问题已修正，学堂主 Tab 根页不再响应边缘返回；子页记录真实触摸起点。6 项新手势回归、原 8 项局部导航／预览测试、16 项 gateway 测试与 TypeScript 通过。原生复测待完成；详见 [GESTURE_ISOLATION.md](verification/2026-10-06/GESTURE_ISOLATION.md)。
+
 ## 1. 已完成的真实工作
 
 - [x] 检查现有教育动画、分类答题、导航、Profile 和设备身份／恢复接入点。

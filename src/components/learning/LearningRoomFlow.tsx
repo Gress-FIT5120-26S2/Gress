@@ -12,6 +12,7 @@ import { LearningQuizScreen } from './LearningQuizScreen';
 import { LearningResourceScreen } from './LearningResourceScreen';
 import { LearningResultScreen } from './LearningResultScreen';
 import { learningNavigationReducer } from './learningNavigation';
+import { createLearningBackGesture } from './learningBackGesture';
 import { LearningBody, LearningButton, LearningPage, ui } from './LearningUi';
 import { learningColors as c } from './learningTheme';
 import { LearningBottomSafeAreaContext, LearningWidthContext } from './learningViewport';
@@ -84,10 +85,15 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   }, [cancelPendingUi, onClose, stack.length, storyVisible]);
   const close = useCallback(() => { cancelPendingUi(); onClose(); }, [cancelPendingUi, onClose]);
   useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; }); return () => sub.remove(); }, [back]);
-  const edge = useMemo(() => PanResponder.create({
-    onMoveShouldSetPanResponderCapture: (_, gesture) => Platform.OS === 'ios' && gesture.x0 <= 24 && gesture.dx > 18 && Math.abs(gesture.dy) < 12,
-    onPanResponderRelease: (_, gesture) => { if (gesture.dx > 65 && Math.abs(gesture.dy) < 35) back(); },
-  }), [back]);
+  // Arthur: NarIyirm
+  // 中文：主 Tab 根页不使用滑动返回；保持手势实例稳定，并读取最新返回目标，避免主题滚动或重渲染误切主导航。
+  // EN: Primary tab roots have no swipe-back; keep the gesture stable and read the latest destination so topic scrolling or re-renders cannot switch primary tabs.
+  const backGestureActions = useRef({ enabled: false, back });
+  backGestureActions.current = { enabled: Platform.OS === 'ios' && (origin !== 'tab' || stack.length > 1) && !storyVisible, back };
+  const edge = useMemo(() => PanResponder.create(createLearningBackGesture({
+    isEnabled: () => backGestureActions.current.enabled,
+    onBack: () => backGestureActions.current.back(),
+  })), []);
 
   // Arthur: NarIyirm
   // 中文：返回或关闭会使旧请求的 UI 更新失效；服务端成功仍由下次加载恢复，避免迟到响应把用户带回已离开的页面。
