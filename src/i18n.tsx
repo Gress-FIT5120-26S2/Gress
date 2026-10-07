@@ -3,11 +3,13 @@ import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { View } from 'react-native';
 import { I18nContext, type AppLanguage } from './i18nContext';
 import { learningCopy } from './i18n/learning';
+import { learningTutorCopy } from './i18n/learningTutor';
 
 export type { AppLanguage } from './i18nContext';
 
 const zh = {
   learning: learningCopy.zh,
+  learningTutor: learningTutorCopy.zh,
   screens: {
     home: { eyebrow: '今晚好', title: '家里的库存怎么样？', description: '购物前，先看看家里还剩下什么。' },
     shopping: { eyebrow: '购物车', title: '带着厨房库存去购物', description: '对照家中现有库存，只购买真正需要的东西。' },
@@ -1155,6 +1157,7 @@ export type Translation = TranslationShape<typeof zh>;
 
 const en: Translation = {
   learning: learningCopy.en,
+  learningTutor: learningTutorCopy.en,
   screens: {
     home: { eyebrow: 'GOOD EVENING', title: 'How stocked is home?', description: 'See what is still at home before the next shop.' },
     shopping: { eyebrow: 'SHOPPING CART', title: 'Shop with the kitchen in mind', description: 'Compare what you need with the stock already at home.' },

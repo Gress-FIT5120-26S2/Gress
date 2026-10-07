@@ -1,0 +1,111 @@
+import assert from 'node:assert/strict';
+import { randomBytes,randomUUID } from 'node:crypto';
+import { once } from 'node:events';
+import express from 'express';
+import '../src/env.js';
+import { supabase } from '../src/supabase.js';
+import { requireDevice } from '../src/middleware/requireDevice.js';
+import sharingRouter,{recoverDeviceRoute} from '../src/routes/sharing.js';
+import { createLearningRouter } from '../src/routes/learning.js';
+import { createLearningRoomService } from '../src/services/learningRoom.js';
+import { createLearningTutorRouter } from '../src/routes/learningTutor.js';
+import { createLearningTutorService } from '../src/services/learningTutor.js';
+
+assert.notEqual(process.env.NODE_ENV,'production');
+assert.equal(new URL(process.env.SUPABASE_URL).hostname,'thmbtsssvnslotoexntz.supabase.co');
+const environment={...process.env,LEARNING_ROOM_ALLOW_DRAFT:'1',LEARNING_ROOM_DRAFT_PROJECT_REF:'thmbtsssvnslotoexntz',LEARNING_TUTOR_ENABLED:'1',LEARNING_TUTOR_COACHING_ENABLED:'1',LEARNING_TUTOR_PROACTIVE_ENABLED:'1'};
+const devices=Array.from({length:3},()=>`test_tutor_${randomUUID()}`);const credentials=devices.map(()=>randomBytes(32).toString('hex'));
+let calls=0;let requests=0;let delay=null;let signal;
+const started=()=>new Promise(resolve=>{signal=resolve;});
+const model=async ({evidence})=>{calls++;assert.doesNotMatch(JSON.stringify(evidence),/private_question_bank|question_snapshot|practiceTemplates/);
+  signal?.();if(delay)await delay;return {answer:'Public teaching explanation.',scope:'in_scope',sourceCodes:evidence.sources.slice(0,1).map(s=>s.sourceCode),usage:{input_tokens:10,output_tokens:10},latencyMs:1,model:'verification-spy'};};
+const service=createLearningTutorService(supabase,environment,model);
+const app=express();app.use(express.json());app.post('/api/devices/recover',recoverDeviceRoute);app.use('/api',requireDevice);app.use('/api',sharingRouter);
+app.use('/api',createLearningRouter(createLearningRoomService(supabase,environment)));app.use('/api',createLearningTutorRouter(service,async()=>true));
+const server=app.listen(0,'127.0.0.1');await once(server,'listening');const base=`http://127.0.0.1:${server.address().port}/api`;
+const secondApp=express();secondApp.use(express.json());secondApp.use('/api',requireDevice);secondApp.use('/api',createLearningTutorRouter(createLearningTutorService(supabase,environment,model),async()=>true));
+const secondServer=secondApp.listen(0,'127.0.0.1');await once(secondServer,'listening');const secondBase=`http://127.0.0.1:${secondServer.address().port}/api`;
+const checks=[];const context={kind:'activity',entityCode:'advanced-climate',contentVersion:'learning-room-v1'};
+const payload=()=>({context,language:'en',message:'Explain climate and food waste',requestKey:randomUUID()});
+async function api(i,path,body,expected=200,method=body===undefined?'GET':'POST',endpoint=base){
+  requests++;const response=await fetch(endpoint+path,{method,signal:AbortSignal.timeout(60000),headers:{'Content-Type':'application/json','Device-ID':devices[i],'Device-Credential':credentials[i]},...(body===undefined?{}:{body:JSON.stringify(body)})});
+  const value=await response.json();assert.equal(response.status,expected,`${path}: ${value.error??response.status}`);return value;
+}
+const tutor=(i,body,expected)=>api(i,'/learning/tutor/messages',body,expected);
+try{
+  const [state,{content:catalog}]=await Promise.all([api(0,'/learning/state'),api(0,'/learning/catalog')]);
+  const first=payload();const reply=await tutor(0,first);const repeat=await tutor(0,first);assert.equal(reply.messageUid,repeat.messageUid);assert.equal(calls,1);
+  await tutor(0,{...first,message:'changed'},409);await tutor(0,{...payload(),learnerUid:'forged'},400);
+  await api(1,`/learning/tutor/conversations/${reply.conversationUid}`,undefined,404);
+  await api(0,`/learning/tutor/messages/${reply.messageUid}/feedback`,{rating:'useful',reasonCode:'helpful'},200,'PUT');
+  const history=await api(0,`/learning/tutor/conversations/${reply.conversationUid}`);assert.equal(history.messages.length,2);assert.equal(history.messages[1].rating,'useful');
+  checks.push('A1 idempotency, payload conflict, strict inputs, private history and feedback');
+  let concurrentRelease;delay=new Promise(resolve=>{concurrentRelease=resolve;});const concurrentStarted=started();const concurrentPayload=payload();
+  const concurrent=tutor(0,concurrentPayload);await concurrentStarted;const concurrentCalls=calls;
+  await api(0,'/learning/tutor/messages',concurrentPayload,409,'POST',secondBase);assert.equal(calls,concurrentCalls);
+  concurrentRelease();const concurrentReply=await concurrent;delay=null;signal=null;
+  assert.equal((await api(0,'/learning/tutor/messages',concurrentPayload,200,'POST',secondBase)).messageUid,concurrentReply.messageUid);
+  checks.push('A1 two Express instances share a lease and cache; one provider call for concurrent same-key requests');
+  const checkpoint=await api(0,'/learning/attempts',{stageCode:'beginner',mode:'checkpoint',createKey:randomUUID()});
+  const beforeRestricted=calls;
+  for(const extra of [context,{kind:'general',contentVersion:context.contentVersion},{kind:'course',entityCode:catalog.courses[0].courseCode,contentVersion:context.contentVersion},{kind:'resource',entityCode:catalog.resources[0].resourceCode,contentVersion:context.contentVersion}])await tutor(0,{...payload(),context:extra},409);
+  assert.equal(calls,beforeRestricted);
+  const q=checkpoint.quiz.question;
+  const submittedContext={kind:'submitted-question',contentVersion:context.contentVersion,attemptUid:checkpoint.quiz.attemptUid,questionUid:q.questionUid};
+  await tutor(0,{context:submittedContext,language:'zh',intent:'explain',requestKey:randomUUID()},404);
+  await api(0,`/learning/attempts/${checkpoint.quiz.attemptUid}/answers`,{questionUid:q.questionUid,optionId:q.options[0].optionId,requestKey:randomUUID()});
+  await tutor(0,{context:submittedContext,language:'zh',intent:'example',requestKey:randomUUID()});
+  const feedbackSources=(await api(0,`/learning/attempts/${checkpoint.quiz.attemptUid}`)).sources;
+  if(feedbackSources[0])await api(0,`/learning/tutor/sources/${feedbackSources[0].sourceCode}?contentVersion=${context.contentVersion}&context=${encodeURIComponent(JSON.stringify(submittedContext))}`);
+  await tutor(0,{context:submittedContext,language:'en',message:'free text',requestKey:randomUUID()},400);
+  await tutor(1,{context:submittedContext,language:'en',intent:'explain',requestKey:randomUUID()},404);
+  await api(0,`/learning/attempts/${checkpoint.quiz.attemptUid}/abandon`,{requestKey:randomUUID()});
+  await tutor(0,payload());checks.push('A2 active checkpoint blocks all free contexts; unanswered/foreign feedback rejected; fixed intent and explicit abandon');
+  const template=await api(0,'/learning/tutor/practice/tutor-materials-v1?contentVersion=learning-room-v1');assert.equal(template.correctOptionId,undefined);assert.equal(template.explanation,undefined);
+  const answerBody={contentVersion:context.contentVersion,optionId:template.options[0].optionId,requestKey:randomUUID()};
+  const answer=await api(0,'/learning/tutor/practice/tutor-materials-v1/answer',answerBody);assert.equal(answer.scored,false);
+  assert.deepEqual(await api(0,'/learning/tutor/practice/tutor-materials-v1/answer',answerBody),answer);
+  const after=await api(0,'/learning/state');assert.deepEqual(after.session,state.session);
+  checks.push('A2 extra templates hide answer keys, server-grade idempotently and never unlock');
+  const practice=await api(0,'/learning/attempts',{stageCode:'beginner',mode:'practice',activityCode:'beginner-bin-action',createKey:randomUUID()});
+  const hintContext={kind:'practice-question',contentVersion:context.contentVersion,attemptUid:practice.quiz.attemptUid,questionUid:practice.quiz.question.questionUid};
+  const hintRequest={context:hintContext,requestKey:randomUUID()};const hint=await api(0,'/learning/tutor/hints',hintRequest);assert.equal(hint.hintLevel,1);
+  assert.deepEqual(await api(0,'/learning/tutor/hints',hintRequest),hint);
+  for(const level of [2,3,3])assert.equal((await api(0,'/learning/tutor/hints',{context:hintContext,requestKey:randomUUID()})).hintLevel,level);
+  assert.doesNotMatch(JSON.stringify(hint),/correctOptionId|selectedOptionId/);
+  await api(1,'/learning/tutor/hints',{context:hintContext,requestKey:randomUUID()},404);
+  await api(0,`/learning/attempts/${practice.quiz.attemptUid}/abandon`,{requestKey:randomUUID()});
+  checks.push('A2 progressive hints cap at three, retain retry level, hide keys and reject foreign attempts');
+  const pref=await api(0,'/learning/tutor/preferences');assert.equal(pref.dwellHintsEnabled,false);
+  await api(0,'/learning/tutor/preferences',{dwellHintsEnabled:true},200,'PATCH');
+  const claimBody={context,visitKey:randomUUID(),reason:'dwell'};const help=await api(0,'/learning/tutor/interventions/claim',claimBody);assert.ok(help.intervention);
+  const callBaseline=calls;assert.equal((await api(0,'/learning/tutor/interventions/claim',claimBody)).intervention,null);
+  await api(0,`/learning/tutor/interventions/${help.intervention.interventionUid}/respond`,{status:'dismissed'});
+  await api(0,`/learning/tutor/interventions/${help.intervention.interventionUid}/respond`,{status:'accepted'},409);
+  await api(0,'/learning/tutor/preferences',{proactiveEnabled:false},200,'PATCH');
+  assert.equal((await api(0,'/learning/tutor/interventions/claim',{...claimBody,visitKey:randomUUID()})).intervention,null);assert.equal(calls,callBaseline);
+  checks.push('A3 defaults, static claims, visit/cooldown, terminal response, disable and zero background model calls');
+  const originalReply=await tutor(1,{...payload(),requestKey:first.requestKey});
+  const share=await api(0,'/fridges/share',{name:'Tutor verification'},201);await api(1,'/fridges/join',{code:share.activeInvite.code});
+  await api(1,`/learning/tutor/conversations/${reply.conversationUid}`,undefined,404);await api(1,'/fridges/leave',{name:'Tutor personal'});
+  const tempReply=await tutor(2,{...payload(),requestKey:first.requestKey});
+  const recovery=await api(1,'/devices/recovery-code',{},201);await api(2,'/devices/recover',{recoveryCode:recovery.recoveryCode});
+  await api(1,`/learning/tutor/conversations/${originalReply.conversationUid}`,undefined,401);
+  await api(2,`/learning/tutor/conversations/${originalReply.conversationUid}`);await api(2,`/learning/tutor/conversations/${tempReply.conversationUid}`);
+  checks.push('A1 shared members remain private, join/leave preserve identity, temporary chat merges before learner deletion, key conflict namespace, old credential revoked');
+  let release;delay=new Promise(resolve=>{release=resolve;});const reached=started();const racePayload=payload();const race=tutor(0,racePayload,404);
+  await reached;await api(0,'/learning/tutor/history',undefined,200,'DELETE');release();await race;delay=null;signal=null;
+  assert.equal((await api(0,'/learning/tutor/conversations')).conversations.length,0);
+  await tutor(0,first,404);checks.push('A1 clear while generating blocks late persistence and tombstones old retry');
+}finally{
+  // Arthur: NarIyirm
+  // 中文：只清理本轮随机测试设备创建的冰箱及设备，导师与测验数据按外键级联删除。
+  // EN: Clean only fridges/devices created by this run's random test IDs; tutor and assessment records cascade through their foreign keys.
+  const owned=await supabase.from('fridges').select('fridge_uid').in('created_by_device_id',devices);if(owned.error)throw owned.error;
+  const ids=owned.data.map(f=>f.fridge_uid);if(ids.length){const detach=await supabase.from('fridges').update({merged_into_fridge_uid:null,status:'active'}).in('fridge_uid',ids);if(detach.error)throw detach.error;
+    const gone=await supabase.from('fridges').delete().in('fridge_uid',ids);if(gone.error)throw gone.error;}
+  const gone=await supabase.from('devices').delete().in('device_id',devices);if(gone.error)throw gone.error;
+  await new Promise(resolve=>server.close(resolve));
+  await new Promise(resolve=>secondServer.close(resolve));
+}
+console.log(JSON.stringify({ok:true,project:'Gress-development',requests,modelCalls:calls,provider:'verification spy (not real model)',checks},null,2));

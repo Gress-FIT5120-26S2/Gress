@@ -1,0 +1,28 @@
+{
+  "entry": "server/src/index.js",
+  "files": 500,
+  "clientAssetOrOfflineManifestFiles": [],
+  "includesTutor": true,
+  "optionalDependencyWarnings": 33,
+  "warningPackages": [
+    "@img/sharp-linux-arm64/sharp.node",
+    "@img/sharp-linux-arm/sharp.node",
+    "@img/sharp-darwin-arm64/sharp.node",
+    "@img/sharp-linux-riscv64/sharp.node",
+    "@img/sharp-linux-s390x/sharp.node",
+    "@img/sharp-linux-ppc64/sharp.node",
+    "@img/sharp-win32-arm64/sharp.node",
+    "@img/sharp-linuxmusl-arm64/sharp.node",
+    "@img/sharp-darwin-x64/sharp.node",
+    "@img/sharp-linuxmusl-x64/sharp.node",
+    "@img/sharp-freebsd-wasm32/sharp.node",
+    "@img/sharp-linux-x64/sharp.node",
+    "@img/sharp-webcontainers-wasm32/sharp.node",
+    "@img/sharp-win32-ia32/sharp.node",
+    "utf-8-validate",
+    "bufferutil",
+    "@img/sharp-libvips-dev/include",
+    "@img/sharp-libvips-dev/cplusplus",
+    "@img/sharp-libvips-\u001a/package"
+  ]
+}

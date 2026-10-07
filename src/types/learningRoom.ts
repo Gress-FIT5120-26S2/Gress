@@ -89,6 +89,7 @@ export interface LearningRoomGateway {
   abandonQuiz?(attemptUid: string): Promise<LearningSessionView>;
   getState?(): LearningStateView | null;
   getSources?(attemptUid: string): LearningSource[];
+  getAttemptContentVersion?(attemptUid: string): string | undefined;
   getPendingAnswer?(attemptUid: string, questionUid: string): string | null;
   dispose?(): void;
 }

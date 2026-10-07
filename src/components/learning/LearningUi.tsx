@@ -9,6 +9,7 @@ import type { LearningSessionView } from '../../types/learningRoom';
 import { getLearningImageSource, learningAssets, learningSdgAttribution, type LearningAssetKey } from './learningAssets';
 import { learningColors as c, learningLayout, learningMotion, learningStyles as s, learningTypography as type } from './learningTheme';
 import { LearningBottomSafeAreaContext, useLearningViewport } from './learningViewport';
+import { LearningTutorSlot } from './tutor/LearningTutorSlot';
 
 export const ui = StyleSheet.create({
   row: { flexDirection: 'row', alignItems: 'center', gap: 12 }, flex: { flex: 1, minWidth: 0 },
@@ -102,6 +103,7 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
   const { t } = useI18n();
   const { width } = useLearningViewport();
   const bottomSafeArea = useContext(LearningBottomSafeAreaContext);
+  const tutorSlot = useContext(LearningTutorSlot);
   const gutter = width < learningLayout.narrowWidth ? 18 : 24;
   const opacity = useRef(new Animated.Value(1)).current;
   useEffect(() => {
@@ -129,6 +131,7 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
     <Animated.View style={{ flex: 1, opacity }}>
       <ScrollView scrollEnabled={scrollEnabled} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 20, gap: contentGap }}>
+        {tutorSlot}
         {children}
         {error && !footer ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
       </ScrollView>

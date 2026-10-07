@@ -18,8 +18,9 @@ export function createLearningGateway(send: LearningRequest, uuid: () => string,
   let generation = 0;
   const pending = new Map<string, { payload: Record<string, unknown>; promise?: Promise<LearningAttemptView | LearningStateView> }>();
   const sources = new Map<string, LearningSource[]>();
+  const attemptVersions = new Map<string, string>();
   const cursors = new Map<string, { questionUid: string; version: bigint }>();
-  const reset = () => { generation += 1; content = null; state = null; pending.clear(); sources.clear(); cursors.clear(); };
+  const reset = () => { generation += 1; content = null; state = null; pending.clear(); sources.clear(); cursors.clear(); attemptVersions.clear(); };
   const request: LearningRequest = async (path, init) => {
     try { return await send(path, init); }
     catch (error) {
@@ -47,7 +48,7 @@ export function createLearningGateway(send: LearningRequest, uuid: () => string,
     if ('sources' in value) {
       const attempt = value as LearningAttemptView;
       const uid = attempt.quiz?.attemptUid ?? attempt.result?.attemptUid ?? attempt.questions?.[0]?.attemptUid;
-      if (uid) sources.set(uid, attempt.sources);
+      if (uid) { sources.set(uid, attempt.sources); attemptVersions.set(uid, attempt.attemptContentVersion); }
       if (attempt.quiz && (!cursors.has(attempt.quiz.attemptUid) || BigInt(value.stateVersion) >= cursors.get(attempt.quiz.attemptUid)!.version)) {
         cursors.set(attempt.quiz.attemptUid, { questionUid: attempt.quiz.question.questionUid, version: BigInt(value.stateVersion) });
       }
@@ -144,6 +145,7 @@ export function createLearningGateway(send: LearningRequest, uuid: () => string,
     markActivity: completion, markResource: completion,
     async abandonQuiz(uid) { return (await write(`abandon:${uid}`, `/api/learning/attempts/${uid}/abandon`, {})).session; },
     getState: () => state, getSources: (uid) => sources.get(uid) ?? [],
+    getAttemptContentVersion: (uid) => attemptVersions.get(uid),
     getPendingAnswer: (uid, questionUid) => {
       const value = pending.get(`answer:${uid}:${questionUid}`)?.payload.optionId;
       return typeof value === 'string' ? value : null;

@@ -16,6 +16,7 @@ import { createLearningBackGesture } from './learningBackGesture';
 import { LearningBody, LearningButton, LearningPage, ui } from './LearningUi';
 import { learningColors as c } from './learningTheme';
 import { LearningBottomSafeAreaContext, LearningWidthContext } from './learningViewport';
+import { LearningTutorController } from './tutor/LearningTutorController';
 
 const loadStory = () => import('../LinearFoodWasteStory').then(m => ({ default: m.LinearFoodWasteStory }));
 
@@ -226,7 +227,10 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
       selectedOptionId={quiz.feedback?.selectedOptionId ?? null} sources={frozenSources(quiz.attemptUid)} busy={false} error={null} onBack={back} onClose={back} onSelect={() => undefined} onSubmit={() => undefined}
       onNext={() => route.index + 1 < route.questions.length ? dispatch({ type: 'replace', route: { ...route, index: route.index + 1 } }) : back()} />;
   }
-  return present(<View style={{ flex: 1 }} {...edge.panHandlers}>{screen}{storyVisible ? <LearningLazyModal load={loadStory} componentProps={{ onClose: () => setStoryVisible(false) }} onClose={() => setStoryVisible(false)} closeLabel={copy.cancel} /> : null}</View>);
+  const body = <View style={{ flex: 1 }} {...edge.panHandlers}>{screen}{storyVisible ? <LearningLazyModal load={loadStory} componentProps={{ onClose: () => setStoryVisible(false) }} onClose={() => setStoryVisible(false)} closeLabel={copy.cancel} /> : null}</View>;
+  return present(gateway.getState ? <LearningTutorController content={content} route={route} gateway={gateway} busy={busy} storyVisible={storyVisible}
+    onNavigate={navigate} onResume={(uid) => { void run(() => gateway.resumeQuiz(uid), value => dispatch({ type: 'push', route: outcomeRoute(value) })); }}
+    onAbandoned={() => { hydrate(); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }}>{body}</LearningTutorController> : body);
 }
 
 export function LearningRoomFlow({ embedded = false, ...props }: Props) {
