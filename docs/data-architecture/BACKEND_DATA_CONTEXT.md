@@ -789,6 +789,10 @@ DELETE /api/inventory/batches/:batchUid
 
 批次详情还会按 `preset_uid` 返回与库存列表一致的远程 icon URL 和 Emoji fallback；列表卡片、详情顶部及删除确认框共用 `PresetFoodIcon` 渲染与失败回退逻辑。
 
+2026-10-07 冰箱卡片新增“快速使用”：`InventoryQuickUseSheet` 从列表快照固定批次与版本，数量选择仅保存在本地；明确确认后复用 `PATCH /api/inventory/batches/:batchUid/quantity` 提交剩余数量。数量减少仍写 `consume/used`，清零转为 `consumed`，保留 use-by 校验和原有包装分类学习 `wasteOpportunity`。共享版本冲突只重读批次并要求重新确认，不自动重试扣减。成功后先合并服务器返回的数量与版本，再重拉完整列表并发出本地库存同步；同名同单位的补货状态同时重新汇总。本次没有新增或修改 API、RPC、数据库 schema 与统计契约。
+
+快速使用的数量支持直接输入，遵循库存已有三位小数精度；空值、零、负数、非法格式和超过当前库存的数量不能提交。加减步长为 g/ml 的 50、kg/L 的 0.1、计数单位的 1，手动输入不受这些步长限制。此改进仅改变客户端输入交互，不改变数量接口或存储精度。
+
 `20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
 `20260904020000_inventory_expiry_warning_days.sql` 新增批次级 `expiry_warning_days`，并为创建与完整编辑 RPC 增加原子保存该字段的安全重载；Express 的列表与详情响应统一返回 `expiryWarningDays`。
@@ -929,3 +933,21 @@ npx supabase db push --include-seed
 17. 通知偏好按设备保存；免打扰只影响角标/提醒呈现，不得把共享通知删除或替其他成员标记已读。
 18. `actor_device_id` 只用于共享通知排除操作者本人；成员响应仍不得暴露真实设备 ID。
 19. Push Token 与投递审计只允许 service role 访问；远程 Push 必须使用 EAS development/preview/production build 和真实设备验证，不能把 Expo Go 当成远程 Push 验收环境。Android Expo Go 仍应能打开 App 并使用本地临期/召回提醒，不得因 `expo-notifications` 入口的 Push 自注册或 `setNotificationChannelAsync` 的空 provider 而红屏。
+
+## 2026-10-08：Learning Room × Spoonie tutor 数据契约
+
+导师业务使用独立 `/api/learning/tutor`，设备仍由 requireDevice 鉴权，RPC锁有效凭证对应的fridge_members及本人learning_learners。所有权只解析可信device→learner，不能按共享fridge合并。原assistant的fridge会话、库存工具、评分/升级RPC不扩权。
+
+新增七条已提交migration：20261008010000 foundation、11000 draft v1、12000 review/help、13000 support修复、14000 evidence v2、15000 versioned context/practice signals、16000 credential alias修复。全部先开发预演再应用Gress-development；本地/开发56份一致，SQL回滚断言和lint通过；生产本轮仅只读核对，尚缺后续学堂依赖，未应用。
+
+六表：learning_tutor_manifests绑定course hash/独立review/不可变body；conversations归属learner/context/manifest/30天；messages复合learner-conversation外键及评价；requests归属learner/requestKey/payloadHash/lease/response/usage/state；preferences归属learner（三开关/时区）；interventions归属learner（visit/topic/dedupe/status/时间）。RLS阻止anon/authenticated，service_role只读，写操作经security-definer action RPC。模板与manifest均draft/pending，不允许作者自批；published必须原课程published、独立review/hash及逐模板approved。
+
+learning_tutor_context只返回公开catalog及授权的本人单题反馈，不返回完整question_snapshot/private_question_bank。任一active checkpoint阻止自由聊天及额外练习，只允许本人已答题固定explain/simplify/example；未答practice仅服务端渐进hint，不含key。learning_tutor_conversation_context恢复原manifest，后续版本不能悄悄替换证据；withdrawn禁止新回答/来源。
+
+learning_tutor_action原子claim/finish持同一learner锁；同requestKey不同payload冲突、已完成返回缓存、40秒lease超时或不确定状态不盲目再次调用供应商。finish再次验身份/考试/内容/lease。delete/clear清除正文和缓存并保留无正文tombstone，迟到结果不能重建历史。正文30天，requests/interventions90天；cleanup_learning_tutor及daily pg_cron已登记，运行历史仍待观察。
+
+恢复函数transfer_learning_with_membership已通过追加migration扩展：在temporary learner删除前移动conversation/message/request/intervention，冲突键保留recovery namespace，原偏好优先，pending lease失效，复合外键延后检查。join/leave不合并教学身份；测试验证恢复后旧设备凭证401、临时历史保留。
+
+recommendations只统计本人当前可用版本近30天已提交正式首答，questionCode/本地日去重，每topic最近5个、样本至少2、最近两次正确停止，最多2项。practice-first-answers-v1单独用于练习错题主动帮助，不能进入正式推荐/升级。关闭personalized停止此统计/提示；关闭proactive仍可手动提问；dwell默认关闭。help原子限频：同visit一次、跨页5分钟、拒绝topic24小时、每本地日3次，所有active checkpoint禁止。
+
+模型使用现有Responses transport、store:false、独立教学提示词、最多6公开证据块/8条历史/本人一题反馈，无库存或grading工具；引用只允许登记来源enum/maxItems:6，导航由服务器映射。额外12模板由服务器固定判分，scored:false，不改变正式进度/库存/成就/XP。真实模型评估60/60结构通过不代表独立事实审核；原课程P5/审核、导师模板审核及生产发布仍pending。实际状态/证据见docs/learning-room/AI_TUTOR_STATUS.md及verification/2026-10-08/。

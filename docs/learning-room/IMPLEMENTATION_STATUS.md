@@ -1,5 +1,7 @@
 # Learning Room 实际进度与继续位置
 
+2026-10-08 导师三步已实现并通过开发验证，A4自动验收/真实模型完成，真机/独立审核/生产发布pending。新工作线见 [AI_TUTOR_STATUS.md](AI_TUTOR_STATUS.md)、[AI_TUTOR_PLAN.md](AI_TUTOR_PLAN.md)、[AI_TUTOR_HANDOFF.md](AI_TUTOR_HANDOFF.md)。旧学堂P5与独立审核状态不变。
+
 最后更新：2026-10-06（Australia/Sydney）。当前阶段：**P0–P4 已完成开发验证；按用户修订新增独立学堂 Tab 并修复默认开发启动的内容加载；P5 真机验收与独立审核仍待完成。**
 
 最新入口为底部「学堂 / Learn」，位于冰箱与成果之间；旧 Home／Profile 入口已移除。`npm start`／`npm run server` 默认开启指定开发库的草稿例外，`server:start`／生产仍仅读 published。交接优先读 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)。历史 P0–P4 文档中的五 Tab／二级 Modal 是当时实现记录，已被本次用户修订替代。

@@ -8,21 +8,26 @@ import { LearningRoomFlow } from '../LearningRoomFlow';
 import { APP_TAB_DOCK_HEIGHT, FloatingTabBar, type AppTab } from '../../FloatingTabBar';
 import { learningColors as c } from '../learningTheme';
 import { createLearningPreview, previewScenarios, type LearningPreviewScenario } from './learningFixtures';
+import { LearningTutorPreview, tutorPreviewScreens, type TutorPreviewScreen } from './LearningTutorPreview';
+import { LearningWidthContext } from '../learningViewport';
 
 function Preview() {
   const { language, setLanguage, t } = useI18n();
   const params = Platform.OS === 'web' ? new URLSearchParams(window.location.search) : new URLSearchParams();
   const initial = params.get('screen');
+  const tutorScreen = params.get('tutor') as TutorPreviewScreen;
   const [scenario, setScenario] = useState<LearningPreviewScenario | null>(previewScenarios.includes(initial as LearningPreviewScenario) ? initial as LearningPreviewScenario : 'hub');
   const [revision, setRevision] = useState(0);
   const [activeTab, setActiveTab] = useState<AppTab>('learn');
   const blurTarget = useRef<View>(null);
   const tabPreview = params.get('nav') === '1';
+  const showChrome = params.get('chrome') !== '0';
   const preview = useMemo(() => scenario ? createLearningPreview(scenario) : null, [scenario, revision]);
   const width = params.get('width') === '320' ? 320 : 390;
   const height = params.get('height') === '667' ? 667 : 844;
   const origin = tabPreview ? 'tab' : params.get('origin') === 'profile' ? 'profile' : 'home';
-  const content = preview && (!tabPreview || activeTab === 'learn') ? <LearningRoomFlow key={`${scenario}:${revision}`} {...preview} origin={origin} embedded onClose={() => setScenario(null)} />
+  const content = tutorPreviewScreens.includes(tutorScreen) ? <LearningTutorPreview key={tutorScreen} screen={tutorScreen} />
+    : preview && (!tabPreview || activeTab === 'learn') ? <LearningRoomFlow key={`${scenario}:${revision}`} {...preview} origin={origin} embedded onClose={() => setScenario(null)} />
     : <ScrollView contentContainerStyle={styles.menu}><Text style={styles.menuTitle}>{t.learning.choosePreview}</Text>
       {previewScenarios.map((item) => <Pressable key={item} accessibilityRole="button" onPress={() => { setActiveTab('learn'); setRevision((n) => n + 1); setScenario(item); }} style={styles.menuRow}><Text style={styles.menuText}>{item}</Text></Pressable>)}
     </ScrollView>;
@@ -41,9 +46,9 @@ function Preview() {
   // Arthur: NarIyirm
   // 中文：Web 画布仅模拟 iPhone 内容区域 inset；原生使用真实安全区。开发提示在画布外，不画手机框或系统状态栏。
   // EN: The web canvas simulates content insets only; native uses real safe areas. The development label sits outside the canvas, with no drawn phone frame or status bar.
-  if (Platform.OS === 'web') return <ScrollView style={styles.desktop} contentContainerStyle={styles.desktopContent}>
-    {chrome}<View testID="learning-preview-canvas" style={{ width, height, maxWidth: '100%', backgroundColor: c.background }}>
-      <SafeAreaInsetsContext.Provider value={{ top: 44, bottom: 24, left: 0, right: 0 }}>{canvas}</SafeAreaInsetsContext.Provider>
+  if (Platform.OS === 'web') return <ScrollView style={styles.desktop} contentContainerStyle={[styles.desktopContent, !showChrome ? { paddingBottom: 0 } : null]}>
+    {showChrome ? chrome : null}<View testID="learning-preview-canvas" style={{ width, height, maxWidth: '100%', backgroundColor: c.background }}>
+      <LearningWidthContext.Provider value={width}><SafeAreaInsetsContext.Provider value={{ top: 44, bottom: 24, left: 0, right: 0 }}>{canvas}</SafeAreaInsetsContext.Provider></LearningWidthContext.Provider>
     </View>
   </ScrollView>;
   return <View style={{ flex: 1, backgroundColor: c.background }}>{chrome}{canvas}</View>;
@@ -51,7 +56,8 @@ function Preview() {
 
 export default function LearningPreviewApp() {
   if (!__DEV__) return null;
-  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><I18nProvider initialLanguage="en" persist={false}><StatusBar style="dark" /><Preview /></I18nProvider></SafeAreaProvider>;
+  const language = Platform.OS === 'web' && new URLSearchParams(window.location.search).get('lang') === 'zh' ? 'zh' : 'en';
+  return <SafeAreaProvider initialMetrics={initialWindowMetrics}><I18nProvider initialLanguage={language} persist={false}><StatusBar style="dark" /><Preview /></I18nProvider></SafeAreaProvider>;
 }
 
 const styles = StyleSheet.create({

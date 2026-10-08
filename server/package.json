@@ -4,6 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "test:learning-tutor": "node --test test/learningTutor.test.js",
+    "verify:learning-tutor": "node scripts/verify-learning-tutor.js",
+    "eval:learning-tutor": "node scripts/evaluate-learning-tutor.js --live",
     "dev:learning": "node scripts/start-learning-development.js",
     "verify:learning-gateway": "node scripts/verify-learning-gateway.js",
     "verify:learning-room": "node scripts/verify-learning-room.js",

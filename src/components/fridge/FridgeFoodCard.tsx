@@ -17,6 +17,9 @@ type FridgeFoodCardProps = {
   name: string;
   needsRestock: boolean;
   onPress: () => void;
+  onUse: () => void;
+  useLabel: string;
+  useAccessibilityLabel: string;
   storage: FridgeStorageZone;
   storageLabel: string;
 };
@@ -36,6 +39,9 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
   name,
   needsRestock,
   onPress,
+  onUse,
+  useLabel,
+  useAccessibilityLabel,
   storage,
   storageLabel,
 }: FridgeFoodCardProps) {
@@ -49,37 +55,49 @@ export const FridgeFoodCard = memo(function FridgeFoodCard({
       : 'cube-outline';
 
   return (
-    <Pressable
-      accessibilityLabel={name}
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [styles.card, { backgroundColor: categoryTint, borderColor: `${categoryTone}20` }, pressed && styles.pressed]}
-    >
-      <View style={styles.top}>
-        <View style={styles.emojiTile}>
-          <PresetFoodIcon emoji={emoji} iconUrl={iconUrl} size="card" />
-        </View>
-        <Text numberOfLines={2} style={styles.name}>{name}</Text>
-      </View>
-      <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.amount}>{amount}</Text>
-      <View style={styles.meta}>
-        <View style={styles.storageBadge}>
-          <Ionicons name={storageIcon} size={13} color="#287A8B" />
-          <Text numberOfLines={1} style={styles.storageText}>{storageLabel}</Text>
-        </View>
-        {freshnessText ? (
-          <View style={[styles.freshnessBadge, { backgroundColor: freshnessTint }]}>
-            <Text numberOfLines={1} style={[styles.freshnessText, { color: freshnessColor }]}>{freshnessText}</Text>
+    <View style={[styles.card, { backgroundColor: categoryTint, borderColor: `${categoryTone}20` }]}>
+      {/* Arthur: NarIyirm
+          中文：详情与快捷使用使用并列点击区域，避免点使用时同时打开详情弹窗。
+          EN: Detail and quick use have sibling touch targets so using an item cannot also open its detail sheet. */}
+      <Pressable
+        accessibilityLabel={name}
+        accessibilityRole="button"
+        onPress={onPress}
+        style={({ pressed }) => [styles.detailArea, pressed && styles.pressed]}
+      >
+        <View style={styles.top}>
+          <View style={styles.emojiTile}>
+            <PresetFoodIcon emoji={emoji} iconUrl={iconUrl} size="card" />
           </View>
-        ) : null}
-      </View>
-      {needsRestock ? <View style={styles.restockDot} /> : null}
-    </Pressable>
+          <Text numberOfLines={2} style={styles.name}>{name}</Text>
+        </View>
+        <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.82} style={styles.amount}>{amount}</Text>
+        <View style={styles.meta}>
+          <View style={styles.storageBadge}>
+            <Ionicons name={storageIcon} size={13} color="#287A8B" />
+            <Text numberOfLines={1} style={styles.storageText}>{storageLabel}</Text>
+          </View>
+          {freshnessText ? (
+            <View style={[styles.freshnessBadge, { backgroundColor: freshnessTint }]}>
+              <Text numberOfLines={1} style={[styles.freshnessText, { color: freshnessColor }]}>{freshnessText}</Text>
+            </View>
+          ) : null}
+        </View>
+      </Pressable>
+      <Pressable accessibilityLabel={useAccessibilityLabel} accessibilityRole="button" onPress={onUse} style={({ pressed }) => [styles.useButton, pressed && styles.pressed]}>
+        <Ionicons name="restaurant-outline" size={17} color="#247A53" />
+        <Text style={styles.useText}>{useLabel}</Text>
+      </Pressable>
+      {needsRestock ? <View pointerEvents="none" style={styles.restockDot} /> : null}
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
   card: { position: 'relative', width: '48%', minHeight: 145, padding: 11, borderWidth: 1, borderRadius: 15, borderCurve: 'continuous' },
+  detailArea: { flex: 1 },
+  useButton: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 11, paddingHorizontal: 8, borderRadius: 11, borderCurve: 'continuous', backgroundColor: '#DDF1E6' },
+  useText: { color: '#247A53', fontSize: 14, fontWeight: '800' },
   top: { minHeight: 42, flexDirection: 'row', alignItems: 'center', gap: 8 },
   emojiTile: { width: 40, height: 40, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 11, borderCurve: 'continuous', backgroundColor: 'rgba(255,255,255,0.68)' },
   name: { flex: 1, minWidth: 0, color: '#183B30', fontSize: 15, fontWeight: '800', lineHeight: 18 },

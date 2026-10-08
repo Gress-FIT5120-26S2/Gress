@@ -9,4 +9,7 @@ assert.notEqual(process.env.NODE_ENV, 'production');
 assert.equal(new URL(process.env.SUPABASE_URL).hostname, `${ref}.supabase.co`);
 process.env.LEARNING_ROOM_ALLOW_DRAFT = '1';
 process.env.LEARNING_ROOM_DRAFT_PROJECT_REF = ref;
+process.env.LEARNING_TUTOR_ENABLED ??= '1';
+process.env.LEARNING_TUTOR_COACHING_ENABLED ??= '1';
+process.env.LEARNING_TUTOR_PROACTIVE_ENABLED ??= '1';
 await import('../src/index.js');

@@ -1,5 +1,7 @@
 # Learning Room — 新对话接手入口
 
+2026-10-08 导师工作线：随堂问答、测验辅导和主动帮助已实现并通过开发验证；A4真机、独立审核和生产发布pending。处理此工作先读 [AI_TUTOR_HANDOFF.md](AI_TUTOR_HANDOFF.md)、[AI_TUTOR_STATUS.md](AI_TUTOR_STATUS.md) 和 [AI_TUTOR_PLAN.md](AI_TUTOR_PLAN.md)，从A4剩余验收接手。以下原学堂P5／审核待验事实继续保留。
+
 更新时间：2026-10-06（Australia/Sydney）。
 
 最新用户修订：独立「学堂 / Learn」主 Tab 已替代 Home／Profile 学习入口与全屏学习 Modal。默认 `npm start`／`npm run server` 已使用指定开发库草稿启动器；`npm run server:start` 和生产仍仅接受 published。请先读 [NAVIGATION_UPDATE.md](verification/2026-10-06/NAVIGATION_UPDATE.md)，不要照旧文档还原五 Tab 或误判 content_unavailable 为路由未挂载。

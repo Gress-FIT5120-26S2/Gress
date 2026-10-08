@@ -1,0 +1,82 @@
+env: load .env.production
+env: export EXPO_PUBLIC_API_URL
+Starting Metro Bundler
+
+| (node:43956) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+| (Use `node --trace-warnings ...` to show where the warning was created)
+iOS Bundled 33918ms index.ts (2050 modules)
+Android Bundled 59939ms index.ts (2056 modules)
+
+› Assets (61):
+assets\achievements\cloud-back.png (401KB)
+assets\achievements\cloud-front.png (527KB)
+assets\achievements\medals\climate-summit.png (411KB)
+assets\achievements\medals\first-item.png (415KB)
+assets\achievements\medals\first-rescue.png (408KB)
+assets\achievements\medals\fridge-regular.png (411KB)
+assets\achievements\medals\rescue-ten.png (416KB)
+assets\achievements\medals\shared-kitchen.png (416KB)
+assets\achievements\medals\waste-aware.png (427KB)
+assets\achievements\medals\zero-waste-week.png (430KB)
+assets\achievements\mountain-lv1.png (230KB)
+assets\achievements\mountain-lv2.png (241KB)
+assets\achievements\mountain-lv3.png (229KB)
+assets\achievements\mountain-lv4.png (216KB)
+assets\achievements\mountain-lv5.png (273KB)
+assets\kitchmemo-assistant-peek-tight.png (1.2MB)
+assets\kitchmemo-assistant-top-peek-final.png (1.8MB)
+assets\kitchmemo-assistant.png (91KB)
+assets\learning-room\empty-aluminium-can.png (559KB)
+assets\learning-room\learning-complete-seal.png (322KB)
+assets\learning-room\learning-leaf-sprig.png (477KB)
+assets\learning-room\packaging-recycling-cover.webp (64KB)
+assets\learning-room\preventing-waste-cover.webp (138KB)
+assets\learning-room\sdg-13-climate-action-en.png (34KB)
+assets\learning-room\sdg-13-climate-action-zh.png (35KB)
+assets\learning-room\tutor-food-lifecycle.png (1.6MB)
+assets\learning-room\tutor-kitchen-example.png (2.1MB)
+assets\learning-room\waste-basics-course-cover.webp (119KB)
+assets\learning-room\waste-basics-still-life.png (783KB)
+assets\learning-room\waste-climate-cover.webp (123KB)
+assets\models\achievements\first-item.glb (1.2MB)
+assets\models\Kitchen-Home-rebuilt-lighting.glb (2.1MB)
+assets\models\Spoonie-Character-v2.glb (6.1MB)
+assets\shared-fridge-family.png (1.8MB)
+assets\story\food-waste\kitchmemo-food-waste-linear-60s.mp4 (1.4MB)
+assets\story\food-waste\poster.png (3.6KB)
+assets\waste-bins\general-closed.png (26KB)
+assets\waste-bins\general-open.png (30KB)
+assets\waste-bins\organics-closed.png (25KB)
+assets\waste-bins\organics-open.png (30KB)
+assets\waste-bins\recycling-closed.png (28KB)
+assets\waste-bins\recycling-open.png (30KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\AntDesign.ttf (130KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Entypo.ttf (66KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\EvilIcons.ttf (13KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Feather.ttf (56KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome.ttf (166KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome5_Brands.ttf (134KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome5_Regular.ttf (34KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome5_Solid.ttf (203KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome6_Brands.ttf (209KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome6_Regular.ttf (68KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\FontAwesome6_Solid.ttf (424KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Fontisto.ttf (314KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Foundation.ttf (57KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Ionicons.ttf (390KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\MaterialCommunityIcons.ttf (1.3MB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\MaterialIcons.ttf (357KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Octicons.ttf (69KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\SimpleLineIcons.ttf (54KB)
+node_modules\@expo\vector-icons\build\vendor\react-native-vector-icons\Fonts\Zocial.ttf (26KB)
+
+› ios bundles (1):
+_expo/static/js/ios/index-71ae36f6b2152cde461f987dff1bda61.hbc (13MB)
+
+› android bundles (1):
+_expo/static/js/android/index-4b21b5d66217c48d3bebd622a15b049f.hbc (13MB)
+
+› Files (1):
+metadata.json (8.1KB)
+
+Exported: .codex-build/learning-tutor-ui-redesign

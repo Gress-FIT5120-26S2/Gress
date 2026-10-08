@@ -1,6 +1,6 @@
 import { useAnimations, useGLTF } from '@react-three/drei/native';
 import { type ThreeEvent, useFrame, useThree } from '@react-three/fiber/native';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   LoopOnce,
   LoopRepeat,
@@ -8,6 +8,8 @@ import {
   type AnimationAction,
   type AnimationClip,
   type Group,
+  type Mesh,
+  type MeshStandardMaterial,
   type Object3D,
 } from 'three';
 import { SkeletonUtils } from 'three-stdlib';
@@ -22,7 +24,6 @@ type Scenario = {
   clip: 'Inspect_Cart' | 'Read_Recipe' | 'Think';
   destination: Destination;
   message: string;
-  yaw: number;
 };
 type DirectorState = {
   clip: Scenario['clip'] | null;
@@ -32,7 +33,6 @@ type DirectorState = {
   remaining: number;
   route: Vector3[];
   routeIndex: number;
-  yaw: number;
 };
 type SpoonieWorldCharacterProps = {
   activitySignal: number;
@@ -42,6 +42,7 @@ type SpoonieWorldCharacterProps = {
   onSpeechChange: (message: string | null) => void;
   reduceMotion: boolean;
   sceneBusy: boolean;
+  sunIntensity: number;
 };
 
 const START_POSITION = new Vector3(-1.12, 0.01, 1.68);
@@ -94,7 +95,7 @@ function buildScenarios(batches: InventoryBatch[], language: 'en' | 'zh'): Scena
   if (expiring) {
     const days = daysUntil(expiring.expiresAt);
     scenarios.push({
-      clip: 'Think', destination: 'fridge', yaw: Math.PI,
+      clip: 'Think', destination: 'fridge',
       message: language === 'zh'
         ? `${expiring.name}${days === 0 ? '今天到期，要先用掉哦。' : `还有 ${days} 天，记得先用。`}`
         : `${expiring.name} ${days === 0 ? 'expires today—use it first.' : `has ${days} day${days === 1 ? '' : 's'} left.`}`,
@@ -102,12 +103,12 @@ function buildScenarios(batches: InventoryBatch[], language: 'en' | 'zh'): Scena
   }
   if (restock) {
     scenarios.push({
-      clip: 'Inspect_Cart', destination: 'cart', yaw: Math.PI / 2,
+      clip: 'Inspect_Cart', destination: 'cart',
       message: language === 'zh' ? `${restock.name}不多啦，记得补货。` : `We are low on ${restock.name}. Time to restock.`,
     });
   }
   scenarios.push({
-    clip: 'Read_Recipe', destination: 'recipe', yaw: Math.PI,
+    clip: 'Read_Recipe', destination: 'recipe',
     message: language === 'zh' ? '让我翻翻食谱，看看今天先用什么。' : 'Let me check what we can use first today.',
   });
   return scenarios;
@@ -116,12 +117,39 @@ function buildScenarios(batches: InventoryBatch[], language: 'en' | 'zh'): Scena
 // Arthur: NarIyirm
 // 中文：角色导演只在片段边界更新 React 状态；行走、转向和骨骼播放全部留在 Three 帧循环中，避免移动时重渲染界面。
 // EN: The character director touches React state only at clip boundaries; walking, turning, and skeletal playback stay in Three's frame loop to avoid UI rerenders in motion.
-export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpenAssistant, onSpeechChange, reduceMotion, sceneBusy }: SpoonieWorldCharacterProps) {
+export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpenAssistant, onSpeechChange, reduceMotion, sceneBusy, sunIntensity }: SpoonieWorldCharacterProps) {
   const { animations, scene } = useGLTF(SPOONIE_MODEL_ASSET) as LoadedSpoonie;
   // Arthur: NarIyirm
   // 中文：蒙皮角色必须连同骨架绑定关系一起克隆；普通 Object3D.clone 会让部分设备上的骨骼引用仍指向缓存原件。
   // EN: Clone the skinned character with its skeleton bindings; Object3D.clone can leave bone references pointing at the cached source on some devices.
-  const characterScene = useMemo(() => SkeletonUtils.clone(scene), [scene]);
+  const characterModel = useMemo(() => {
+    const clone = SkeletonUtils.clone(scene);
+    const materials = new Map<MeshStandardMaterial, MeshStandardMaterial>();
+    // Arthur: NarIyirm
+    // 中文：骨架克隆仍共享缓存材质，需单独克隆；用原贴图作为发光贴图，保留眼睛、围裙和身体的颜色对比。
+    // EN: Skeleton clones still share cached materials, so clone them separately and reuse the color map for emission to preserve eyes, apron, and body contrast.
+    clone.traverse((object) => {
+      const mesh = object as Mesh;
+      if (!mesh.isMesh) return;
+      const prepareMaterial = (source: MeshStandardMaterial) => {
+        if (!source.isMeshStandardMaterial) return source;
+        let material = materials.get(source);
+        if (!material) {
+          material = source.clone();
+          material.emissive.copy(material.color);
+          material.emissiveMap = material.map;
+          materials.set(source, material);
+        }
+        return material;
+      };
+      mesh.material = Array.isArray(mesh.material)
+        ? mesh.material.map((material) => prepareMaterial(material as MeshStandardMaterial))
+        : prepareMaterial(mesh.material as MeshStandardMaterial);
+    });
+    return { scene: clone, materials: [...materials.values()] };
+  }, [scene]);
+  const characterScene = characterModel.scene;
+  const facingPositions = useMemo(() => ({ camera: new Vector3(), character: new Vector3() }), []);
   const characterRef = useRef<Group>(null);
   const { actions } = useAnimations(animations, characterScene);
   const invalidate = useThree((state) => state.invalidate);
@@ -130,8 +158,21 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
   const currentLocationRef = useRef<CharacterLocation>('start');
   const [cycleVersion, setCycleVersion] = useState(0);
   const directorRef = useRef<DirectorState>({
-    clip: null, destination: null, message: null, phase: 'idle', remaining: 0, route: [], routeIndex: 0, yaw: 0,
+    clip: null, destination: null, message: null, phase: 'idle', remaining: 0, route: [], routeIndex: 0,
   });
+
+  useLayoutEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：随日光减弱增强柔和自发光，让夜间清晰可见，同时避免昼夜阶段切换时亮度突变。
+    // EN: Increase soft emission as sunlight fades so Spoonie remains readable at night without a brightness jump between time phases.
+    const darkness = 1 - Math.max(0, Math.min(1, sunIntensity / 1.48));
+    for (const material of characterModel.materials) material.emissiveIntensity = 0.35 + darkness * 0.55;
+    invalidate();
+  }, [characterModel, invalidate, sunIntensity]);
+
+  useEffect(() => () => {
+    for (const material of characterModel.materials) material.dispose();
+  }, [characterModel]);
 
   const playAction = useCallback((name: string, repeat: boolean) => {
     const next = actions[name];
@@ -148,7 +189,7 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
   }, [actions, invalidate]);
 
   const stopScenario = useCallback(() => {
-    directorRef.current = { clip: null, destination: null, message: null, phase: 'idle', remaining: 0, route: [], routeIndex: 0, yaw: 0 };
+    directorRef.current = { clip: null, destination: null, message: null, phase: 'idle', remaining: 0, route: [], routeIndex: 0 };
     onSpeechChange(null);
     playAction('Idle_Breathe', true);
   }, [onSpeechChange, playAction]);
@@ -163,7 +204,7 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
 
   useEffect(() => {
     if (directorRef.current.phase !== 'idle') stopScenario();
-  }, [activitySignal, sceneBusy, stopScenario]);
+  }, [activitySignal, reduceMotion, sceneBusy, stopScenario]);
 
   const beginScenario = useCallback(() => {
     if (reduceMotion || sceneBusy || !characterRef.current || directorRef.current.phase !== 'idle') return;
@@ -181,7 +222,6 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
       // EN: Routes follow the dining-table perimeter and right aisle based on the character's current zone, instead of cutting straight through furniture between destinations.
       route: SAFE_ROUTES[currentLocationRef.current][scenario.destination].map((point) => new Vector3(...point)),
       routeIndex: 0,
-      yaw: scenario.yaw,
     };
     onSpeechChange(null);
     playAction('Walk', true);
@@ -194,10 +234,29 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
     return () => clearTimeout(timer);
   }, [activitySignal, beginScenario, cycleVersion, reduceMotion, sceneBusy]);
 
-  useFrame((_, delta) => {
+  useFrame(({ camera }, delta) => {
     const character = characterRef.current;
     const director = directorRef.current;
-    if (!character || director.phase === 'idle') return;
+    if (!character) return;
+
+    // Arthur: NarIyirm
+    // 中文：行走时朝向路线；停下后只绕竖轴持续朝向镜头，保留站立姿态，并让待机和动作阶段都跟随用户视角。
+    // EN: Follow the route while walking; otherwise track the camera around the vertical axis in both idle and performing phases while staying upright.
+    if (director.phase !== 'walking') {
+      camera.getWorldPosition(facingPositions.camera);
+      character.getWorldPosition(facingPositions.character);
+      const x = facingPositions.camera.x - facingPositions.character.x;
+      const z = facingPositions.camera.z - facingPositions.character.z;
+      if (x * x + z * z > 0.000001) {
+        const desiredYaw = Math.atan2(x, z);
+        const yawDelta = Math.atan2(Math.sin(desiredYaw - character.rotation.y), Math.cos(desiredYaw - character.rotation.y));
+        character.rotation.y += reduceMotion || Math.abs(yawDelta) < 0.001
+          ? yawDelta
+          : yawDelta * (1 - Math.exp(-10 * Math.min(delta, 0.05)));
+        if (!reduceMotion && Math.abs(yawDelta) >= 0.001) invalidate();
+      }
+    }
+    if (director.phase === 'idle') return;
 
     if (director.phase === 'walking') {
       const target = director.route[director.routeIndex];
@@ -216,7 +275,6 @@ export function SpoonieWorldCharacter({ activitySignal, batches, language, onOpe
           if (director.destination) currentLocationRef.current = director.destination;
           director.phase = 'performing';
           director.remaining = animations.find((clip) => clip.name === director.clip)?.duration ?? 2.2;
-          character.rotation.y = director.yaw;
           playAction(director.clip ?? 'Think', false);
           onSpeechChange(director.message);
         }

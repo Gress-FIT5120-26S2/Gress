@@ -25,6 +25,8 @@ import { FridgeFilterChip } from './fridge/FridgeFilterChip';
 import { FridgeFoodCard, type FridgeStorageZone } from './fridge/FridgeFoodCard';
 import { FridgeAssistantButton } from './fridge/FridgeAssistantButton';
 import { InventoryItemDetailSheet } from './fridge/InventoryItemDetailSheet';
+import { InventoryQuickUseSheet, type QuickUseResult } from './fridge/InventoryQuickUseSheet';
+import { applyQuickUseResult } from '../utils/inventoryQuickUse';
 import { WasteSortingOverlay } from './fridge/WasteSortingOverlay';
 import type { WasteOpportunity } from '../services/wasteLearningApi';
 import {
@@ -195,6 +197,7 @@ export function FridgeScreen({
   const [recognitionInitialValues, setRecognitionInitialValues] = useState<InventoryEntryInitialValues | undefined>();
   const [entrySource, setEntrySource] = useState<InventoryEntrySource>('manual');
   const [selectedBatchUid, setSelectedBatchUid] = useState<string | null>(null);
+  const [quickUseBatch, setQuickUseBatch] = useState<InventoryBatchDetail | null>(null);
   const [wasteOpportunity, setWasteOpportunity] = useState<WasteOpportunity | null>(null);
   // Arthur: NarIyirm
   // 中文：同次使用产生多个部件时逐个展示；关闭当前题只推进队列，不重复库存 mutation。
@@ -228,6 +231,7 @@ export function FridgeScreen({
   const sharingContextLoadRef = useRef<Promise<void> | null>(null);
   const [sharingFlow, setSharingFlow] = useState<SharedFridgeFlowScreen | null>(null);
   const [saveConfirmationVisible, setSaveConfirmationVisible] = useState(false);
+  const [confirmationKind, setConfirmationKind] = useState<'edit' | 'use'>('edit');
   const [showFilterSwipeHint, setShowFilterSwipeHint] = useState(false);
   const filterSwipeHintDismissedRef = useRef(false);
   const handledAssistantAddRequestRef = useRef(0);
@@ -670,9 +674,27 @@ export function FridgeScreen({
       ? currentRestockRule
       : (await setInventoryRestockRule(editingBatch.id, nextRestockRule, submission.batch.unit)).restockRule;
     void loadInventory('background').catch(() => undefined);
+    setConfirmationKind('edit');
     setSaveConfirmationVisible(true);
     return { ...updated.batch, restockRule };
   }, [loadInventory]);
+
+  const openQuickUse = useCallback((batchUid: string) => {
+    const batch = snapshot?.batches.find((entry) => entry.id === batchUid);
+    if (batch) setQuickUseBatch(batch);
+  }, [snapshot]);
+
+  // Arthur: NarIyirm
+  // 中文：成功后立即展示权威扣减结果；等待旧读取结束再重新对账，分类学习沿用详情页的 Modal 交接。
+  // EN: Show the authoritative deduction immediately, then reconcile after any older read finishes and hand sorting prompts off through the existing modal flow.
+  const handleQuickUse = useCallback((result: QuickUseResult) => {
+    setSnapshot((current) => current ? applyQuickUseResult(current, result.batch) : current);
+    setQuickUseBatch(null);
+    setConfirmationKind('use');
+    setSaveConfirmationVisible(true);
+    void Promise.resolve(inventoryLoadRef.current).catch(() => undefined).then(() => loadInventory('background')).catch(() => undefined);
+    if (result.wasteOpportunity) showWasteOpportunity(result.wasteOpportunity);
+  }, [loadInventory, showWasteOpportunity]);
 
   const renderInventoryItem = useCallback(({ item }: ListRenderItemInfo<InventoryItem>) => {
     const categoryStyle = CATEGORY_STYLE[item.category];
@@ -697,11 +719,14 @@ export function FridgeScreen({
         name={item.name}
         needsRestock={Boolean(item.needsRestock)}
         onPress={() => setSelectedBatchUid(item.id)}
+        onUse={() => openQuickUse(item.id)}
+        useLabel={t.fridge.quickUse.button}
+        useAccessibilityLabel={t.fridge.quickUse.buttonA11y(item.name)}
         storage={item.storage}
         storageLabel={t.fridge.filters[item.storage]}
       />
     );
-  }, [t]);
+  }, [openQuickUse, t]);
 
   return (
     <View style={styles.screen}>
@@ -925,6 +950,7 @@ export function FridgeScreen({
         onSaveEdit={saveEditedInventoryEntry}
         visible={selectedBatchUid !== null}
       />
+      {quickUseBatch ? <InventoryQuickUseSheet initialBatch={quickUseBatch} onClose={() => setQuickUseBatch(null)} onUsed={handleQuickUse} /> : null}
       <CreateCategoryModal copy={t.fridge.customCategory} onClose={() => setIsCreateCategoryVisible(false)} onCreated={handleCategoryCreated} visible={isCreateCategoryVisible} />
       <BarcodeResultReview
         draft={barcodeDraft}
@@ -936,7 +962,7 @@ export function FridgeScreen({
       {saveConfirmationVisible ? (
         <View accessibilityLiveRegion="polite" style={styles.saveConfirmation}>
           <Ionicons color="#FFFFFF" name="checkmark-circle" size={20} />
-          <Text style={styles.saveConfirmationText}>{t.fridge.itemDetail.saveSuccess}</Text>
+          <Text style={styles.saveConfirmationText}>{confirmationKind === 'use' ? t.fridge.quickUse.success : t.fridge.itemDetail.saveSuccess}</Text>
         </View>
       ) : null}
       <FridgeSpaceMenu

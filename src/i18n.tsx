@@ -3,11 +3,13 @@ import { useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { View } from 'react-native';
 import { I18nContext, type AppLanguage } from './i18nContext';
 import { learningCopy } from './i18n/learning';
+import { learningTutorCopy } from './i18n/learningTutor';
 
 export type { AppLanguage } from './i18nContext';
 
 const zh = {
   learning: learningCopy.zh,
+  learningTutor: learningTutorCopy.zh,
   screens: {
     home: { eyebrow: '今晚好', title: '家里的库存怎么样？', description: '购物前，先看看家里还剩下什么。' },
     shopping: { eyebrow: '购物车', title: '带着厨房库存去购物', description: '对照家中现有库存，只购买真正需要的东西。' },
@@ -510,6 +512,24 @@ const zh = {
         review: '返回检查',
         continue: '确认并保存',
       },
+    },
+    quickUse: {
+      title: '快速使用', button: '使用',
+      buttonA11y: (name: string) => `快速使用${name}`,
+      stock: (amount: string) => `当前库存 ${amount}`,
+      quantity: '使用数量', decrease: '减少使用数量', increase: '增加使用数量',
+      inputHint: '点击数字可直接输入',
+      invalidQuantity: '请输入大于 0 的数量，最多保留三位小数。',
+      exceedsStock: (amount: string) => `使用数量不能超过当前库存 ${amount}。`,
+      remainingPlaceholder: '输入有效数量后显示剩余库存',
+      confirmDefault: '确认使用',
+      remaining: (amount: string) => `使用后剩余 ${amount}`,
+      all: '全部用完', confirm: (amount: string) => `确认使用 ${amount}`,
+      saving: '正在记录使用…', success: '使用已记录',
+      saveError: '使用没有保存，请检查网络后重试。',
+      conflict: '这项食材已被其他成员修改，库存已更新。请核对数量后再次确认。',
+      unavailable: '这项食材已不在可用库存中，请关闭面板并刷新列表。',
+      expired: '这项食材已超过食用期限，不能记为已使用。',
     },
     itemDetail: {
       close: '关闭',
@@ -1155,6 +1175,7 @@ export type Translation = TranslationShape<typeof zh>;
 
 const en: Translation = {
   learning: learningCopy.en,
+  learningTutor: learningTutorCopy.en,
   screens: {
     home: { eyebrow: 'GOOD EVENING', title: 'How stocked is home?', description: 'See what is still at home before the next shop.' },
     shopping: { eyebrow: 'SHOPPING CART', title: 'Shop with the kitchen in mind', description: 'Compare what you need with the stock already at home.' },
@@ -1653,6 +1674,24 @@ const en: Translation = {
         review: 'Review details',
         continue: 'Confirm and save',
       },
+    },
+    quickUse: {
+      title: 'Quick use', button: 'Use',
+      buttonA11y: (name: string) => `Quickly use ${name}`,
+      stock: (amount: string) => `Current stock ${amount}`,
+      quantity: 'Amount to use', decrease: 'Decrease amount to use', increase: 'Increase amount to use',
+      inputHint: 'Tap the number to enter an amount',
+      invalidQuantity: 'Enter an amount greater than 0 with up to 3 decimal places.',
+      exceedsStock: (amount: string) => `Amount to use cannot exceed current stock of ${amount}.`,
+      remainingPlaceholder: 'Enter a valid amount to preview remaining stock',
+      confirmDefault: 'Confirm use',
+      remaining: (amount: string) => `${amount} remaining after use`,
+      all: 'Use all', confirm: (amount: string) => `Confirm use ${amount}`,
+      saving: 'Recording usage…', success: 'Usage recorded',
+      saveError: 'Usage was not saved. Check your connection and try again.',
+      conflict: 'Another member changed this item. Stock has been updated; review the amount and confirm again.',
+      unavailable: 'This item is no longer available. Close the sheet and refresh the list.',
+      expired: 'This item is past its use-by time and cannot be recorded as used.',
     },
     itemDetail: {
       close: 'Close',
