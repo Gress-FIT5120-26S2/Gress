@@ -117,6 +117,11 @@ const INITIAL_CAMERA_POSITION: [number, number, number] = [10.8, 8.8, 16.6];
 const REDUCED_MOTION_DELAY = 180;
 const EFFECT_CUE_PROGRESS = 0.32;
 const CAMERA_IDLE_RESET_DELAY = 12_000;
+// Arthur: NarIyirm
+// 中文：吊灯升高后需要补偿距离衰减，灯泡自发光和真实照明共用同一亮度倍率。
+// EN: Compensate for falloff after raising the pendant; bulb emission and real illumination share the same intensity multiplier.
+const CEILING_LAMP_HEIGHT_OFFSET = 0.4;
+const CEILING_LAMP_INTENSITY_MULTIPLIER = 1.8;
 const CAMERA_FOCUS: Record<KitchenNavigationFeature, CameraFocusConfig> = {
   fridge: {
     anchorName: 'Hotspot_Fridge',
@@ -348,6 +353,7 @@ function KitchenModel({
   const sceneMotionPaused = reduceMotion || !sceneVisible;
   const anchors = useMemo(() => ({
     burners: BURNER_ANCHORS.map((name) => scene.getObjectByName(name)).filter((anchor): anchor is Object3D => Boolean(anchor)),
+    ceilingLamp: scene.getObjectByName('Ceiling_Lamp'),
     ceilingLight: scene.getObjectByName('Ceiling_Light_Anchor'),
     fridgeDoor: scene.getObjectByName('Fridge_Door_Pivot'),
     fridgeLight: scene.getObjectByName('Fridge_Light_Anchor'),
@@ -356,6 +362,21 @@ function KitchenModel({
     stoveHotspot: scene.getObjectByName('Hotspot_Stove'),
     windowLight: scene.getObjectByName('Window_Light_Anchor'),
   }), [scene]);
+  const ceilingIntensity = lighting.ceilingIntensity * CEILING_LAMP_INTENSITY_MULTIPLIER;
+
+  useLayoutEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：灯罩、灯泡、吊线和光源同步升高；清理时恢复缓存模型的位置，避免重新挂载后反复累加高度。
+    // EN: Raise the shade, bulb, cord, and light together; restore cached model positions on cleanup so remounts cannot accumulate height offsets.
+    const originalPositions = [anchors.ceilingLamp, anchors.ceilingLight]
+      .filter((object): object is Object3D => Boolean(object))
+      .map((object) => ({ object, y: object.position.y }));
+    for (const { object, y } of originalPositions) object.position.y = y + CEILING_LAMP_HEIGHT_OFFSET;
+    invalidate();
+    return () => {
+      for (const { object, y } of originalPositions) object.position.y = y;
+    };
+  }, [anchors, invalidate]);
 
   useLayoutEffect(() => {
     const closedRecipeBook = scene.getObjectByName('Recipe_Book');
@@ -389,10 +410,10 @@ function KitchenModel({
     // Arthur: NarIyirm
     // 中文：灯泡材质跟随时间和开门状态变化，真实点光源则挂在模型锚点上，旋转视角不会产生漂移。
     // EN: Bulb materials follow time and door state while real lights live on model anchors, preventing drift after rotation.
-    setEmissiveIntensity(scene.getObjectByName('Ceiling_Lamp_Bulb'), 0.08 + lighting.ceilingIntensity * 0.35);
+    setEmissiveIntensity(scene.getObjectByName('Ceiling_Lamp_Bulb'), 0.08 + ceilingIntensity * 0.35);
     setEmissiveIntensity(scene.getObjectByName('Fridge_Lamp'), effectInteraction === 'fridge' ? 2.5 : 0.05);
     invalidate();
-  }, [effectInteraction, invalidate, lighting.ceilingIntensity, scene]);
+  }, [ceilingIntensity, effectInteraction, invalidate, scene]);
 
   useEffect(() => {
     const doorPivot = scene.getObjectByName('Fridge_Door_Pivot');
@@ -497,7 +518,7 @@ function KitchenModel({
         </Fragment>
       ))}
       {anchors.ceilingLight ? createPortal(
-        <pointLight color="#FFD08A" intensity={lighting.ceilingIntensity} distance={7.2} decay={2} />,
+        <pointLight color="#FFD08A" intensity={ceilingIntensity} distance={8.4} decay={2} />,
         anchors.ceilingLight,
       ) : null}
       {anchors.fridgeLight ? createPortal(
@@ -785,6 +806,7 @@ function KitchenScene({ active, activeInteraction, activitySignal, batches, came
           onSpeechChange={onSpeechChange}
           reduceMotion={reduceMotion}
           sceneBusy={!active || activeInteraction !== null || isResettingCamera}
+          sunIntensity={lighting.sunIntensity}
         />
       </Suspense>
     </>

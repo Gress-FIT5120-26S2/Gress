@@ -789,6 +789,10 @@ DELETE /api/inventory/batches/:batchUid
 
 批次详情还会按 `preset_uid` 返回与库存列表一致的远程 icon URL 和 Emoji fallback；列表卡片、详情顶部及删除确认框共用 `PresetFoodIcon` 渲染与失败回退逻辑。
 
+2026-10-07 冰箱卡片新增“快速使用”：`InventoryQuickUseSheet` 从列表快照固定批次与版本，数量选择仅保存在本地；明确确认后复用 `PATCH /api/inventory/batches/:batchUid/quantity` 提交剩余数量。数量减少仍写 `consume/used`，清零转为 `consumed`，保留 use-by 校验和原有包装分类学习 `wasteOpportunity`。共享版本冲突只重读批次并要求重新确认，不自动重试扣减。成功后先合并服务器返回的数量与版本，再重拉完整列表并发出本地库存同步；同名同单位的补货状态同时重新汇总。本次没有新增或修改 API、RPC、数据库 schema 与统计契约。
+
+快速使用的数量支持直接输入，遵循库存已有三位小数精度；空值、零、负数、非法格式和超过当前库存的数量不能提交。加减步长为 g/ml 的 50、kg/L 的 0.1、计数单位的 1，手动输入不受这些步长限制。此改进仅改变客户端输入交互，不改变数量接口或存储精度。
+
 `20260830020000_fix_inventory_lifecycle_enum_cast.sql` 修复详情数量和资料 mutation 中 `lifecycle_state` 的枚举转换，必须在包含 `20260830010000` 的环境中继续应用。
 
 `20260904020000_inventory_expiry_warning_days.sql` 新增批次级 `expiry_warning_days`，并为创建与完整编辑 RPC 增加原子保存该字段的安全重载；Express 的列表与详情响应统一返回 `expiryWarningDays`。

@@ -1,18 +1,21 @@
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, Image, KeyboardAvoidingView, Linking, Modal, Platform, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native';
+import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Modal, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
 import { getApiErrorCode } from '../../../services/apiClient';
-import { learningTutorApi as api, newTutorKey } from '../../../services/learningTutorApi';
+import { learningTutorApi as defaultApi, newTutorKey } from '../../../services/learningTutorApi';
 import type { LearningText } from '../../../types/learningContent';
 import type { TutorAction, TutorContext, TutorConversation, TutorIntent, TutorMessage, TutorPreferences, TutorSend, TutorPractice } from '../../../types/learningTutor';
-import { LearningButton, LearningLink, ui } from '../LearningUi';
+import { LearningTutorView } from './LearningTutorView';
+import type { LearningAssetKey } from '../learningAssets';
 import { learningColors as c } from '../learningTheme';
 
 type Props={context:TutorContext;label:LearningText;restricted:boolean;onClose:()=>void;onAction:(a:TutorAction)=>void;
-  onResume?:()=>void;onAbandon?:()=>Promise<void>;initialPrompt?:string;};
+  onResume?:()=>void;onAbandon?:()=>Promise<void>;initialPrompt?:string;
+  coverAssetKey?:LearningAssetKey;showLifecycle?:boolean;service?:typeof defaultApi;embedded?:boolean;};
 
-export function LearningTutorPanel({context,label,restricted,onClose,onAction,onResume,onAbandon,initialPrompt}:Props){
+export function LearningTutorPanel({context,label,restricted,onClose,onAction,onResume,onAbandon,initialPrompt,coverAssetKey,showLifecycle,service=defaultApi,embedded=false}:Props){
+  const api=service;
   const {language,t}=useI18n();const copy=t.learningTutor;
   const [messages,setMessages]=useState<TutorMessage[]>([]);const [conversation,setConversation]=useState<string>();
   const [history,setHistory]=useState<TutorConversation[]|null>(null);const [input,setInput]=useState(initialPrompt??'');
@@ -24,7 +27,8 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
   const [practice,setPractice]=useState<TutorPractice|null>(null);const [selected,setSelected]=useState<string|null>(null);
   const [practiceFeedback,setPracticeFeedback]=useState<{isCorrect:boolean;explanation:LearningText}|null>(null);
   const pending=useRef<TutorSend|null>(null);const controller=useRef<AbortController|null>(null);
-  const generation=useRef(0);const flight=useRef(false);const field=useRef<TextInput>(null);
+  const generation=useRef(0);const flight=useRef(false);
+  const [intent,setIntent]=useState<TutorIntent>('explain');
   const practiceRequest=useRef<{key:string;option:string}|null>(null);
   const submitted=context.kind==='submitted-question';
   const failure=(err:unknown)=>{const code=getApiErrorCode(err);
@@ -47,13 +51,13 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
       if(context.kind==='practice-template'){const value=await api.practice(context.entityCode,context.contentVersion);if(live&&generation.current===id)setPractice(value);}
     }).catch(err=>{if(live)setError(failure(err));}).finally(()=>{if(live)setLoading(false);});
     const sub=AppState.addEventListener('change',state=>{if(state!=='active'){cancel();}else{const version=generation.current;void api.list(context).then(list=>list.conversations[0]?restore(list.conversations[0].conversationUid,version):undefined).catch(err=>setError(failure(err)));}});
-    field.current?.focus();
     return()=>{live=false;generation.current++;controller.current?.abort();sub.remove();};
   },[]);
   const perform=async(operation:()=>Promise<void>)=>{if(flight.current)return;flight.current=true;setBusy(true);setError(null);const id=generation.current;
     try{await operation();}catch(err){if(id===generation.current)setError(failure(err));}finally{if(id===generation.current){flight.current=false;setBusy(false);}}};
   const send=async(value?:string,intent?:TutorIntent)=>{
-    if(flight.current||withdrawn||loading)return;
+    if(flight.current||withdrawn||loading||(restricted&&!submitted))return;
+    if(intent)setIntent(intent);
     const payload=pending.current??{context,language,requestKey:newTutorKey(),...(conversation?{conversationUid:conversation}:{}),
       ...(submitted?{intent:intent??'explain'}:{message:value??input.trim()})};
     if(!payload.message&&!payload.intent)return;
@@ -74,7 +78,7 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
   const source=async(code:string)=>{await perform(async()=>{const verified=await api.source(code,context.contentVersion,context);await Linking.openURL(verified.url);});};
   const openHistory=()=>{cancel();void perform(async()=>{const list=(await api.list(context)).conversations;setHistory(list);setMoreHistory(list.length===20);});};
   const loadMore=()=>{if(!history?.length)return;void perform(async()=>{const list=(await api.list(context,history[history.length-1].createdAt)).conversations;setHistory(old=>[...(old??[]),...list]);setMoreHistory(list.length===20);});};
-  const newChat=()=>{cancel();pending.current=null;setConversation(undefined);setMessages([]);setWithdrawn(false);setHistory(null);setError(null);};
+  const newChat=()=>{cancel();pending.current=null;setConversation(undefined);setMessages([]);setWithdrawn(false);setHistory(null);setSettings(false);setError(null);};
   const confirm=()=>{const action=confirmation;setConfirmation(null);cancel();void perform(async()=>{
     if(action==='abandon'){await onAbandon?.();onClose();return;}
     if(action==='clear')await api.clear();else if(conversation)await api.delete(conversation);
@@ -83,68 +87,31 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
   const practiceAnswer=()=>{if(!practice||!selected)return;
     practiceRequest.current??={key:newTutorKey(),option:selected};const frozen=practiceRequest.current;
     void perform(async()=>{setPracticeFeedback(await api.practiceAnswer(practice.templateCode,practice.contentVersion,frozen.option,frozen.key));});};
-  return <Modal visible transparent={false} animationType="none" onRequestClose={()=>{cancel();onClose();}}>
-    <SafeAreaView style={{flex:1,backgroundColor:c.background}}>
-      <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'}>
-        <View style={{paddingHorizontal:20,paddingVertical:8,gap:4}} accessibilityViewIsModal>
-          <View style={[ui.row,{justifyContent:'space-between'}]}>
-            <Image source={require('../../../../assets/kitchmemo-assistant.png')} style={{width:36,height:44}} resizeMode="contain" accessible={false}/>
-            <Text accessibilityRole="header" style={[ui.listTitle,ui.flex]}>{copy.title}</Text>
-            <LearningLink label={copy.close} onPress={()=>{cancel();onClose();}} icon="close-outline"/>
-          </View>
-          <Text style={ui.caption}>{copy.discussing}: {label[language]}</Text>
-          <View style={{flexDirection:'row',flexWrap:'wrap',columnGap:16}}>
-            <LearningLink label={copy.history} onPress={openHistory}/><LearningLink label={copy.newChat} onPress={newChat}/>
-            <LearningLink label={copy.settings} onPress={()=>{setSettings(!settings);setHistory(null);}}/>
-          </View>
-        </View>
-        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{padding:20,gap:16}}>
-          {loading?<Text style={ui.secondary}>{t.learning.loading}</Text>:null}
-          {settings?<View style={ui.group}><Text style={ui.body}>{copy.settingsBody}</Text>
-            {preferences?(['proactiveEnabled','personalizedEnabled','dwellHintsEnabled'] as const).map((key,i)=><View key={key} style={[ui.row,{justifyContent:'space-between'}]}>
-              <Text style={[ui.body,ui.flex]}>{[copy.proactive,copy.personalized,copy.dwell][i]}</Text>
-              <Switch accessibilityLabel={[copy.proactive,copy.personalized,copy.dwell][i]} value={preferences[key]} disabled={busy}
-                onValueChange={value=>{void perform(async()=>setPreferences(await api.savePreferences({[key]:value})));}}/>
-            </View>):null}
-            <LearningLink label={copy.clear} onPress={()=>setConfirmation('clear')}/>
-            {conversation?<LearningLink label={copy.deleteChat} onPress={()=>setConfirmation('delete')}/>:null}
-          </View>:history?<View style={ui.group}>{!history.length?<Text style={ui.secondary}>{copy.historyEmpty}</Text>:history.map(item=><LearningLink key={item.conversationUid}
-            label={new Date(item.createdAt).toLocaleString(language==='zh'?'zh-CN':'en-AU')} onPress={()=>{void perform(async()=>{pending.current=null;await restore(item.conversationUid,generation.current);setHistory(null);});}}/>)}{moreHistory?<LearningButton label={copy.moreHistory} disabled={busy} onPress={loadMore}/>:null}</View>:<>
-            {withdrawn?<Text style={ui.error}>{copy.withdrawn}</Text>:null}
-            {!messages.length&&!loading?<Text style={ui.secondary}>{copy.empty}</Text>:null}
-            {practice?<View style={ui.group}><Text accessibilityRole="header" style={ui.sectionTitle}>{practice.title[language]}</Text><Text style={ui.caption}>{copy.practiceBody}</Text>
-              <Text style={ui.body}>{practice.prompt[language]}</Text>{practice.options.map(option=><Pressable key={option.optionId} accessibilityRole="radio"
-                accessibilityState={{checked:selected===option.optionId,disabled:busy||Boolean(practiceFeedback)||Boolean(practiceRequest.current)}} disabled={busy||Boolean(practiceFeedback)||Boolean(practiceRequest.current)}
-                onPress={()=>setSelected(option.optionId)} style={{padding:14,minHeight:48,borderWidth:1,borderColor:c.border,borderRadius:14,backgroundColor:selected===option.optionId?c.mintStrong:c.surface}}>
-                <Text style={ui.body}>{option.text[language]}</Text></Pressable>)}
-              {practiceFeedback?<><Text style={ui.listTitle}>{practiceFeedback.isCorrect?copy.practiceCorrect:copy.practiceIncorrect}</Text><Text style={ui.body}>{practiceFeedback.explanation[language]}</Text><Text style={ui.caption}>{copy.practiceSaved}</Text></>
-                :<LearningButton label={copy.check} disabled={!selected||busy} onPress={practiceAnswer}/>}</View>:null}
-            {messages.map(message=><View key={message.messageUid} style={{gap:8,padding:message.role==='user'?14:0,backgroundColor:message.role==='user'?c.mintSurface:c.background,borderRadius:14}}>
-              <Text selectable style={ui.body}>{message.content}</Text>
-              {message.response?<><Text style={ui.caption}>{message.response.contentVersion} · {message.response.manifestVersion} · {new Date(message.createdAt).toLocaleDateString()}</Text>
-                {message.response.sources.length?<Text style={ui.listTitle}>{copy.sources}</Text>:null}
-                {message.response.sources.map(s=><View key={s.sourceCode}><LearningLink label={`${s.publisher} · ${s.title}`} onPress={()=>{if(!withdrawn)void source(s.sourceCode);}} icon="open-outline"/><Text style={ui.caption}>{s.regionCode} · {copy.published}: {s.publishedAt??t.learning.unspecifiedDate}{s.updatedAt?` · ${copy.updated}: ${s.updatedAt}`:''}</Text></View>)}
-                {!withdrawn?message.response.suggestedActions.map(a=><LearningLink key={a.type+a.entityCode} label={a.label[language]} onPress={()=>{cancel();onAction(a);}}/>):null}
-                <View style={[ui.row,{flexWrap:'wrap'}]}>{(['useful','not_useful'] as const).map(rating=><LearningLink key={rating}
-                  label={`${message.rating===rating?'✓ ':''}${rating==='useful'?copy.useful:copy.notUseful}`} onPress={()=>{void perform(async()=>{await api.feedback(message.messageUid,rating);setMessages(old=>old.map(m=>m.messageUid===message.messageUid?{...m,rating}:m));AccessibilityInfo.announceForAccessibility(copy.feedbackSaved);});}}/>)}</View>
-              </>:null}
-            </View>)}
-          </>}
-          {confirmation?<View style={ui.panel}><Text style={ui.body}>{confirmation==='clear'?copy.confirmClear:confirmation==='delete'?copy.confirmDelete:copy.abandonBody}</Text>
-            <LearningButton label={copy.confirm} onPress={confirm} disabled={busy}/><LearningLink label={copy.cancel} onPress={()=>setConfirmation(null)}/></View>:null}
-          {restricted?<View style={ui.panel}><Text style={ui.body}>{copy.restricted}</Text>{onResume?<LearningLink label={copy.resume} onPress={()=>{cancel();onClose();onResume();}}/>:null}
-            {onAbandon?<LearningLink label={copy.abandon} onPress={()=>setConfirmation('abandon')}/>:null}</View>:null}
-          {busy?<Text accessibilityLiveRegion="polite" style={ui.secondary}>{slow?copy.stillWaiting:copy.waiting}</Text>:null}
-          {error?<Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text>:null}
-        </ScrollView>
-        {!settings&&!history&&!withdrawn?<View style={{padding:16,gap:8,backgroundColor:c.surface,borderTopWidth:1,borderTopColor:c.border}}>
-          <View style={{flexDirection:'row',flexWrap:'wrap',columnGap:14}}>{(['explain','simplify','example'] as const).map(intent=><LearningLink key={intent} label={copy[intent]}
-            onPress={()=>{if(!busy&&!pending.current&&(!restricted||submitted))void send(copy[intent],intent);}}/>)}</View>
-          {!submitted?<TextInput ref={field} accessibilityLabel={copy.placeholder} placeholder={copy.placeholder} placeholderTextColor={c.textSecondaryReadable} value={input}
-            onChangeText={setInput} editable={!busy&&!restricted&&!pending.current} multiline maxLength={2000} style={[ui.body,{maxHeight:140,minHeight:48,padding:12,borderWidth:1,borderColor:c.border,borderRadius:14}]}/>:null}
-          <LearningButton label={pending.current?copy.retry:copy.send} disabled={busy||loading||Boolean(restricted&&!submitted)||(!submitted&&!input.trim()&&!pending.current)} onPress={()=>{void send();}}/>
-        </View>:null}
-      </KeyboardAvoidingView>
-    </SafeAreaView>
-  </Modal>;
+  // Arthur: NarIyirm
+  // 中文：展示层只接收状态与原操作；开发预览显式注入离线服务，正式界面继续使用设备身份校验 API。
+  // EN: Presentation receives state and existing operations; explicit development previews inject an offline service while production retains the identity-checked API.
+  const close=()=>{cancel();onClose();};
+  const content=<SafeAreaView style={{flex:1,backgroundColor:c.background}}>
+    <KeyboardAvoidingView style={{flex:1}} behavior={Platform.OS==='ios'?'padding':'height'}>
+      <LearningTutorView label={label} coverAssetKey={coverAssetKey} showLifecycle={showLifecycle} submitted={submitted}
+        messages={messages} input={input} loading={loading} busy={busy} slow={slow} error={error}
+        withdrawn={withdrawn} restricted={restricted} retrying={Boolean(pending.current)} intent={intent}
+        settings={settings} history={history} moreHistory={moreHistory} preferences={preferences}
+        practice={practice} selected={selected} practiceLocked={Boolean(practiceFeedback)||Boolean(practiceRequest.current)}
+        practiceFeedback={practiceFeedback} confirmation={confirmation}
+        onClose={close} onInput={setInput} onSend={(value,nextIntent)=>{void send(value,nextIntent);}}
+        onMenu={action=>{if(action==='history'){setSettings(false);openHistory();}
+          else if(action==='new')newChat();else{setSettings(!settings);setHistory(null);}}}
+        onBackToConversation={()=>{cancel();setSettings(false);setHistory(null);}}
+        onHistory={uid=>{void perform(async()=>{pending.current=null;await restore(uid,generation.current);setHistory(null);});}}
+        onMoreHistory={loadMore} onPreferences={value=>{void perform(async()=>setPreferences(await api.savePreferences(value)));}}
+        onConfirmation={setConfirmation} onConfirm={confirm} onSelect={setSelected} onPracticeAnswer={practiceAnswer}
+        onSource={code=>{if(!withdrawn)void source(code);}}
+        onFeedback={(uid,rating)=>{void perform(async()=>{await api.feedback(uid,rating);
+          setMessages(old=>old.map(m=>m.messageUid===uid?{...m,rating}:m));AccessibilityInfo.announceForAccessibility(copy.feedbackSaved);});}}
+        onAction={action=>{cancel();onAction(action);}} onResume={onResume?()=>{close();onResume();}:undefined}
+        canAbandon={Boolean(onAbandon)} />
+    </KeyboardAvoidingView>
+  </SafeAreaView>;
+  return embedded?content:<Modal visible transparent={false} animationType="none" onRequestClose={close}>{content}</Modal>;
 }

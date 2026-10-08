@@ -8,6 +8,7 @@ import type { TutorAction, TutorContext, TutorIntervention, TutorRecommendations
 import { LearningLink, ui } from '../LearningUi';
 import { LearningTutorSlot } from './LearningTutorSlot';
 import { LearningTutorPanel } from './LearningTutorPanel';
+import { TutorEntryButton, TutorHelpCard } from './LearningTutorView';
 
 type Props={children:ReactNode;content:PublicLearningContent;route:LearningRoute;gateway:LearningRoomGateway;
   busy:boolean;storyVisible:boolean;onNavigate:(route:LearningRoute)=>void;onResume:(uid:string)=>void;onAbandoned:()=>void;};
@@ -65,21 +66,27 @@ export function LearningTutorController({children,content,route,gateway,busy,sto
     const hintVisit=visit.current;
     try{const result=await api.hint({kind:'practice-question',contentVersion:content.contentVersion,attemptUid:quiz.attemptUid,questionUid:quiz.question.questionUid},hintKey.current);if(hintVisit===visit.current){setHint(result.hint[language]);hintKey.current=null;}}
     catch{setError(t.learning.actionFailed);}finally{hintBusy.current=false;}};
-  const slot=<View style={{paddingHorizontal:20,gap:6}}>
-    {formalUnanswered?<Text style={ui.caption}>{copy.checkpointNote}</Text>:route.name==='quiz'&&quiz?.mode==='practice'&&!quiz.feedback?
-      <LearningLink label={copy.hint} onPress={()=>{if(!busy)void askHint();}}/>:<LearningLink label={quiz?.feedback?copy.explain:copy.ask} icon="chatbubble-outline" onPress={()=>open()}/>}
-    {hint?<Text style={ui.caption}>{hint}</Text>:null}
-    {intervention&&canOffer?<View style={ui.panel}><Text style={ui.body}>{intervention.prompt[language]}</Text>
-      <View style={{flexDirection:'row',flexWrap:'wrap',columnGap:14}}><LearningLink label={copy.accepted} onPress={()=>{void accept();}}/>
-        <LearningLink label={copy.dismiss} onPress={()=>{void dismiss();}}/><LearningLink label={copy.turnOff} onPress={()=>{setIntervention(null);void api.savePreferences({proactiveEnabled:false}).catch(()=>setError(t.learning.actionFailed));}}/></View></View>:null}
+  const footer=formalUnanswered?<Text style={ui.caption}>{copy.checkpointNote}</Text>:route.name==='quiz'&&quiz?.mode==='practice'&&!quiz.feedback?
+    <TutorEntryButton label={copy.hint} disabled={busy} onPress={()=>{void askHint();}}/>:
+    <TutorEntryButton label={quiz?.feedback?copy.explain:copy.ask} disabled={busy} onPress={()=>open()}/>;
+  const body=hint||intervention&&canOffer||recommendations?.topics.length||error?<View style={{gap:16}}>
+    {hint?<View style={ui.panel}><Text style={ui.body}>{hint}</Text></View>:null}
+    {intervention&&canOffer?<TutorHelpCard prompt={intervention.prompt[language]} onAccept={()=>{void accept();}} onDismiss={()=>{void dismiss();}}
+      onTurnOff={()=>{setIntervention(null);void api.savePreferences({proactiveEnabled:false}).catch(()=>setError(t.learning.actionFailed));}}/>:null}
     {recommendations?.topics.length?<View style={ui.group}><Text style={ui.listTitle}>{copy.review}</Text>{recommendations.topics.map(item=><View key={item.topicCode}>
       <Text style={ui.caption}>{copy.evidence(item.sampleCount,item.wrongCount)}</Text><View style={{flexDirection:'row',flexWrap:'wrap',columnGap:14}}>
         <LearningLink label={content.activities.find(a=>a.activityCode===item.activityCode)?.title[language]??copy.readLesson} onPress={()=>onNavigate({name:'lesson',activityCode:item.activityCode})}/>
         <LearningLink label={copy.similar} onPress={()=>open({kind:'practice-template',entityCode:item.templateCode,contentVersion:content.contentVersion})}/></View></View>)}</View>:null}
     {error?<Text style={ui.error}>{error}</Text>:null}
-  </View>;
+  </View>:undefined;
+  const slot={body,footer};
+  const panelCover=panel&&'entityCode' in panel?panel.kind==='resource'?content.resources.find(r=>r.resourceCode===panel.entityCode)?.coverAssetKey
+    :panel.kind==='course'?content.courses.find(course=>course.courseCode===panel.entityCode)?.coverAssetKey
+    :content.courses.find(course=>course.activityCodes.includes(panel.entityCode))?.coverAssetKey:undefined;
   return <LearningTutorSlot.Provider value={storyVisible?null:slot}>{children}
-    {panel?<LearningTutorPanel key={JSON.stringify(panel)} context={panel} label={label(panel)} initialPrompt={prompt} restricted={Boolean(activeAttempt)} onClose={()=>setPanel(null)} onAction={navigateAction}
+    {panel?<LearningTutorPanel key={JSON.stringify(panel)} context={panel} label={label(panel)} coverAssetKey={panelCover}
+      showLifecycle={'entityCode' in panel&&['waste-climate-sdg13','beginner-why-waste'].includes(panel.entityCode)}
+      initialPrompt={prompt} restricted={Boolean(activeAttempt)} onClose={()=>setPanel(null)} onAction={navigateAction}
       onResume={activeAttempt?()=>onResume(activeAttempt):undefined} onAbandon={activeAttempt&&gateway.abandonQuiz?async()=>{await gateway.abandonQuiz!(activeAttempt);onAbandoned();}:undefined}/>:null}
   </LearningTutorSlot.Provider>;
 }

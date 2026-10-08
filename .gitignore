@@ -85,3 +85,8 @@ server/.env.production
 **/.frames/
 **/__pycache__/
 *.pyc
+
+# Arthur: NarIyirm
+# 中文：AI 产品视频的分镜、提示词、素材、样片与生成工作流仅在本地保留，避免随应用提交到 GitHub。
+# EN: Keep AI product video storyboards, prompts, assets, samples, and generation workflows local instead of committing them to GitHub.
+/docs/art-direction/product-video/

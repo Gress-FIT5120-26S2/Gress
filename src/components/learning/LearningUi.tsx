@@ -96,12 +96,13 @@ export function LearningProgress({ value, label }: { value: number; label: strin
   </View>;
 }
 
-export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true }: {
+export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true, tutorBodyInContent = false }: {
   backLabel?: string; onBack?: () => void; onClose?: () => void; brand?: boolean;
-  children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number; scrollEnabled?: boolean;
+  children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number; scrollEnabled?: boolean; tutorBodyInContent?: boolean;
 }) {
   const { t } = useI18n();
-  const { width } = useLearningViewport();
+  const { width, fontScale } = useLearningViewport();
+  const stackFooter = width < 360 || fontScale > 1.2;
   const bottomSafeArea = useContext(LearningBottomSafeAreaContext);
   const tutorSlot = useContext(LearningTutorSlot);
   const gutter = width < learningLayout.narrowWidth ? 18 : 24;
@@ -131,13 +132,17 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
     <Animated.View style={{ flex: 1, opacity }}>
       <ScrollView scrollEnabled={scrollEnabled} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 20, gap: contentGap }}>
-        {tutorSlot}
         {children}
-        {error && !footer ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
+        {!tutorBodyInContent ? tutorSlot?.body : null}
+        {error && !footer && !tutorSlot?.footer ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
       </ScrollView>
     </Animated.View>
-    {footer ? <View style={[ui.footer, { paddingHorizontal: gutter }]}>
-      {error ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}{footer}
+    {footer || tutorSlot?.footer ? <View style={[ui.footer, { paddingHorizontal: gutter }]}>
+      {error ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
+      <View style={{ flexDirection: stackFooter ? 'column' : 'row', gap: 8, alignItems: 'stretch' }}>
+        {tutorSlot?.footer ? <View style={{ flex: footer && !stackFooter ? 1 : undefined }}>{tutorSlot.footer}</View> : null}
+        {footer ? <View style={{ flex: !stackFooter ? 1 : undefined }}>{footer}</View> : null}
+      </View>
     </View> : null}
   </SafeAreaView>;
 }
@@ -163,7 +168,7 @@ export function LearningPath({ content, session, onCourse }: { content: PublicLe
   })}</View>;
 }
 
-export function LearningBody({ blocks, sources, gap = 18 }: { blocks: LearningBodyBlock[]; sources: LearningSource[]; gap?: number }) {
+export function LearningBody({ blocks, sources, gap = 18, compactSdg = false }: { blocks: LearningBodyBlock[]; sources: LearningSource[]; gap?: number; compactSdg?: boolean }) {
   const { language, t } = useI18n();
   return <View style={{ gap }}>{blocks.map((block, index) => {
     switch (block.type) {
@@ -173,7 +178,7 @@ export function LearningBody({ blocks, sources, gap = 18 }: { blocks: LearningBo
       case 'image': return <LearningImage key={index} assetKey={block.assetKey} label={block.alt[language]} style={ui.cover} />;
       case 'fact': return <View key={index} style={ui.group}><Text style={ui.fact}>{block.value[language]}</Text><Text style={ui.body}>{block.text[language]}</Text><Text style={ui.caption}>{block.scope[language]}</Text></View>;
       case 'sdg-callout': return <View key={index} style={[ui.panel, ui.row, { backgroundColor: c.skySurface }]}>
-        <LearningImage assetKey={block.assetKey} label={t.learning.sdgAlt} style={{ width: 76, height: 76 }} />
+        <LearningImage assetKey={block.assetKey} label={t.learning.sdgAlt} style={{ width: compactSdg ? 48 : 76, height: compactSdg ? 48 : 76 }} />
         <View style={ui.flex}><Text style={ui.listTitle}>{block.title[language]}</Text><Text style={ui.body}>{block.text[language]}</Text><Text style={ui.caption}>{block.detail[language]}</Text></View>
       </View>;
       case 'source': return <View key={index}>{block.sourceRefs.map((code) => { const source = sources.find((item) => item.sourceCode === code); return source ? <LearningSourceLink key={code} label={`${source.publisher} · ${source.title}`} url={source.url} /> : null; })}</View>;

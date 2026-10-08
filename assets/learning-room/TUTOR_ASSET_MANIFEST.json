@@ -1,0 +1,31 @@
+{
+  "preparedAt": "2026-10-08",
+  "provenance": "built-in-imagegen",
+  "transparencyRequested": true,
+  "transform": "None; original generated PNGs copied to runtime assets",
+  "contentReview": "pending independent review; static visual aids, not model evidence or official SDG marks",
+  "assets": [
+    {
+      "file": "tutor-food-lifecycle.png",
+      "width": 2172,
+      "height": 724,
+      "bytes": 1573981,
+      "hasAlpha": true,
+      "isOpaque": false,
+      "sha256": "058a9fc47ef25c9bd3ad1d4e111f7f16cd403506226fccf94031bfee1ebcb429",
+      "reference": "docs/art-direction/learning-room/2026-10-08-ai-tutor-redesign/02-lesson-explanation.png",
+      "direction": "Transparent horizontal clay-style plant/produce, small mint delivery truck, and food-scraps pail; soft mint and warm food colours; no captions, arrows, interface or logos. Captions and arrows are native UI."
+    },
+    {
+      "file": "tutor-kitchen-example.png",
+      "width": 1536,
+      "height": 1024,
+      "bytes": 2097449,
+      "hasAlpha": true,
+      "isOpaque": false,
+      "sha256": "15d0b3757b3510bd8a0a53d08643dd2a9d5e3f23e28f2b02dd257066daa3dcd5",
+      "reference": "docs/art-direction/learning-room/2026-10-08-ai-tutor-redesign/03-submitted-question-coaching.png",
+      "direction": "Transparent food still life with a small bread loaf and two tomatoes, warm light and restrained soft shadow; no text or interface. Decorative kitchen example for food-related submitted coaching."
+    }
+  ]
+}
