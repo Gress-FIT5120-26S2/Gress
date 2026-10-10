@@ -1,3 +1,4 @@
+import { useTabActive, TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type CameraType, type FlashMode } from 'expo-camera';
 import { Image } from 'expo-image';
@@ -6,7 +7,6 @@ import * as ImagePicker from 'expo-image-picker';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Platform,
   Pressable,
   StatusBar,
@@ -44,6 +44,7 @@ export function PhotoRecognitionCamera({
   onBarcodeProduct,
   visible,
 }: PhotoRecognitionCameraProps) {
+  const tabActive = useTabActive();
   const { t } = useI18n();
   const copy = t.fridge.photoRecognition;
   const barcodeCopy = t.fridge.barcodeRecognition;
@@ -191,7 +192,7 @@ export function PhotoRecognitionCamera({
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
         {isCameraAvailable && (stage === 'camera' || stage === 'barcodeLookup') ? (
           <CameraView
-            active={visible && stage === 'camera'}
+            active={tabActive && visible && stage === 'camera'}
             barcodeScannerSettings={mode === 'barcode' ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] } : undefined}
             facing={facing}
             flash={flash}

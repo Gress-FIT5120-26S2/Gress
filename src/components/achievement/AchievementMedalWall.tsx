@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Haptics from 'expo-haptics';
@@ -7,7 +8,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   type NativeScrollEvent,
   type NativeSyntheticEvent,
   Pressable,

@@ -1,6 +1,7 @@
+import { useTabActive, TabModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n, type Translation } from '../i18n';
 import { fetchNotifications, markNotificationRead, type KitchenNotification, type NotificationType } from '../services/notificationApi';
 import { subscribeToSync } from '../services/realtimeSync';
@@ -36,6 +37,7 @@ function copyForItem(t: Translation, item: KitchenNotification) {
 
 type NotificationInboxProps = {
   initialNotificationId?: string | null;
+  initialNotificationToken?: number;
   onBack: () => void;
   onCountsChange?: (badgeCount: number, unreadCount: number) => void;
   // 中文：补货详情里"去购物车"按钮的回调；不传就不显示。
@@ -46,12 +48,14 @@ type NotificationInboxProps = {
 // Arthur: NarIyirm
 // 中文：消息页使用完整页面层级；空状态、列表、详情和当前设备已读状态共用同一个权威快照。
 // EN: The notification centre is a full page whose empty state, list, detail view, and device-specific read state share one authoritative snapshot.
-export function NotificationInbox({ initialNotificationId, onBack, onCountsChange, onGoToRestock }: NotificationInboxProps) {
+export function NotificationInbox({ initialNotificationId, initialNotificationToken = 0, onBack, onCountsChange, onGoToRestock }: NotificationInboxProps) {
+  const tabActive = useTabActive();
   const { language, t } = useI18n();
   const [items, setItems] = useState<KitchenNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
   const [loading, setLoading] = useState(true);
+  const hasSnapshot = useRef(false);
   const [failed, setFailed] = useState(false);
   const [selected, setSelected] = useState<KitchenNotification | null>(null);
   const handledNotificationIdRef = useRef<string | null>(null);
@@ -62,18 +66,20 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
   // 中文：加载函数与父层回调的引用解耦，防止回调变化让挂载 effect 反复请求并触发限流。
   // EN: Loading is decoupled from the parent callback reference so callback changes cannot retrigger the mount effect and flood the API.
   const load = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
+    const showLoading = !silent && !hasSnapshot.current;
+    if (showLoading) setLoading(true);
     setFailed(false);
     try {
       const snapshot = await fetchNotifications();
+      hasSnapshot.current = true;
       setItems(snapshot.items);
       setUnreadCount(snapshot.unreadCount);
       setBadgeCount(snapshot.badgeCount);
       onCountsChangeRef.current?.(snapshot.badgeCount, snapshot.unreadCount);
     } catch {
-      setFailed(true);
+      if (!hasSnapshot.current) setFailed(true);
     } finally {
-      if (!silent) setLoading(false);
+      if (showLoading || hasSnapshot.current) setLoading(false);
     }
   }, []);
 
@@ -94,12 +100,17 @@ export function NotificationInbox({ initialNotificationId, onBack, onCountsChang
   }, [badgeCount, load, unreadCount]);
 
   useEffect(() => {
-    if (!initialNotificationId || handledNotificationIdRef.current === initialNotificationId) return;
+    if (!initialNotificationId) { handledNotificationIdRef.current = null; return; }
+    // Arthur: NarIyirm
+    // 中文：每次系统通知点击都有独立请求标记，常驻消息页也能重复打开同一条通知。
+    // EN: Each system notification tap has its own request token so a retained inbox can reopen the same notification.
+    const requestKey = `${initialNotificationId}:${initialNotificationToken}`;
+    if (!tabActive || handledNotificationIdRef.current === requestKey) return;
     const target = items.find((item) => item.id === initialNotificationId);
     if (!target) return;
-    handledNotificationIdRef.current = initialNotificationId;
+    handledNotificationIdRef.current = requestKey;
     void openItem(target);
-  }, [initialNotificationId, items, openItem]);
+  }, [initialNotificationId, initialNotificationToken, items, openItem, tabActive]);
 
   const selectedCopy = useMemo(() => (selected ? copyForItem(t, selected) : null), [selected, t]);
   const selectedTime = selected

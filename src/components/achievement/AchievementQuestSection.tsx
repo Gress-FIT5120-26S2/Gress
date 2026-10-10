@@ -1,6 +1,7 @@
+import { TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { FridgeQuestAssignment, QuestCode } from '../../services/achievementApi';
 
 type QuestCopy = {

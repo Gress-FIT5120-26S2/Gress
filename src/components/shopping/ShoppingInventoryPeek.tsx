@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 // src/components/shopping/ShoppingInventoryPeek.tsx
 // US5.1 "Pre-Shop Review": a read-only look at what's already at home, shown
 // inside Shopping Mode so the user can review stock before deciding to buy.
@@ -7,7 +8,6 @@
 // not expired AND <= 3 days left.
 import React, { useCallback, useEffect, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   FlatList,

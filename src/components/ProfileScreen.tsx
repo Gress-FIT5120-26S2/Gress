@@ -1,10 +1,10 @@
+import { TabModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +22,7 @@ import { NotificationSettingsModal } from './NotificationSettingsModal';
 import { ProfileBottomSheet } from './ProfileBottomSheet';
 import { useProfileData } from './ProfileDataProvider';
 import { LanguageSettingsModal } from './ProfileSettings';
+import { subscribeNavigationMemory } from '../services/navigationMemory';
 
 const AVATAR_COLOURS: Record<ProfileAvatarKey, { background: string; foreground: string }> = {
   sage: { background: '#DDEFE7', foreground: '#245846' },
@@ -51,6 +52,11 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
   const [privacyVisible, setPrivacyVisible] = useState(false);
   const [replayVisible, setReplayVisible] = useState(false);
   const [medalWallVisible, setMedalWallVisible] = useState(false);
+  const [settingsEpoch, setSettingsEpoch] = useState(0);
+  // Arthur: NarIyirm
+  // 中文：设备恢复清除旧通知偏好缓存，同时保留恢复抽屉中新生成的一次性恢复码。
+  // EN: Recovery clears cached notification preferences while preserving the newly generated one-time code in the recovery sheet.
+  useEffect(() => subscribeNavigationMemory(() => setSettingsEpoch(value => value + 1)), []);
 
   const displayName = profile?.displayName ?? null;
   const avatar = AVATAR_COLOURS[profile?.avatarKey ?? 'sage'];
@@ -61,7 +67,7 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
       : copy.personalFridge(context.fridge.name)
     : copy.contextUnavailable;
 
-  if (loading) return <ProfileSkeleton />;
+  if (loading && !profile) return <ProfileSkeleton />;
 
   if (failed && !profile) {
     return (
@@ -185,6 +191,7 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
       />
       <LanguageSettingsModal onClose={() => setLanguageVisible(false)} visible={languageVisible} />
       <NotificationSettingsModal
+        key={settingsEpoch}
         onClose={() => setNotificationSettingsVisible(false)}
         onOpenInbox={onOpenNotifications}
         visible={notificationSettingsVisible}

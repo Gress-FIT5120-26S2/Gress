@@ -1,19 +1,21 @@
+import { useTabActive, TabModal as Modal } from '../RetainedTab';
 import { useEffect } from 'react';
-import { ActivityIndicator, BackHandler, Modal, Pressable, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
 import { learningColors as c } from './learningTheme';
 
 export function LearningLoadingModal({ onClose, closeLabel, failed = false, onRetry, embedded = false }: { onClose: () => void; closeLabel?: string; failed?: boolean; onRetry?: () => void; embedded?: boolean }) {
   const { t } = useI18n();
+  const active = useTabActive();
   // Arthur: NarIyirm
   // 中文：导航页的加载／失败视图留在页面内，并在模块尚未就绪时接管 Android 返回；视频仍用全屏 Modal。
   // EN: Tab loading/error stays inline and handles Android Back before the module is ready; video retains its full-screen modal.
   useEffect(() => {
-    if (!embedded) return;
+    if (!embedded || !active) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
     return () => subscription.remove();
-  }, [embedded, onClose]);
+  }, [embedded, onClose, active]);
   const body = <SafeAreaView edges={embedded ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: c.background, paddingHorizontal: 24 }}>
       {embedded ? null : <Pressable accessibilityRole="button" onPress={onClose} style={{ minHeight: 52, justifyContent: 'center' }}><Text style={{ color: c.learningGreenReadable }}>{closeLabel ?? t.learning.close}</Text></Pressable>}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>

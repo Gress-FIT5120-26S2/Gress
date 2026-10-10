@@ -1,6 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { invalidateNavigationMemory } from '../services/navigationMemory';
+import { notifyLocalSync } from '../services/realtimeSync';
 import { useI18n } from '../i18n';
 import { createDeviceRecoveryCode, getFridgeAccessContext, recoverDevice } from '../services/sharingApi';
 
@@ -57,6 +59,8 @@ export function DeviceRecoverySettings({ active, onContentChange }: { active: bo
         text: copy.confirm,
         onPress: () => void run('restore', async () => {
           const result = await recoverDevice(code);
+          invalidateNavigationMemory();
+          notifyLocalSync(['fridge', 'members', 'inventory', 'cart', 'restock', 'notifications', 'home']);
           setRecoveryCode(result.recoveryCode);
           setRestoreCode('');
           setConfigured(true);

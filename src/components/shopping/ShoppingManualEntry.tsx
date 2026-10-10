@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 // src/components/shopping/ShoppingManualEntry.tsx
 // Lightweight "add to cart" form (US5.2.1). Name + quantity + unit only.
 // US5.3.1/5.3.2/5.3.3: shows a possible-duplicate warning when the typed name
@@ -9,7 +10,6 @@
 // title/button copy swapped to "edit" instead of "add".
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   TextInput,

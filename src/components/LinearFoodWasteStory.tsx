@@ -1,9 +1,10 @@
+import { useTabActive, TabModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useEventListener } from 'expo';
 import { VideoView, useVideoPlayer, type VideoPlayerStatus } from 'expo-video';
 import { memo, useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, AppState, Easing, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Animated, AppState, Easing, Image, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import timeline from '../../assets/story/food-waste/timeline.json';
 import { useI18n } from '../i18n';
@@ -88,6 +89,7 @@ const CueCard = memo(function CueCard({ cue, language, reducedMotion }: { cue: C
 });
 
 export function LinearFoodWasteStory({ onClose }: { onClose: () => void }) {
+  const tabActive = useTabActive();
   const { language } = useI18n();
   const t = labels[language];
   const insets = useSafeAreaInsets();
@@ -130,15 +132,15 @@ export function LinearFoodWasteStory({ onClose }: { onClose: () => void }) {
   }, []);
 
   useEffect(() => {
-    if (status === 'readyToPlay' && (reducedMotion === false || userRequestedVideo) && !autoStartedRef.current) {
+    if (tabActive && status === 'readyToPlay' && (reducedMotion === false || userRequestedVideo) && !autoStartedRef.current) {
       autoStartedRef.current = true;
       player.play();
     }
-  }, [player, reducedMotion, status, userRequestedVideo]);
+  }, [player, reducedMotion, status, userRequestedVideo, tabActive]);
 
   useEffect(() => {
-    if (reducedMotion && !userRequestedVideo) player.pause();
-  }, [player, reducedMotion, userRequestedVideo]);
+    if (!tabActive || reducedMotion && !userRequestedVideo) player.pause();
+  }, [player, reducedMotion, userRequestedVideo, tabActive]);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {

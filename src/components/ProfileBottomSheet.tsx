@@ -1,10 +1,10 @@
+import { TabModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   AccessibilityInfo,
   Animated,
   Easing,
-  Modal,
   PanResponder,
   Platform,
   Pressable,

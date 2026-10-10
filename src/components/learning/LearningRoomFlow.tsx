@@ -1,5 +1,6 @@
+import { useTabActive, TabModal as Modal } from '../RetainedTab';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type ReactNode } from 'react';
-import { ActivityIndicator, AppState, BackHandler, Modal, PanResponder, Platform, Text, View } from 'react-native';
+import { ActivityIndicator, AppState, BackHandler, PanResponder, Platform, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { PublicLearningContent } from '../../types/learningContent';
 import type { LearningOrigin, LearningRoomGateway, LearningRoute, LearningSessionView, LearningStageCode, LearningQuizView, LearningOutcome, LearningRecentResult } from '../../types/learningRoom';
@@ -22,10 +23,15 @@ const loadStory = () => import('../LinearFoodWasteStory').then(m => ({ default: 
 
 type Props = {
   gateway: LearningRoomGateway; origin: LearningOrigin; onClose: () => void;
-  initialRoute?: LearningRoute; embedded?: boolean;
+  initialRoute?: LearningRoute; embedded?: boolean; entryToken?: number;
 };
 
-function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded = false }: Props) {
+function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded = false, entryToken = 0 }: Props) {
+  const tabActive = useTabActive();
+  const tabActiveRef = useRef(tabActive); tabActiveRef.current = tabActive;
+  const previousEntryToken = useRef(entryToken);
+  const refreshOnActivation = useRef(false);
+  const lastLoadedAt = useRef(0);
   const { language, t } = useI18n();
   const copy = t.learning;
   const outcomeRoute = (value: LearningOutcome): LearningRoute => {
@@ -45,6 +51,8 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   const [stack, dispatch] = useReducer(learningNavigationReducer, initialStack);
   const requestId = useRef(0);
   const inFlight = useRef(false);
+  const syncing = useRef(false);
+  const hasContent = useRef(false);
   const mounted = useRef(true);
   // Arthur: NarIyirm
   // 中文：切换语言只更换提示文案，不重新加载并丢弃当前的学习视图。
@@ -61,56 +69,86 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   };
   const hydrate = () => { const value = gateway.getState?.(); if (value) { setSession(value.session); setRecentResults(value.recentResults); } };
   const frozenSources = (uid: string) => gateway.getSources?.(uid)?.length ? gateway.getSources(uid) : content?.sources ?? [];
-  const route = stack[stack.length - 1];
+  const storedRoute = stack[stack.length - 1];
+  // Arthur: NarIyirm
+  // 中文：静默更新可能撤回课程或资料；旧路径回到总览，不能用已删除实体继续渲染。
+  // EN: Silent refresh can withdraw a course or resource; return stale paths to the hub instead of rendering removed entities.
+  const missingRoute = content && (
+    storedRoute.name === 'lesson' && !content.activities.some(item => item.activityCode === storedRoute.activityCode) ||
+    storedRoute.name === 'course' && !content.courses.some(item => item.courseCode === storedRoute.courseCode) ||
+    storedRoute.name === 'resource' && !content.resources.some(item => item.resourceCode === storedRoute.resourceCode)
+  );
+  const route: LearningRoute = missingRoute ? { name: 'hub', segment: 'learn' } : storedRoute;
+  useEffect(() => { if (missingRoute) dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }, [missingRoute]);
   const routeRef = useRef(route); routeRef.current = route;
   useEffect(() => { mounted.current = true; return () => { mounted.current = false; requestId.current += 1; }; }, []);
 
   const load = useCallback(async () => {
     const id = ++requestId.current;
-    inFlight.current = true; setLoading(true); setError(null);
+    // Arthur: NarIyirm
+    // 中文：首次读取才展示加载页；已有课程内容在刷新期间保持挂载，保留滚动和交互状态。
+    // EN: Show the loading page only for the first read; keep existing course content mounted through refresh to preserve scroll and interaction.
+    inFlight.current = true; syncing.current = false; if (!hasContent.current) setLoading(true); setError(null);
     try {
       const value = await gateway.load();
-      if (mounted.current && requestId.current === id) { setContent(value.content); setSession(value.session); setRecentResults(value.recentResults ?? []); }
+      if (mounted.current && requestId.current === id) { hasContent.current = true; lastLoadedAt.current = Date.now(); setContent(value.content); setSession(value.session); setRecentResults(value.recentResults ?? []); }
     } catch (failure) { if (mounted.current && requestId.current === id) setError(errorText(failure, loadErrorCopy.current)); }
     finally { if (mounted.current && requestId.current === id) { setLoading(false); inFlight.current = false; } }
   }, [gateway]);
   useEffect(() => { void load(); }, [load]);
 
   const cancelPendingUi = useCallback(() => {
-    requestId.current += 1; inFlight.current = false; setBusy(false); setError(null);
+    requestId.current += 1; inFlight.current = false; syncing.current = false; setBusy(false); setError(null);
   }, []);
   const back = useCallback(() => {
     if (storyVisible) { setStoryVisible(false); return; }
+    if (stack.length === 1) { onClose(); return; }
     cancelPendingUi();
-    if (stack.length === 1) onClose(); else dispatch({ type: 'back' });
+    dispatch({ type: 'back' });
   }, [cancelPendingUi, onClose, stack.length, storyVisible]);
-  const close = useCallback(() => { cancelPendingUi(); onClose(); }, [cancelPendingUi, onClose]);
-  useEffect(() => { const sub = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; }); return () => sub.remove(); }, [back]);
+  // Arthur: NarIyirm
+  // 中文：离开主 Tab 仍让首次加载或已提交操作完成；取消它会让常驻页面永远停在 loading。
+  // EN: Leaving the primary tab lets initial loads and submitted operations finish; canceling them would strand a retained page in loading.
+  const close = useCallback(() => { onClose(); }, [onClose]);
+  useEffect(() => { if (!tabActive) return; const sub = BackHandler.addEventListener('hardwareBackPress', () => { back(); return true; }); return () => sub.remove(); }, [back, tabActive]);
+  // Arthur: NarIyirm
+  // 中文：垃圾桶入口明确返回 waste 总览，普通导航栏切换则沿用当前学习栈。
+  // EN: The bin explicitly opens the waste overview; ordinary dock switches keep the current learning stack.
+  useEffect(() => {
+    if (previousEntryToken.current === entryToken) return;
+    previousEntryToken.current = entryToken;
+    if (!loading) cancelPendingUi();
+    setStoryVisible(false); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } });
+  }, [entryToken, loading, cancelPendingUi]);
   // Arthur: NarIyirm
   // 中文：主 Tab 根页不使用滑动返回；保持手势实例稳定，并读取最新返回目标，避免主题滚动或重渲染误切主导航。
   // EN: Primary tab roots have no swipe-back; keep the gesture stable and read the latest destination so topic scrolling or re-renders cannot switch primary tabs.
   const backGestureActions = useRef({ enabled: false, back });
-  backGestureActions.current = { enabled: Platform.OS === 'ios' && (origin !== 'tab' || stack.length > 1) && !storyVisible, back };
+  backGestureActions.current = { enabled: tabActive && Platform.OS === 'ios' && (origin !== 'tab' || stack.length > 1) && !storyVisible, back };
   const edge = useMemo(() => PanResponder.create(createLearningBackGesture({
     isEnabled: () => backGestureActions.current.enabled,
     onBack: () => backGestureActions.current.back(),
   })), []);
 
   // Arthur: NarIyirm
-  // 中文：返回或关闭会使旧请求的 UI 更新失效；服务端成功仍由下次加载恢复，避免迟到响应把用户带回已离开的页面。
-  // EN: Back/close invalidate stale UI updates; server success is recovered on the next load, so late responses cannot pull users into a screen they left.
-  const run = async <T,>(operation: () => Promise<T>, apply: (value: T) => void, failure = copy.actionFailed) => {
-    if (inFlight.current) return;
+  // 中文：后台读取不显示“保存中”；用户操作优先使旧校验的 UI 响应失效，已提交写操作仍保持原防重复锁。
+  // EN: Background reads never show saving; user actions supersede their stale UI responses while submitted writes keep the existing duplicate guard.
+  const run = async <T,>(operation: () => Promise<T>, apply: (value: T) => void, failure = copy.actionFailed, silent = false) => {
+    if (inFlight.current) {
+      if (silent || !syncing.current) return;
+      cancelPendingUi();
+    }
     const id = ++requestId.current;
-    inFlight.current = true; setBusy(true); setError(null);
+    inFlight.current = true; syncing.current = silent; if (!silent) { setBusy(true); setError(null); }
     try { const value = await operation(); if (mounted.current && requestId.current === id) { hydrate(); apply(value); } }
     catch (error) { if (mounted.current && requestId.current === id) {
-      hydrate(); setError(errorText(error, failure));
       const code = getLearningErrorCode(error);
+      if (!silent) { hydrate(); setError(errorText(error, failure)); }
+      else if (code === 'learning_identity_changed' || code === 'device_credential_revoked' || code === 'invalid_device_credential') setError(errorText(error, failure));
       if (code === 'attempt_invalidated' || code === 'attempt_not_active' || code === 'attempt_not_found') dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } });
-      if (code === 'learning_identity_changed') { setContent(null); setSession(null); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }
+      if (code === 'learning_identity_changed') { hasContent.current = false; setContent(null); setSession(null); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }
     } }
-    finally { if (mounted.current && requestId.current === id) { inFlight.current = false; setBusy(false); } }
+    finally { if (mounted.current && requestId.current === id) { inFlight.current = false; syncing.current = false; if (!silent) setBusy(false); } }
   };
   const navigate = (next: LearningRoute) => { cancelPendingUi(); dispatch({ type: 'push', route: next }); };
   const openQuiz = (stage: LearningStageCode, mode: LearningQuizView['mode'] = 'checkpoint', activityCode?: string) => {
@@ -129,12 +167,14 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
   // EN: Refresh the server cursor on foreground without reopening finished screens; an unconfirmed first choice stays locked until feedback or retry.
   const refresh = useRef<() => void>(() => undefined);
   refresh.current = () => {
+    lastLoadedAt.current = Date.now();
     void run(async () => {
       const value = await gateway.load();
       const current = routeRef.current;
       const restored = current.name === 'quiz' ? await gateway.resumeQuiz(current.quiz.attemptUid) : null;
       return { value, restored, current };
     }, ({ value, restored, current }) => {
+      lastLoadedAt.current = Date.now();
       setContent(value.content); setSession(gateway.getState?.()?.session ?? value.session); setRecentResults(gateway.getState?.()?.recentResults ?? value.recentResults ?? []);
       if (restored && current.name === 'quiz') {
         const next = outcomeRoute(restored);
@@ -143,9 +183,26 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
         }
         dispatch({ type: 'replace', route: next });
       }
-    });
+    }, copy.actionFailed, true);
   };
-  useEffect(() => { const sub = AppState.addEventListener('change', value => { if (value === 'active') refresh.current(); }); return () => sub.remove(); }, []);
+  // Arthur: NarIyirm
+  // 中文：普通 Tab 返回复用内存，五分钟后静默校验；应用从后台恢复时仅刷新可见页，隐藏页延迟到激活。
+  // EN: Dock returns reuse memory with a silent check after five minutes; foreground refreshes visible flows and defers hidden ones until activation.
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', value => {
+      if (value !== 'active') return;
+      refreshOnActivation.current = true;
+      if (tabActiveRef.current && !inFlight.current) { refreshOnActivation.current = false; refresh.current(); }
+    });
+    return () => sub.remove();
+  }, []);
+  useEffect(() => {
+    if (!tabActive || loading || busy) return;
+    if (!content || !session) return;
+    if (refreshOnActivation.current || Date.now() - lastLoadedAt.current > 5 * 60_000) {
+      refreshOnActivation.current = false; refresh.current();
+    }
+  }, [tabActive, loading, busy]);
   const present = (node: ReactNode) => {
     const body = <View style={{ flex: 1 }} onLayout={(event) => setContainerWidth(event.nativeEvent.layout.width)}>
       <LearningBottomSafeAreaContext.Provider value={origin !== 'tab'}>

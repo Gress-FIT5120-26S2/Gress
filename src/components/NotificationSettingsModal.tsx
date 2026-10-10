@@ -1,6 +1,6 @@
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { Ionicons } from '@expo/vector-icons';
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -49,26 +49,29 @@ export function NotificationSettingsModal({ onClose, onOpenInbox, visible }: Not
   const copy = t.profile.notificationSettings;
   const [preferences, setPreferences] = useState<NotificationPreferences | null>(null);
   const [loading, setLoading] = useState(true);
+  const hasSnapshot = useRef(false);
+  const loadFlight = useRef<Promise<void> | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
   const [saveFailed, setSaveFailed] = useState(false);
   const [savingCount, setSavingCount] = useState(0);
 
-  const load = useCallback(async () => {
-    setLoading(true);
+  // Arthur: NarIyirm
+  // 中文：隐藏抽屉提前读取设置，打开时复用内容并静默核对；预加载不触发系统通知授权。
+  // EN: Prefetch settings in the hidden sheet; opening reuses content and silently reconciles without asking for notification permissions.
+  const load = useCallback(() => {
+    if (loadFlight.current) return loadFlight.current;
+    if (!hasSnapshot.current) setLoading(true);
     setLoadFailed(false);
-    try {
-      setPreferences(await fetchNotificationPreferences());
-    } catch {
-      setLoadFailed(true);
-    } finally {
-      setLoading(false);
-    }
+    const flight = fetchNotificationPreferences().then(value => {
+      hasSnapshot.current = true; setPreferences(value);
+    }).catch(() => {
+      if (!hasSnapshot.current) setLoadFailed(true);
+    }).finally(() => { setLoading(false); loadFlight.current = null; });
+    loadFlight.current = flight;
+    return flight;
   }, []);
-
-  useEffect(() => {
-    if (!visible) return;
-    void load();
-  }, [load, visible]);
+  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { if (visible) void load(); }, [load, visible]);
 
   const deviceTimeZone = useMemo(
     () => Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',

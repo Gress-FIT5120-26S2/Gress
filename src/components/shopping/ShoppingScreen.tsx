@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 // src/components/shopping/ShoppingScreen.tsx
 // Shopping Mode (Epic E5). Two tabs, swipeable horizontally:
 //   - 'restock': suggested buys (需补货), derived from restock rules + stock
@@ -20,7 +21,6 @@ import {
   StyleSheet,
   Animated,
   Easing,
-  Modal,
   ScrollView,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

@@ -19,8 +19,11 @@ import { NotificationInbox } from './src/components/NotificationInbox';
 import { OpeningAnimation } from './src/components/OpeningAnimation';
 import { FirstUseJourney } from './src/components/FirstUseJourney';
 import { ProfileScreen } from './src/components/ProfileScreen';
-import { ProfileDataProvider } from './src/components/ProfileDataProvider';
+import { RetainedTab } from './src/components/RetainedTab';
+import { subscribeNavigationMemory } from './src/services/navigationMemory';
+import { ProfileDataProvider, useProfileData } from './src/components/ProfileDataProvider';
 import { AchievementDataProvider } from './src/components/AchievementDataProvider';
+import { AchievementReportDataProvider } from './src/components/achievement/AchievementReportDataProvider';
 import { AchievementsScreen } from './src/components/AchievementsScreen';
 import { I18nProvider, useI18n } from './src/i18n';
 import { getDeviceId } from './src/services/deviceId';
@@ -45,8 +48,8 @@ const LinearFoodWasteStory = lazy(() =>
 );
 
 // Arthur: NarIyirm
-// 中文：学堂作为独立 Tab 按需加载；切走时销毁本人适配器，再次进入从服务器恢复。
-// EN: Load Learn on demand as a primary tab; leaving disposes its personal adapter, and re-entry restores from the server.
+// 中文：首页首帧就绪后预热学堂模块、图片和视频，隐藏挂载的入口提前读取本人课程与进度。
+// EN: Warm Learn code, images and video after Home is ready; its hidden entry preloads personal courses and progress.
 const loadLearningRoom = () => import('./src/components/learning/LearningRoomEntry').then(m => ({ default: m.LearningRoomEntry }));
 const transitionTones: Record<AppTab, string> = {
   home: '#E6F1EE',
@@ -76,6 +79,20 @@ const FIRST_USE_JOURNEY_KEY = 'kitchmemo:first-use-journey:v1';
 
 function KitchMemoApp() {
   const { language, t } = useI18n();
+  const { fridgeContext } = useProfileData();
+  const [memoryEpoch, setMemoryEpoch] = useState(0);
+  const [preloadTabs, setPreloadTabs] = useState(false);
+  const [learningEntryToken, setLearningEntryToken] = useState(0);
+  const inventoryIdentityEpoch = useRef(0);
+  // Arthur: NarIyirm
+  // 中文：冰箱范围页面随 fridge.uid 重建，个人学堂仅在身份恢复时清空；设置页保留新恢复码展示。
+  // EN: Fridge-scoped pages reset with fridge.uid, personal Learn resets on identity recovery, and settings retains the new recovery-code display.
+  const fridgeScope = fridgeContext?.fridge.uid ?? 'initial';
+  useEffect(() => subscribeNavigationMemory(() => {
+    inventoryIdentityEpoch.current += 1;
+    setMemoryEpoch(value => value + 1);
+    setAssistantSnapshot(null);
+  }), []);
 
   const [deviceId, setDeviceId] = useState<string | null>(null);
   // Arthur: NarIyirm
@@ -98,6 +115,7 @@ function KitchMemoApp() {
   const [activeTab, setActiveTab] = useState<AppTab>('home');
   const [notificationReturnTab, setNotificationReturnTab] = useState<'home' | 'profile'>('home');
   const [notificationTargetId, setNotificationTargetId] = useState<string | null>(null);
+  const [notificationOpenToken, setNotificationOpenToken] = useState(0);
   const [isCinematicActive, setIsCinematicActive] = useState(false);
   const [isTransitionOverlayVisible, setIsTransitionOverlayVisible] = useState(false);
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -108,6 +126,7 @@ function KitchMemoApp() {
   // 中文：学堂根页的系统返回回到进入前的主 Tab；课程／测验内部先走自己的返回栈。
   // EN: Back from the Learn root returns to the previous primary tab; lessons/quizzes first follow their local back stack.
   const learningReturnTab = useRef<AppTab>('home');
+  const [learningOrigin, setLearningOrigin] = useState<'home' | 'tab'>('tab');
   const closeLearning = useCallback(() => setActiveTab(learningReturnTab.current), []);
   const [transitionTone, setTransitionTone] = useState(transitionTones.home);
   const blurTargetRef = useRef<View>(null);
@@ -123,9 +142,20 @@ function KitchMemoApp() {
   const markKitchenReady = useCallback(() => setCanRevealKitchen(true), []);
   const dismissHomeInteractionHint = useCallback(() => setShowHomeInteractionHint(false), []);
   const kitchenLighting = useKitchenTimeLighting();
-  const screen = t.screens[activeTab];
-  const status = t.status[connectionState];
   const isFirstUseJourneyVisible = !isOpening && firstUseJourneyState === 'pending';
+
+  // Arthur: NarIyirm
+  // 中文：厨房首帧后在空闲时预热所有主页面；数据提前读取，原生弹窗、视频播放和学习提交仍由用户触发。
+  // EN: Warm every primary page at idle after the kitchen first frame; prefetch reads while user actions still own native modals, playback and learning submissions.
+  useEffect(() => {
+    if (!canRevealKitchen) return;
+    const task = InteractionManager.runAfterInteractions(() => {
+      setPreloadTabs(true);
+      void import('./src/components/learning/learningAssets').then(module => module.preloadLearningAssets()).catch(() => undefined);
+      void import('./src/components/LinearFoodWasteStory').catch(() => undefined);
+    });
+    return () => task.cancel();
+  }, [canRevealKitchen]);
 
   useEffect(() => {
     let mounted = true;
@@ -208,9 +238,10 @@ function KitchMemoApp() {
     // Arthur: NarIyirm
     // 中文：首页计数和系统临期提醒共用同一库存快照，避免两个入口对“快过期”产生不同判断。
     // EN: The home count and native expiry reminders share one inventory snapshot so both entry points use the same expiring rule.
+    const identityEpoch = inventoryIdentityEpoch.current;
     getInventorySnapshot()
       .then((snapshot) => {
-        if (!mounted) return;
+        if (!mounted || identityEpoch !== inventoryIdentityEpoch.current) return;
         setAssistantSnapshot(snapshot);
         setExpiringCount(countExpiringBatches(snapshot.batches));
         void fetchNotificationPreferences()
@@ -224,8 +255,10 @@ function KitchMemoApp() {
   }, [activeTab, language]);
 
   useEffect(() => subscribeToSync(['inventory', 'home'], () => {
+    const identityEpoch = inventoryIdentityEpoch.current;
     void getInventorySnapshot()
       .then((snapshot) => {
+        if (identityEpoch !== inventoryIdentityEpoch.current) return;
         setAssistantSnapshot(snapshot);
         setExpiringCount(countExpiringBatches(snapshot.batches));
         void fetchNotificationPreferences()
@@ -288,11 +321,19 @@ function KitchMemoApp() {
     // 中文：只有首页临期文案会带上 expiring；3D 冰箱热点仍打开未筛选的冰箱页。
     // EN: Only the home expiring headline passes expiring; the 3D fridge hotspot still opens an unfiltered fridge.
     if (targetTab === 'fridge') setFridgeFocusFilter(fridgeFilter);
+    if (targetTab === 'learn') {
+      // Arthur: NarIyirm
+      // 中文：垃圾桶进入废弃物学堂总览，根页返回首页；黑色过渡接住桶口最后的全黑帧。
+      // EN: The bin opens the waste learning overview with home as its return target; a black veil continues the opening's final black frame.
+      learningReturnTab.current = 'home';
+      setLearningOrigin('home');
+      setLearningEntryToken(value => value + 1);
+    }
     transitionInProgressRef.current = true;
     setIsCinematicActive(true);
     setIsTransitionOverlayVisible(true);
-    setTransitionTone(transitionTones[targetTab]);
-    transitionOverlayOpacity.setValue(0);
+    setTransitionTone(targetTab === 'learn' ? '#000000' : transitionTones[targetTab]);
+    transitionOverlayOpacity.setValue(targetTab === 'learn' && !reduceMotion ? 1 : 0);
 
     // Arthur: NarIyirm
     // 中文：遮罩完全覆盖时才替换页面，再同时淡出遮罩和淡入目标页，避免卸载 3D Canvas 产生视觉断层。
@@ -378,6 +419,7 @@ function KitchMemoApp() {
   const openSystemNotification = useCallback((notificationId?: string) => {
     setNotificationReturnTab('home');
     setNotificationTargetId(notificationId ?? null);
+    setNotificationOpenToken(value => value + 1);
     setActiveTab('notifications');
   }, []);
 
@@ -414,8 +456,13 @@ function KitchMemoApp() {
   }, []);
 
   const refreshAssistantSnapshot = useCallback(() => {
+    // Arthur: NarIyirm
+    // 中文：恢复身份后旧请求不得重新填回已清除的库存预加载缓存。
+    // EN: Old identity requests must not repopulate the cleared inventory preload cache after recovery.
+    const identityEpoch = inventoryIdentityEpoch.current;
     return getInventorySnapshot()
       .then((snapshot) => {
+        if (identityEpoch !== inventoryIdentityEpoch.current) return;
         setAssistantSnapshot(snapshot);
         setExpiringCount(countExpiringBatches(snapshot.batches));
       })
@@ -500,71 +547,41 @@ function KitchMemoApp() {
             ) : !isOpening ? <KitchenLoading /> : null}
           </View>
 
-          {activeTab !== 'home' ? (
-            <View
-              style={[
-                styles.activeScreen,
-                activeTab === 'fridge'
-                  ? styles.fridgeContent
-                  : activeTab === 'profile' || activeTab === 'notifications' || activeTab === 'achievements' || activeTab === 'learn' || activeTab === 'shopping'
-                    ? styles.profileContent
-                    : styles.standardContent,
-                { backgroundColor: transitionTones[activeTab] },
-              ]}
-            >
-              {activeTab === 'fridge' ? (
-                <FridgeScreen
-                  assistantAddRequestToken={assistantAddRequestToken}
-                  assistantBatchRequestUid={assistantBatchRequestUid}
-                  blurTarget={blurTargetRef}
-                  initialFilter={fridgeFocusFilter}
-                  key={fridgeFocusFilter ?? 'unfiltered'}
-                  onAssistantBatchRequestHandled={clearAssistantBatchRequest}
-                  onOpenAssistant={openAssistant}
-                />
-              ) : activeTab === 'shopping' ? (
-                <ShoppingScreen />
-              ) : activeTab === 'learn' ? (
-                <View style={styles.learningContent}>
-                  <LearningLazyModal load={loadLearningRoom} embedded componentProps={{ origin: 'tab' as const, embedded: true, onClose: closeLearning }} onClose={closeLearning} />
-                </View>
-              ) : activeTab === 'notifications' ? (
-                <NotificationInbox
-                  initialNotificationId={notificationTargetId}
-                  onBack={() => setActiveTab(notificationReturnTab)}
-                  onCountsChange={handleNotificationCountsChange}
-                  onGoToRestock={() => setActiveTab('shopping')}
-                />
-              ) : activeTab === 'profile' ? (
-                <ProfileScreen
-                  onOpenNotifications={() => {
-                    setNotificationReturnTab('profile');
-                    setNotificationTargetId(null);
-                    setActiveTab('notifications');
-                  }}
-                  onReplayOnboarding={() => {
-                    // Arthur: NarIyirm
-                    // 中文：个人页重播只切换当前会话的引导状态，不清除首次完成标记或任何业务数据。
-                    // EN: Profile replay changes only the current session's journey state without clearing completion or business data.
-                    setFirstUseJourneyState('pending');
-                  }}
-                />
-              ) : activeTab === 'achievements' ? (
-                <AchievementsScreen onAddFirstItem={handleAssistantAddItem} onOpenInventoryItem={handleAssistantOpenItem} />
-              ) : (
-                <>
-                  <View style={styles.glow} />
-                  <Text style={styles.greeting}>KITCHMEMO</Text>
-                  <View style={styles.screenCopy}>
-                    <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
-                    <Text style={styles.title}>{screen.title}</Text>
-                    <Text style={styles.description}>{screen.description}</Text>
-                    <Text style={styles.connection}>{status}</Text>
-                  </View>
-                </>
-              )}
+          {activeTab === 'fridge' ? (
+            <View style={[styles.activeScreen, styles.fridgeContent, { backgroundColor: transitionTones.fridge }]}>
+              <FridgeScreen assistantAddRequestToken={assistantAddRequestToken} assistantBatchRequestUid={assistantBatchRequestUid}
+                blurTarget={blurTargetRef} initialFilter={fridgeFocusFilter} key={`${memoryEpoch}:${fridgeScope}:${fridgeFocusFilter ?? 'unfiltered'}`}
+                initialSnapshot={!fridgeContext || assistantSnapshot?.fridge.uid === fridgeContext.fridge.uid ? assistantSnapshot : null} initialSharingContext={fridgeContext}
+                onAssistantBatchRequestHandled={clearAssistantBatchRequest} onOpenAssistant={openAssistant} />
             </View>
           ) : null}
+          <RetainedTab key={`shopping:${fridgeScope}:${memoryEpoch}`} active={activeTab === 'shopping'} preload={preloadTabs} style={{ backgroundColor: transitionTones.shopping }}>
+            <ShoppingScreen />
+          </RetainedTab>
+          <RetainedTab key={`learn:${memoryEpoch}`} active={activeTab === 'learn'} preload={preloadTabs} style={{ backgroundColor: transitionTones.learn }}>
+            <View style={styles.learningContent}>
+              <LearningLazyModal load={loadLearningRoom} embedded componentProps={{ origin: learningOrigin, embedded: true, entryToken: learningEntryToken, onClose: closeLearning }} onClose={closeLearning} />
+            </View>
+          </RetainedTab>
+          <RetainedTab key={`notifications:${fridgeScope}:${memoryEpoch}`} active={activeTab === 'notifications'} preload={preloadTabs} style={{ backgroundColor: transitionTones.notifications }}>
+            <NotificationInbox initialNotificationId={notificationTargetId} initialNotificationToken={notificationOpenToken} onBack={() => setActiveTab(notificationReturnTab)}
+              onCountsChange={handleNotificationCountsChange} onGoToRestock={() => setActiveTab('shopping')} />
+          </RetainedTab>
+          <RetainedTab active={activeTab === 'profile'} preload={preloadTabs} style={{ backgroundColor: transitionTones.profile }}>
+            <ProfileScreen onOpenNotifications={() => {
+              setNotificationReturnTab('profile'); setNotificationTargetId(null); setActiveTab('notifications');
+            }} onReplayOnboarding={() => {
+              // Arthur: NarIyirm
+              // 中文：重播只更改当前会话引导状态，不清除首次完成标记或业务数据。
+              // EN: Replay changes the current session's journey state without clearing completion or business data.
+              setFirstUseJourneyState('pending');
+            }} />
+          </RetainedTab>
+          <RetainedTab key={`achievements:${fridgeScope}:${memoryEpoch}`} active={activeTab === 'achievements'} preload={preloadTabs} style={{ backgroundColor: transitionTones.achievements }}>
+            <AchievementReportDataProvider>
+              <AchievementsScreen onAddFirstItem={handleAssistantAddItem} onOpenInventoryItem={handleAssistantOpenItem} />
+            </AchievementReportDataProvider>
+          </RetainedTab>
         </Animated.View>
       </BlurTargetView>
       {!isOpening && firstUseJourneyState === 'complete' && (
@@ -597,6 +614,7 @@ function KitchMemoApp() {
             bottomMaskColor={activeTab === 'home' ? kitchenLighting.background : '#F7FBFA'}
             onChange={(tab) => {
               if (tab === 'learn' && activeTab !== 'learn') {
+                setLearningOrigin('tab');
                 learningReturnTab.current = activeTab === 'notifications' ? notificationReturnTab : activeTab;
                 setAssistantVisible(false); setStoryVisible(false);
               }

@@ -1,9 +1,9 @@
+import { TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useState } from 'react';
 import {
   AccessibilityInfo,
-  Modal,
   Platform,
   Pressable,
   ScrollView,

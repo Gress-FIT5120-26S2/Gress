@@ -167,6 +167,8 @@ type FridgeScreenProps = {
   assistantBatchRequestUid?: string | null;
   blurTarget?: RefObject<View | null>;
   initialFilter?: FridgeFilter | null;
+  initialSnapshot?: InventorySnapshot | null;
+  initialSharingContext?: FridgeAccessContext | null;
   onAssistantBatchRequestHandled?: () => void;
   onOpenAssistant: () => void;
 };
@@ -179,6 +181,8 @@ export function FridgeScreen({
   assistantBatchRequestUid = null,
   blurTarget,
   initialFilter = null,
+  initialSnapshot = null,
+  initialSharingContext = null,
   onAssistantBatchRequestHandled,
   onOpenAssistant,
 }: FridgeScreenProps) {
@@ -218,14 +222,18 @@ export function FridgeScreen({
     wasteOpenTimer.current = setTimeout(() => setWasteOpportunity(next), Platform.OS === 'ios' ? 180 : 0);
   }, []);
   useEffect(() => () => { if (wasteOpenTimer.current) clearTimeout(wasteOpenTimer.current); }, []);
-  const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(null);
-  const [isLoadingInventory, setIsLoadingInventory] = useState(true);
+  // Arthur: NarIyirm
+  // 中文：返回仍重置冰箱交互，但从首页常驻快照立即展示库存；原同步订阅继续静默读取服务器。
+  // EN: Re-entry resets fridge interaction while immediately showing the root inventory snapshot; existing sync subscriptions keep reading the server silently.
+  const [snapshot, setSnapshot] = useState<InventorySnapshot | null>(initialSnapshot);
+  const hasInventorySnapshot = useRef(initialSnapshot !== null);
+  const [isLoadingInventory, setIsLoadingInventory] = useState(initialSnapshot === null);
   const [isRefreshingInventory, setIsRefreshingInventory] = useState(false);
-  const [isSyncingInventory, setIsSyncingInventory] = useState(false);
   const inventoryLoadRef = useRef<Promise<void> | null>(null);
   const [hasInventoryLoadError, setHasInventoryLoadError] = useState(false);
   const [isSpaceMenuVisible, setIsSpaceMenuVisible] = useState(false);
-  const [sharingContext, setSharingContext] = useState<FridgeAccessContext | null>(null);
+  const [sharingContext, setSharingContext] = useState<FridgeAccessContext | null>(initialSharingContext);
+  const hasSharingSnapshot = useRef(initialSharingContext !== null);
   const [isSharingContextLoading, setIsSharingContextLoading] = useState(false);
   const [hasSharingContextError, setHasSharingContextError] = useState(false);
   const sharingContextLoadRef = useRef<Promise<void> | null>(null);
@@ -235,6 +243,14 @@ export function FridgeScreen({
   const [showFilterSwipeHint, setShowFilterSwipeHint] = useState(false);
   const filterSwipeHintDismissedRef = useRef(false);
   const handledAssistantAddRequestRef = useRef(0);
+
+  useEffect(() => {
+    if (!initialSnapshot || hasInventorySnapshot.current) return;
+    hasInventorySnapshot.current = true; setSnapshot(initialSnapshot); setIsLoadingInventory(false);
+  }, [initialSnapshot]);
+  useEffect(() => {
+    if (initialSharingContext) { hasSharingSnapshot.current = true; setSharingContext(current => current ?? initialSharingContext); }
+  }, [initialSharingContext]);
 
   useEffect(() => {
     let mounted = true;
@@ -251,9 +267,8 @@ export function FridgeScreen({
   // 中文：初次进入、下拉刷新和后台同步共用此加载器；最终调用 inventoryApi.getInventorySnapshot 并替换页面 snapshot。
   // EN: Initial entry, pull-to-refresh, and background sync share this loader, which calls inventoryApi.getInventorySnapshot and replaces the screen snapshot.
   const loadInventory = useCallback(async (mode: InventoryLoadMode = 'background') => {
-    if (mode === 'initial') setIsLoadingInventory(true);
+    if (mode === 'initial' && !hasInventorySnapshot.current) setIsLoadingInventory(true);
     if (mode === 'manual') setIsRefreshingInventory(true);
-    if (mode === 'background') setIsSyncingInventory(true);
     try {
       // Arthur: NarIyirm
       // 中文：Realtime、保存后对账和手动刷新共用同一个在途请求，避免同一次库存变更重复下载完整快照。
@@ -261,6 +276,7 @@ export function FridgeScreen({
       if (!inventoryLoadRef.current) {
         inventoryLoadRef.current = getInventorySnapshot()
           .then((nextSnapshot) => {
+            hasInventorySnapshot.current = true;
             setSnapshot(nextSnapshot);
             setHasInventoryLoadError(false);
           })
@@ -270,19 +286,18 @@ export function FridgeScreen({
       }
       await inventoryLoadRef.current;
     } catch (error) {
-      setHasInventoryLoadError(true);
+      if (!hasInventorySnapshot.current || mode === 'manual') setHasInventoryLoadError(true);
       throw error;
     } finally {
       if (mode === 'initial') setIsLoadingInventory(false);
       if (mode === 'manual') setIsRefreshingInventory(false);
-      if (mode === 'background') setIsSyncingInventory(false);
     }
   }, []);
 
   useEffect(() => {
     // Arthur: NarIyirm
-    // 中文：进入冰箱页后用当前设备对应的真实冰箱替换演示数据；失败时保留空状态，不显示过期缓存数据。
-    // EN: Opening the fridge loads the real fridge for this device; failures keep an empty state instead of showing stale mock data.
+    // 中文：进入冰箱后静默核对预取快照；没有成功快照时保留首载与错误反馈。
+    // EN: Reconcile the prefetched snapshot on entry; retain initial loading and error feedback when no successful snapshot exists.
     void loadInventory('initial').catch(() => undefined);
   }, [loadInventory]);
 
@@ -302,11 +317,12 @@ export function FridgeScreen({
       if (!sharingContextLoadRef.current) {
         sharingContextLoadRef.current = getFridgeAccessContext()
           .then((nextContext) => {
+            hasSharingSnapshot.current = true;
             setSharingContext(nextContext);
             setHasSharingContextError(false);
           })
           .catch((error) => {
-            setHasSharingContextError(true);
+            if (!hasSharingSnapshot.current) setHasSharingContextError(true);
             throw error;
           })
           .finally(() => {
@@ -858,9 +874,6 @@ export function FridgeScreen({
               <Text numberOfLines={1} style={styles.heading}>{sectionTitle}</Text>
               <View style={styles.inventoryStatusRow}>
                 <Text numberOfLines={1} style={styles.subheading}>{t.fridge.itemCount(visibleItems.length, hasActiveConditions)}</Text>
-                {isSyncingInventory ? (
-                  <ActivityIndicator accessibilityLabel={t.status.connecting} color="#168ACB" size="small" />
-                ) : null}
               </View>
             </View>
             <View style={styles.headingActions}>
