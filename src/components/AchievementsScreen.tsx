@@ -1,13 +1,15 @@
+import { useTabActive, TabModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import * as Haptics from 'expo-haptics';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, BackHandler, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, BackHandler, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
 import { getApiErrorCode } from '../services/apiClient';
 import type { AchievementDashboard, FridgeQuestAssignment } from '../services/achievementApi';
 import { rerollQuest } from '../services/achievementApi';
+import { subscribeToSync } from '../services/realtimeSync';
 import { getWasteLearningStats } from '../services/wasteLearningApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementBadgeHoldDetail } from './achievement/AchievementBadgeHoldDetail';
@@ -27,6 +29,7 @@ const BADGE_LONG_PRESS_MS = 420;
 // 中文：首页只展示等级、下一步与成果预览；完整挑战和记录留在按需打开的详情页，权威状态仍全部来自成就快照。
 // EN: The overview shows level, next action, and impact previews; full challenges and history open on demand, with all authoritative state still coming from the achievement snapshot.
 export function AchievementsScreen({ onAddFirstItem, onOpenInventoryItem }: AchievementsScreenProps) {
+  const tabActive = useTabActive();
   const { language, t } = useI18n();
   const insets = useSafeAreaInsets();
   const { dashboard, failed, loading, refresh } = useAchievementData();
@@ -44,38 +47,41 @@ export function AchievementsScreen({ onAddFirstItem, onOpenInventoryItem }: Achi
   const latestXpEventRef = useRef<string | null | undefined>(undefined);
 
   // Arthur: NarIyirm
-  // 中文：分类学习独立于食物挽回金额与 XP；每次进入成果页重读当前冰箱的学习次数。
-  // EN: Sorting lessons are separate from rescued food value and XP; read the current fridge's counts when this screen opens.
+  // 中文：分类统计跟随隐藏成果页预取，库存同步静默更新次数，进入页面不再启动首载。
+  // EN: Prefetch sorting totals with the hidden achievements page and silently update on inventory sync instead of loading on entry.
   useEffect(() => {
     let active = true;
-    void getWasteLearningStats().then((stats) => { if (active) setSortingStats(stats); }).catch(() => undefined);
-    return () => { active = false; };
+    const load = () => { void getWasteLearningStats().then(stats => { if (active) setSortingStats(stats); }).catch(() => undefined); };
+    load();
+    const unsubscribe = subscribeToSync(['inventory', 'fridge'], load);
+    return () => { active = false; unsubscribe(); };
   }, []);
 
   // Arthur: NarIyirm
   // 中文：报告可从概览或环保里程碑打开；系统返回键回到实际来源页面。
   // EN: The report can open from the overview or impact detail; system back returns to its actual source.
   useEffect(() => {
-    if (!detailRoute) return;
+    if (!detailRoute || !tabActive) return;
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
       setDetailRoute(detailRoute === 'report' ? reportReturnRoute : null);
       setInitialQuestUid(null);
       return true;
     });
     return () => subscription.remove();
-  }, [detailRoute, reportReturnRoute]);
+  }, [detailRoute, reportReturnRoute, tabActive]);
 
   // Arthur: NarIyirm
   // 中文：只庆祝本次会话新出现的挑战 XP，首次加载已有流水时不播放旧奖励。
   // EN: Celebrate only quest XP newly observed in this session, never historical events on first load.
   useEffect(() => {
+    if (!tabActive) return;
     const latest = dashboard?.recentXpEvents[0] ?? null;
     if (latestXpEventRef.current !== undefined && latest?.id !== latestXpEventRef.current && latest?.reasonCode === 'quest_completed') {
       setCelebrationXp(latest.points);
       void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => undefined);
     }
     latestXpEventRef.current = latest?.id ?? null;
-  }, [dashboard?.recentXpEvents]);
+  }, [dashboard?.recentXpEvents, tabActive]);
 
   const showHeldAchievement = (achievement: AchievementDashboard['achievements'][number]) => {
     setHeldAchievement(achievement);

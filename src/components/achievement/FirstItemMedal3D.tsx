@@ -1,3 +1,4 @@
+import { useTabActive } from '../RetainedTab';
 import { OrbitControls, useGLTF } from '@react-three/drei/native';
 import { Canvas, useFrame } from '@react-three/fiber/native';
 import { Suspense, useEffect, useMemo, useRef, useState } from 'react';
@@ -18,6 +19,7 @@ type LoadedMedal = {
 // 中文：首枚奖牌使用 Blender 制作的独立浮雕、包边与丝带网格；详情页只挂载一个 GL 场景，避免奖牌列表产生多个 GPU 上下文。
 // EN: The first medal uses independently modeled Blender reliefs, rims, and ribbons; the detail view mounts one GL scene so the medal grid never creates multiple GPU contexts.
 export function FirstItemMedal3D({ earned }: Props) {
+  const tabActive = useTabActive();
   const [reduceMotion, setReduceMotion] = useState(true);
 
   useEffect(() => {
@@ -36,6 +38,7 @@ export function FirstItemMedal3D({ earned }: Props) {
     <View style={styles.root}>
       <Suspense fallback={<View style={styles.loading}><ActivityIndicator color="#D7B06D" /></View>}>
         <Canvas
+          frameloop={tabActive ? 'always' : 'never'}
           camera={{ fov: 31, near: 0.1, far: 30, position: [0, 0, 7.6] }}
           gl={{ alpha: true, antialias: true }}
           onCreated={({ gl }) => gl.setClearColor(new Color('#000000'), 0)}

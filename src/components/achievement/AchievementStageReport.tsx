@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useI18n } from '../../i18n';
-import { getAchievementStageReport, type AchievementStageReport as StageReport } from '../../services/achievementApi';
+import { useAchievementReportData } from './AchievementReportDataProvider';
 
 type Props = { onOpenInventoryItem: (batchUid: string) => void };
 
@@ -15,31 +15,15 @@ export function AchievementStageReport({ onOpenInventoryItem }: Props) {
   const copy = t.wins.report;
   const locale = language === 'zh' ? 'zh-CN' : 'en-AU';
   const { width } = useWindowDimensions();
-  const [report, setReport] = useState<StageReport | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: report, loading, failed: error, refresh } = useAchievementReportData();
   const [upcomingOpen, setUpcomingOpen] = useState(false);
-  const [loadVersion, setLoadVersion] = useState(0);
-
   // Arthur: NarIyirm
-  // 中文：详情卸载后忽略未完成请求，避免用户快速返回时更新旧页面状态。
-  // EN: Ignore an unfinished request after this detail unmounts, so a quick back navigation cannot update stale state.
-  useEffect(() => {
-    let active = true;
-    setLoading(true);
-    setError(false);
-    getAchievementStageReport().then((value) => {
-      if (active) setReport(value);
-    }).catch(() => {
-      if (active) setError(true);
-    }).finally(() => {
-      if (active) setLoading(false);
-    });
-    return () => { active = false; };
-  }, [loadVersion]);
+  // 中文：打开报告即显示预取数据，原来的进入页读取继续后台校验报告日期和统计。
+  // EN: Show prefetched data immediately while the original entry read reconciles report dates and totals in the background.
+  useEffect(() => { void refresh(); }, [refresh]);
 
   if (loading && !report) return <View style={styles.state}><ActivityIndicator color="#298361" /><Text style={styles.muted}>{copy.loading}</Text></View>;
-  if (error && !report) return <View style={styles.state}><Text style={styles.muted}>{copy.error}</Text><Pressable accessibilityRole="button" onPress={() => setLoadVersion((version) => version + 1)} style={styles.retry}><Text style={styles.retryText}>{copy.retry}</Text></Pressable></View>;
+  if (error && !report) return <View style={styles.state}><Text style={styles.muted}>{copy.error}</Text><Pressable accessibilityRole="button" onPress={() => { void refresh(); }} style={styles.retry}><Text style={styles.retryText}>{copy.retry}</Text></Pressable></View>;
   if (!report) return null;
 
   const currency = report.currency === 'AUD' ? 'A$' : report.currency;

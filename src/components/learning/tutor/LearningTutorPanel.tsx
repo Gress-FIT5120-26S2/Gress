@@ -1,5 +1,6 @@
+import { useTabActive, TabModal as Modal } from '../../RetainedTab';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Modal, Platform } from 'react-native';
+import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Platform } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
 import { getApiErrorCode } from '../../../services/apiClient';
@@ -15,6 +16,7 @@ type Props={context:TutorContext;label:LearningText;restricted:boolean;onClose:(
   coverAssetKey?:LearningAssetKey;showLifecycle?:boolean;service?:typeof defaultApi;embedded?:boolean;};
 
 export function LearningTutorPanel({context,label,restricted,onClose,onAction,onResume,onAbandon,initialPrompt,coverAssetKey,showLifecycle,service=defaultApi,embedded=false}:Props){
+  const tabActive=useTabActive();const tabActiveRef=useRef(tabActive);tabActiveRef.current=tabActive;
   const api=service;
   const {language,t}=useI18n();const copy=t.learningTutor;
   const [messages,setMessages]=useState<TutorMessage[]>([]);const [conversation,setConversation]=useState<string>();
@@ -50,7 +52,7 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
       if(list.conversations[0])await restore(list.conversations[0].conversationUid,id);
       if(context.kind==='practice-template'){const value=await api.practice(context.entityCode,context.contentVersion);if(live&&generation.current===id)setPractice(value);}
     }).catch(err=>{if(live)setError(failure(err));}).finally(()=>{if(live)setLoading(false);});
-    const sub=AppState.addEventListener('change',state=>{if(state!=='active'){cancel();}else{const version=generation.current;void api.list(context).then(list=>list.conversations[0]?restore(list.conversations[0].conversationUid,version):undefined).catch(err=>setError(failure(err)));}});
+    const sub=AppState.addEventListener('change',state=>{if(state!=='active'){cancel();}else if(tabActiveRef.current){const version=generation.current;void api.list(context).then(list=>list.conversations[0]?restore(list.conversations[0].conversationUid,version):undefined).catch(err=>setError(failure(err)));}});
     return()=>{live=false;generation.current++;controller.current?.abort();sub.remove();};
   },[]);
   const perform=async(operation:()=>Promise<void>)=>{if(flight.current)return;flight.current=true;setBusy(true);setError(null);const id=generation.current;
@@ -71,7 +73,7 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
     try{const reply=await api.send(payload,abort.signal);if(generation.current!==id)return;
       setConversation(reply.conversationUid);pending.current=null;setInput('');
       await restore(reply.conversationUid,id);
-      AccessibilityInfo.announceForAccessibility(reply.answer);
+      if(tabActiveRef.current)AccessibilityInfo.announceForAccessibility(reply.answer);
     }catch(err){if(generation.current===id)setError(failure(err));}
     finally{clearTimeout(slowTimer);clearTimeout(deadline);if(generation.current===id){flight.current=false;setBusy(false);setSlow(false);controller.current=null;}}
   };
@@ -108,7 +110,7 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
         onConfirmation={setConfirmation} onConfirm={confirm} onSelect={setSelected} onPracticeAnswer={practiceAnswer}
         onSource={code=>{if(!withdrawn)void source(code);}}
         onFeedback={(uid,rating)=>{void perform(async()=>{await api.feedback(uid,rating);
-          setMessages(old=>old.map(m=>m.messageUid===uid?{...m,rating}:m));AccessibilityInfo.announceForAccessibility(copy.feedbackSaved);});}}
+          setMessages(old=>old.map(m=>m.messageUid===uid?{...m,rating}:m));if(tabActiveRef.current)AccessibilityInfo.announceForAccessibility(copy.feedbackSaved);});}}
         onAction={action=>{cancel();onAction(action);}} onResume={onResume?()=>{close();onResume();}:undefined}
         canAbandon={Boolean(onAbandon)} />
     </KeyboardAvoidingView>

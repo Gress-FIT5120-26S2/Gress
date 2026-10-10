@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -5,7 +6,6 @@ import {
   AccessibilityInfo,
   Keyboard,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,

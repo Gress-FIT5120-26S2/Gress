@@ -738,7 +738,8 @@ const zh = {
     },
   },
   kitchen: {
-    accessibility: '可旋转的三维厨房；冰箱、购物车、信箱和故事黑板可以点击，灶台和菜谱可在原地互动',
+    accessibility: '可旋转的三维厨房；冰箱、购物车、信箱、垃圾桶和故事黑板可以点击',
+    wasteBin: '打开垃圾桶，进入废弃物知识总览',
     resetCamera: '恢复厨房视角',
     storyBoard: '观看食物浪费短片',
     resetCameraHint: '将三维厨房恢复到初始视角',
@@ -1900,7 +1901,8 @@ const en: Translation = {
     },
   },
   kitchen: {
-    accessibility: 'Rotatable 3D kitchen. Fridge, cart, mailbox, and story board can be tapped; stove and recipe book interact in place.',
+    accessibility: 'Rotatable 3D kitchen. Tap the fridge, cart, mailbox, waste bin, or story board.',
+    wasteBin: 'Open the waste bin to explore waste knowledge',
     resetCamera: 'Reset kitchen view',
     storyBoard: 'Watch the food waste story',
     resetCameraHint: 'Return the 3D kitchen to its initial camera angle',

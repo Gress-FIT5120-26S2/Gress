@@ -1,3 +1,4 @@
+import { TabModal as Modal } from '../RetainedTab';
 // src/components/shopping/ShoppingCheckoutReview.tsx
 // US5.4 checkout review + US5.5 add purchases to inventory (B1 draft flow).
 // Receives the WHOLE cart (the checkbox "confirm" gate was removed -- every
@@ -6,7 +7,6 @@
 // US5.5.3: leaving while any item is still not stocked prompts first.
 import React, { useMemo, useState } from 'react';
 import {
-  Modal,
   View,
   Text,
   FlatList,

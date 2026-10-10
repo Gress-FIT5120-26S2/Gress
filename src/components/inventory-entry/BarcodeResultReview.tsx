@@ -1,6 +1,7 @@
+import { TabModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { Modal, Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
 import type { BarcodeProduct } from '../../services/barcodeApi';
 import type { FoodPresetSuggestion } from '../../services/inventoryApi';

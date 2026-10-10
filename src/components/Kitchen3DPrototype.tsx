@@ -26,6 +26,8 @@ import { FridgeMemoryMagnet, TodayRecipeScene, WindowRain, type KitchenWeather }
 import { KitchenMailbox, KITCHEN_MAILBOX_POSITION, KITCHEN_MAILBOX_ROTATION } from './KitchenMailbox';
 import { KitchenShoppingCart, SHOPPING_CART_POSITION } from './KitchenShoppingCart';
 import { KitchenStoryBoard, KITCHEN_STORY_BOARD_POSITION } from './KitchenStoryBoard';
+import { KitchenWasteBin } from './KitchenWasteBin';
+import { getWastePortalFrame, KITCHEN_WASTE_BIN_POSITION, WASTE_BIN_OPENING_HEIGHT, WASTE_PORTAL_DURATION } from './kitchenWastePortal';
 import { SpoonieWorldCharacter } from './SpoonieWorldCharacter';
 import {
   KitchenTimeEnvironment,
@@ -57,8 +59,8 @@ type FeatureHotspotProps = {
   selected?: boolean;
 };
 
-type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox' | 'story';
-type KitchenNavigationFeature = Extract<KitchenFeature, 'fridge' | 'shopping' | 'mailbox'>;
+type KitchenFeature = 'fridge' | 'stove' | 'recipes' | 'shopping' | 'mailbox' | 'story' | 'waste';
+type KitchenNavigationFeature = Extract<KitchenFeature, 'fridge' | 'shopping' | 'mailbox' | 'waste'>;
 type KitchenInteraction = KitchenNavigationFeature | null;
 type LoadedKitchen = { scene: Object3D; animations: AnimationClip[] };
 type CameraFocusConfig = {
@@ -140,6 +142,12 @@ const CAMERA_FOCUS: Record<KitchenNavigationFeature, CameraFocusConfig> = {
     cameraOffset: [4.25, 0.82, 0],
     targetOffset: [0, 0.16, 0],
     duration: 1320,
+  },
+  waste: {
+    worldPosition: KITCHEN_WASTE_BIN_POSITION,
+    cameraOffset: [0, 0.025, 0.005],
+    targetOffset: [0, WASTE_BIN_OPENING_HEIGHT - 0.07, 0],
+    duration: WASTE_PORTAL_DURATION,
   },
 };
 // 中文：暂时关闭灶台点火和菜谱翻开的首页互动；改成 true 即可恢复热点和点击反应。
@@ -393,6 +401,20 @@ function KitchenModel({
     };
   }, [invalidate, scene]);
 
+  useLayoutEffect(() => {
+    // Arthur: NarIyirm
+    // 中文：只替换左下角的地面盆栽和凳子，保留架上绿植；清理时恢复缓存 GLB 的可见性。
+    // EN: Replace only the floor plant and stool, retaining shelf greenery and restoring cached GLB visibility on cleanup.
+    const hidden: { object: Object3D; visible: boolean }[] = [];
+    scene.traverse((object) => {
+      if (!/^(Floor_Plant_|Plant_Stool_)/.test(object.name)) return;
+      hidden.push({ object, visible: object.visible });
+      object.visible = false;
+    });
+    invalidate();
+    return () => { for (const { object, visible } of hidden) object.visible = visible; };
+  }, [invalidate, scene]);
+
   useEffect(() => {
     if (reduceMotion || !sceneVisible) {
       invalidate();
@@ -460,6 +482,15 @@ function KitchenModel({
   return (
     <>
       <primitive object={scene} />
+
+      <group position={KITCHEN_WASTE_BIN_POSITION}>
+        <KitchenWasteBin active={activeInteraction === 'waste' && sceneVisible} reduceMotion={sceneMotionPaused} />
+        {activeInteraction === null || activeInteraction === 'waste' ? (
+          <group position={[0, 0.48, 0]}>
+            <FeatureHotspot hitboxSize={[0.95, 1.1, 0.95]} markerOffset={[0, 0.62, 0]} onPress={() => onSelectFeature('waste')} reduceMotion={sceneMotionPaused} selected={pressedFeature === 'waste'} />
+          </group>
+        ) : null}
+      </group>
 
       {/* Arthur: NarIyirm
           中文：小黑板挂在后墙台面上方；独立热区沿用厨房里其他物件的点击与提示方式。
@@ -569,6 +600,9 @@ function KitchenCameraControls({
   const { scene } = useGLTF(KITCHEN_MODEL_ASSET) as LoadedKitchen;
   const controlsRef = useRef<OrbitControlsImpl>(null);
   const cameraMotionRef = useRef<CameraMotion | null>(null);
+  const portalCoverRef = useRef<Mesh>(null);
+  const portalCoverMaterialRef = useRef<MeshBasicMaterial>(null);
+  const rollAxis = useMemo(() => new Vector3(), []);
   const camera = useThree((state) => state.camera);
   const invalidate = useThree((state) => state.invalidate);
   const canvasWidth = useThree((state) => state.size.width);
@@ -601,6 +635,7 @@ function KitchenCameraControls({
     // 中文：切离首页时立刻复位镜头；隐藏态下 demand 帧循环可能不跑完动画复位。
     // EN: Snap the camera as soon as home deactivates; a paused demand loop may never finish an animated reset.
     cameraMotionRef.current = null;
+    if (portalCoverRef.current) portalCoverRef.current.visible = false;
     camera.position.set(...INITIAL_CAMERA_POSITION);
     camera.up.set(0, 1, 0);
     controlsRef.current?.target.set(...CAMERA_TARGET);
@@ -612,6 +647,7 @@ function KitchenCameraControls({
   useEffect(() => {
     if (!activeInteraction) {
       cameraMotionRef.current = null;
+      if (portalCoverRef.current) portalCoverRef.current.visible = false;
       return;
     }
 
@@ -698,6 +734,37 @@ function KitchenCameraControls({
     if (motion.startedAt === null) motion.startedAt = clock.elapsedTime;
 
     const progress = MathUtils.clamp(((clock.elapsedTime - motion.startedAt) * 1000) / motion.duration, 0, 1);
+    if (motion.feature === 'waste') {
+      const frame = getWastePortalFrame((clock.elapsedTime - motion.startedAt) * 1000);
+      // Arthur: NarIyirm
+      // 中文：先对准已打开的桶口，再收缩螺旋半径并滚转镜头；遮罩贴着相机，始终盖住整个视口。
+      // EN: Aim at the open rim, then shrink the spiral radius and roll the camera; a camera-aligned veil covers the entire viewport.
+      motion.currentTarget.lerpVectors(motion.startTarget, motion.endTarget, frame.aim);
+      motion.currentSpherical.set(
+        MathUtils.lerp(MathUtils.lerp(motion.startSpherical.radius, 2.15, frame.aim), 0.025, frame.pull),
+        MathUtils.lerp(MathUtils.lerp(motion.startSpherical.phi, 0.28, frame.aim), 0.02, frame.pull),
+        motion.startSpherical.theta + frame.pull * Math.PI * 1.8,
+      );
+      motion.currentOffset.setFromSpherical(motion.currentSpherical);
+      camera.position.copy(motion.currentTarget).add(motion.currentOffset);
+      rollAxis.copy(motion.currentTarget).sub(camera.position).normalize();
+      camera.up.set(0, 1, 0).applyAxisAngle(rollAxis, frame.roll);
+      camera.lookAt(motion.currentTarget);
+      camera.updateMatrixWorld();
+      controlsRef.current?.target.copy(motion.currentTarget);
+      if (portalCoverRef.current) {
+        portalCoverRef.current.visible = frame.fade > 0;
+        portalCoverRef.current.position.copy(camera.position).addScaledVector(rollAxis, 0.2);
+        portalCoverRef.current.quaternion.copy(camera.quaternion);
+      }
+      if (portalCoverMaterialRef.current) portalCoverMaterialRef.current.opacity = frame.fade;
+      if (frame.progress < 1) invalidate();
+      else {
+        cameraMotionRef.current = null;
+        onFocusCompleteRef.current('waste');
+      }
+      return;
+    }
     const moveProgress = cameraMoveEase(progress);
     const zoomStart = EFFECT_CUE_PROGRESS * 0.58;
     const zoomProgress = cameraZoomEase(MathUtils.clamp((progress - zoomStart) / (1 - zoomStart), 0, 1));
@@ -734,27 +801,33 @@ function KitchenCameraControls({
   });
 
   return (
-    <OrbitControls
-      ref={controlsRef}
-      makeDefault
-      enabled={activeInteraction === null && !isResettingCamera}
-      enablePan={false}
-      enableDamping={activeInteraction === null}
-      dampingFactor={0.12}
-      minDistance={16}
-      maxDistance={31}
-      minPolarAngle={0.62}
-      maxPolarAngle={1.28}
-      minAzimuthAngle={-0.95}
-      maxAzimuthAngle={0.95}
-      target={CAMERA_TARGET}
-      onStart={() => {
-        onExplore?.();
-        onCameraChanged();
-        onCameraActivity();
-      }}
-      onEnd={onCameraActivity}
-    />
+    <>
+      <mesh ref={portalCoverRef} visible={false} renderOrder={1000} frustumCulled={false}>
+        <planeGeometry args={[10, 10]} />
+        <meshBasicMaterial ref={portalCoverMaterialRef} color="#000000" transparent opacity={0} depthTest={false} depthWrite={false} toneMapped={false} />
+      </mesh>
+      <OrbitControls
+        ref={controlsRef}
+        makeDefault
+        enabled={activeInteraction === null && !isResettingCamera}
+        enablePan={false}
+        enableDamping={activeInteraction === null}
+        dampingFactor={0.12}
+        minDistance={16}
+        maxDistance={31}
+        minPolarAngle={0.62}
+        maxPolarAngle={1.28}
+        minAzimuthAngle={-0.95}
+        maxAzimuthAngle={0.95}
+        target={CAMERA_TARGET}
+        onStart={() => {
+          onExplore?.();
+          onCameraChanged();
+          onCameraActivity();
+        }}
+        onEnd={onCameraActivity}
+      />
+    </>
   );
 }
 
@@ -835,8 +908,10 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
     AccessibilityInfo.isReduceMotionEnabled().then((enabled) => {
       if (mounted) setReduceMotion(enabled);
     });
+    const subscription = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
     return () => {
       mounted = false;
+      subscription.remove();
     };
   }, []);
 
@@ -891,6 +966,7 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
   }, [activeInteraction, cameraActivityVersion, isCameraModified, isResettingCamera, requestCameraReset]);
 
   const handleSelectFeature = useCallback((feature: KitchenFeature) => {
+    if (!active || interactionRef.current || isResettingCamera) return;
     registerCameraActivity();
     if (markerFeedbackTimerRef.current) clearTimeout(markerFeedbackTimerRef.current);
     setPressedFeature(feature);
@@ -921,15 +997,13 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
       return;
     }
 
-    if (interactionRef.current) return;
-
     // Arthur: NarIyirm
-    // 中文：冰箱、购物车和信箱会锁住输入并进入镜头导航；灶台与菜谱只更新首页中的本地动效状态。
-    // EN: Fridge, cart, and mailbox lock input for camera navigation; stove and recipe update local home-scene effects only.
+    // 中文：冰箱、购物车、信箱和垃圾桶锁住输入并进入镜头导航；灶台与菜谱只更新本地动效。
+    // EN: Fridge, cart, mailbox and waste bin lock input for camera navigation; stove and recipes only update local effects.
     interactionRef.current = feature;
     onInteractionStart?.();
     setActiveInteraction(feature);
-  }, [onExplore, onInteractionStart, onOpenStory, registerCameraActivity]);
+  }, [active, isResettingCamera, onExplore, onInteractionStart, onOpenStory, registerCameraActivity]);
 
   const handleEffectCue = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current === feature) setEffectInteraction(feature);
@@ -937,6 +1011,13 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
 
   const handleFocusComplete = useCallback((feature: KitchenNavigationFeature) => {
     if (interactionRef.current !== feature) return;
+    if (feature === 'waste') {
+      // Arthur: NarIyirm
+      // 中文：保持垃圾桶交互锁和全黑帧直到首页失活，避免页面遮罩接管前闪回厨房或重复点击导航。
+      // EN: Retain the waste lock and black frame until home deactivates, preventing a kitchen flash or repeated navigation before the page veil takes over.
+      onNavigate('learn');
+      return;
+    }
     // Arthur: NarIyirm
     // 中文：导航发出后立刻释放交互锁，避免 keep-alive 场景在切页后重复完成焦点并跳回冰箱。
     // EN: Release the interaction lock as soon as navigation fires so a kept-alive scene cannot complete focus again and bounce back to fridge.
@@ -948,13 +1029,14 @@ export function Kitchen3DPrototype({ active = true, batches = [], expiringCount 
 
   return (
     <View
-      accessibilityActions={[{ name: 'watchStory', label: t.kitchen.storyBoard }]}
+      accessibilityActions={[{ name: 'watchStory', label: t.kitchen.storyBoard }, { name: 'learnWaste', label: t.kitchen.wasteBin }]}
       accessibilityLabel={t.kitchen.accessibility}
       onAccessibilityAction={(event) => {
         // Arthur: NarIyirm
-        // 中文：读屏用户可从厨房的自定义操作进入故事，避免只能点击 3D 热区。
-        // EN: The kitchen exposes the story as a screen-reader action so it does not depend on tapping a 3D hitbox.
-        if (event.nativeEvent.actionName === 'watchStory') onOpenStory();
+        // 中文：读屏用户可从厨房的自定义操作进入故事或废弃物学堂，不依赖点击 3D 热区。
+        // EN: Screen-reader actions open the story or waste learning without relying on a 3D hitbox.
+        if (event.nativeEvent.actionName === 'watchStory' && !interactionRef.current) onOpenStory();
+        if (event.nativeEvent.actionName === 'learnWaste') handleSelectFeature('waste');
       }}
       onTouchStart={registerCameraActivity}
       style={styles.container}

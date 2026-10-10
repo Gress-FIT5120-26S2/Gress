@@ -1,3 +1,4 @@
+import { useTabActive } from '../../RetainedTab';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { AccessibilityInfo, AppState, Text, View } from 'react-native';
 import { useI18n } from '../../../i18n';
@@ -13,6 +14,7 @@ import { TutorEntryButton, TutorHelpCard } from './LearningTutorView';
 type Props={children:ReactNode;content:PublicLearningContent;route:LearningRoute;gateway:LearningRoomGateway;
   busy:boolean;storyVisible:boolean;onNavigate:(route:LearningRoute)=>void;onResume:(uid:string)=>void;onAbandoned:()=>void;};
 export function LearningTutorController({children,content,route,gateway,busy,storyVisible,onNavigate,onResume,onAbandoned}:Props){
+  const tabActive=useTabActive();
   const {t,language}=useI18n();const copy=t.learningTutor;
   const [panel,setPanel]=useState<TutorContext|null>(null);const [prompt,setPrompt]=useState<string>();
   const [intervention,setIntervention]=useState<TutorIntervention|null>(null);const [recommendations,setRecommendations]=useState<TutorRecommendations|null>(null);
@@ -31,16 +33,19 @@ export function LearningTutorController({children,content,route,gateway,busy,sto
     :{kind:'general',contentVersion:content.contentVersion};
   const contextKey=JSON.stringify(context);const routeKey=JSON.stringify(route.name==='hub'?{name:route.name,segment:route.segment}:route.name==='result'?{name:'result',uid:route.result.attemptUid}:context);
   const formalUnanswered=Boolean(route.name==='quiz'&&quiz?.mode!=='practice'&&!quiz?.feedback);
-  const canOffer=active&&!storyVisible&&!busy&&!panel&&!formalUnanswered;
+  // Arthur: NarIyirm
+  // 中文：隐藏预加载和导航切走不计算导师停留时间，也不写入提示已展示事件。
+  // EN: Hidden preload and off-tab visits neither count tutor dwell time nor record shown interventions.
+  const canOffer=tabActive&&active&&!storyVisible&&!busy&&!panel&&!formalUnanswered;
   useEffect(()=>{let alive=true;void AccessibilityInfo.isScreenReaderEnabled().then(v=>{if(alive)setScreenReader(v);});
     const reader=AccessibilityInfo.addEventListener('screenReaderChanged',setScreenReader);
     const app=AppState.addEventListener('change',v=>{setActive(v==='active');if(v!=='active')setIntervention(null);});
     return()=>{alive=false;reader.remove();app.remove();};},[]);
   useEffect(()=>{visit.current=newTutorKey();hintKey.current=null;setHint(null);setPanel(null);setIntervention(null);setError(null);},[routeKey]);
-  useEffect(()=>{let alive=true;setRecommendations(null);
+  useEffect(()=>{let alive=true;if(!tabActive||!active)return;setRecommendations(null);
     if(!activeAttempt&&(route.name==='result'||route.name==='hub'&&route.segment==='path'))
       void api.recommendations(content.contentVersion).then(v=>{if(alive)setRecommendations(v);}).catch(()=>undefined);
-    return()=>{alive=false;};},[routeKey,activeAttempt,active,content.contentVersion]);
+    return()=>{alive=false;};},[routeKey,activeAttempt,active,tabActive,content.contentVersion]);
   useEffect(()=>{
     let alive=true;let timer:ReturnType<typeof setTimeout>|undefined;
     if(!canOffer||activeAttempt)return;

@@ -1,3 +1,5 @@
+import { Asset } from 'expo-asset';
+import { Image } from 'expo-image';
 import type { ImageSourcePropType } from 'react-native';
 
 type LearningImageAsset = {
@@ -54,6 +56,26 @@ export type LearningAssetKey = keyof typeof learningAssets;
 
 const sdgChineseSource: ImageSourcePropType = require('../../../assets/learning-room/sdg-13-climate-action-zh.png');
 
+let preload: Promise<void> | null = null;
+
+// Arthur: NarIyirm
+// 中文：图片解码缓存与视频文件提前准备，失败允许下次重试；不提前创建播放器或自动播放。
+// EN: Warm image caches and video files with retry after failure, without creating a player or autoplaying.
+export function preloadLearningAssets(): Promise<void> {
+  if (preload) return preload;
+  preload = (async () => {
+    const sources = [...Object.values(learningAssets).map(asset => asset.source), sdgChineseSource];
+    const images = await Promise.all(sources.map(source => Asset.fromModule(source as number).downloadAsync()));
+    const cached = await Image.prefetch(images.map(asset => asset.localUri ?? asset.uri), { cachePolicy: 'memory-disk' });
+    await Asset.loadAsync([
+      require('../../../assets/story/food-waste/poster.png'),
+      require('../../../assets/story/food-waste/kitchmemo-food-waste-linear-60s.mp4'),
+    ]);
+    if (!cached) throw new Error('Learning image preload failed');
+  })().catch(error => { preload = null; throw error; });
+  return preload;
+}
+
 export function getLearningImageSource(key: LearningAssetKey, language: 'en' | 'zh'): ImageSourcePropType {
   return key === 'sdg-13-climate-action' && language === 'zh' ? sdgChineseSource : learningAssets[key].source;
 }
@@ -71,4 +93,3 @@ export const learningSdgAttribution = {
   en: 'The content of this publication has not been approved by the United Nations and does not reflect the views of the United Nations or its officials or Member States.',
   zh: '本刊物内容未经联合国批准，不代表联合国、其官员或会员国的观点。',
 } as const;
-

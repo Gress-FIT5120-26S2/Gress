@@ -951,3 +951,12 @@ learning_tutor_action原子claim/finish持同一learner锁；同requestKey不同
 recommendations只统计本人当前可用版本近30天已提交正式首答，questionCode/本地日去重，每topic最近5个、样本至少2、最近两次正确停止，最多2项。practice-first-answers-v1单独用于练习错题主动帮助，不能进入正式推荐/升级。关闭personalized停止此统计/提示；关闭proactive仍可手动提问；dwell默认关闭。help原子限频：同visit一次、跨页5分钟、拒绝topic24小时、每本地日3次，所有active checkpoint禁止。
 
 模型使用现有Responses transport、store:false、独立教学提示词、最多6公开证据块/8条历史/本人一题反馈，无库存或grading工具；引用只允许登记来源enum/maxItems:6，导航由服务器映射。额外12模板由服务器固定判分，scored:false，不改变正式进度/库存/成就/XP。真实模型评估60/60结构通过不代表独立事实审核；原课程P5/审核、导师模板审核及生产发布仍pending。实际状态/证据见docs/learning-room/AI_TUTOR_STATUS.md及verification/2026-10-08/。
+
+
+### 客户端导航内存与页面预加载（2026-10-11）
+
+首页首帧完成后的空闲时段，隐藏挂载 Learn、Shopping、Achievements、Profile、Notifications，预读现有 API，并预热课程图片与故事视频文件。购物两个子页同时挂载，通知偏好与成果报告也提前读取。普通主导航切换保留这些组件实例和本地视图状态；Home 与 Fridge 继续使用各自既有返回交互。Fridge 首次渲染复用根节点预取的同 fridge.uid 库存与共享摘要，然后继续原来的进入页读取与同步订阅。这是当前 App 会话内的 UI 内存，不新增离线权威数据或本地学习判分。
+
+Learn 的个人 gateway 跨普通 Tab 切换复用，应用从后台恢复或缓存超过五分钟后在可见页面静默校验，隐藏页面延迟到下一次激活。学习提交、导师对话与判分仍调用原 API；预加载不会启动测验、自动完成课程、请求系统通知权限或写入导师提示展示事件。后台数据同步继续刷新现有 Provider/列表，不因保留视图而停止。已有成功快照（含空列表）时继续显示内容，自动刷新不切回整页加载或骨架屏；首次数据尚未取得、真实首载错误及主动提交/下拉刷新反馈仍保留。报告快照合并并发读取，父层作用域销毁后拒绝迟到响应。
+
+切换 fridge.uid 会重建冰箱范围的购物、消息与成果页面；join/leave 不清除个人 Learn。设备恢复成功后通过 navigationMemory 清除旧学习、购物、消息、成果实例、通知设置及根节点库存缓存，并通知现有同步订阅重新读取数据，即使恢复目标 fridge.uid 相同也清除旧 gateway。Profile 的恢复码展示保留，便于保存新一次性恢复码。API 与数据库合同没有变化。

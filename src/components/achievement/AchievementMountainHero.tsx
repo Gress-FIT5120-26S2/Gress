@@ -1,3 +1,4 @@
+import { useTabActive } from '../RetainedTab';
 import * as Haptics from 'expo-haptics';
 import { Image, type ImageSource } from 'expo-image';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -310,6 +311,7 @@ function usePrefersReducedMotion() {
 // 中文：前后云层使用独立的原生驱动循环形成错速景深；减少动态效果开启时停在中点，并在卸载时停止循环。
 // EN: Independent native-driven loops give the cloud layers parallax depth; reduced motion holds both at rest and unmounting stops every loop.
 function useCloudMotion(reducedMotion: boolean) {
+  const tabActive = useTabActive();
   const backCloudProgress = useRef(new Animated.Value(0.5)).current;
   const frontCloudProgress = useRef(new Animated.Value(0.5)).current;
 
@@ -318,7 +320,7 @@ function useCloudMotion(reducedMotion: boolean) {
     frontCloudProgress.stopAnimation();
     backCloudProgress.setValue(0.5);
     frontCloudProgress.setValue(0.5);
-    if (reducedMotion) return;
+    if (reducedMotion || !tabActive) return;
 
     const cloudEase = Easing.bezier(0.42, 0, 0.58, 1);
     const backLoop = Animated.loop(Animated.sequence([
@@ -338,7 +340,7 @@ function useCloudMotion(reducedMotion: boolean) {
       backLoop.stop();
       frontLoop.stop();
     };
-  }, [backCloudProgress, frontCloudProgress, reducedMotion]);
+  }, [backCloudProgress, frontCloudProgress, reducedMotion, tabActive]);
 
   return { backCloudProgress, frontCloudProgress };
 }
