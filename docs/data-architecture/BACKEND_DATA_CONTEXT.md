@@ -4,6 +4,8 @@
 
 ## 1. 当前状态
 
+- 2026-10-12 App Store 隐私准备：新增 `20261012100000_app_store_privacy_and_erasure.sql`，当前阶段为本地实现，尚待开发库验证及生产应用，不能据此宣称已部署。它新增 AI 授权、已删除身份指纹、资产清理队列与今后恢复链；设备、库存和共享数据的删除合同详见文末新节。此前 57 份迁移仍保持不变。
+
 - 2026-10-12 发布完成：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 已先在开发库应用、通过 release guard 回滚检查与 lint，再以完全相同文件应用生产。课程 v1 已 published，导师新增 v3 已 published（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。生产 API 已切换，三导师开关开启，正式域名 health 200/database connected。详见 `docs/learning-room/verification/2026-10-12/RELEASE_VERIFICATION.md`。
 
 - 最后核对日期：2026-10-12（Australia/Sydney）。
@@ -965,3 +967,19 @@ recommendations只统计本人当前可用版本近30天已提交正式首答，
 Learn 的个人 gateway 跨普通 Tab 切换复用，应用从后台恢复或缓存超过五分钟后在可见页面静默校验，隐藏页面延迟到下一次激活。学习提交、导师对话与判分仍调用原 API；预加载不会启动测验、自动完成课程、请求系统通知权限或写入导师提示展示事件。后台数据同步继续刷新现有 Provider/列表，不因保留视图而停止。已有成功快照（含空列表）时继续显示内容，自动刷新不切回整页加载或骨架屏；首次数据尚未取得、真实首载错误及主动提交/下拉刷新反馈仍保留。报告快照合并并发读取，父层作用域销毁后拒绝迟到响应。
 
 切换 fridge.uid 会重建冰箱范围的购物、消息与成果页面；join/leave 不清除个人 Learn。设备恢复成功后通过 navigationMemory 清除旧学习、购物、消息、成果实例、通知设置及根节点库存缓存，并通知现有同步订阅重新读取数据，即使恢复目标 fridge.uid 相同也清除旧 gateway。Profile 的恢复码展示保留，便于保存新一次性恢复码。API 与数据库合同没有变化。
+
+## 18. App Store 隐私、AI 授权与身份删除（2026-10-12 新合同）
+
+公开 `/privacy`、`/support` 无设备鉴权、无需 JavaScript，提供中英双语，运营方 Haoxuan Sun，公开邮箱 nariyirm@gmail.com。审核电话号码不进入仓库／公共页面。真实照片识别端点是 AWS CloudFront 分发的独立模型服务，不是 Gemini 照片 API。
+
+`device_privacy_choices` 以 device_id 绑定授权，版本 `2026-10-12`，默认无授权。`GET/PUT /api/privacy/ai-consent` 仅用已鉴权身份；PUT 只接受布尔 allowed 和精确版本。Express 在照片 multipart 解析或任何供应商请求前拦截七类 AI POST（助手／导师消息、照片识别、食物预设生成、自定义分类、包装建议、材质图标），未授权 403 `ai_consent_required`，数据库故障 fail closed。读取历史、人工库存、购物、静态课程与本地规则不受限制。前端用统一授权桥接和单个原生弹窗合并并发请求；明确拒绝后不反复弹窗，只能通过隐私页主动重新授权。每次 AI 请求仍复核服务端选择，撤回阻止后续请求；已在供应商处理中的请求不可召回。授权不通过身份恢复隐式迁移。
+
+`DELETE /api/privacy/device-data` 只接受 `{confirm:'DELETE'}`。`erase_device_data` 再次核验当前凭证摘要，锁住身份／成员并在单事务删除资料、凭证、恢复码、推送、私人学习／聊天，以及本人创建或拥有的库存／购物条目及依赖提醒、动作和事件。其他成员原始批次与清单保留。本人自定义分类删除，其他成员引用移到同冰箱默认 Other；无身份默认分类和共享容器保留。本人在其他成员条目的历史事件去除 actor 与自由备注；不保留当前身份可识别的 UGC。本人创建的冰箱名称恢复 My Fridge，作者关联置空。为支持真正删除，fridges/food_categories.created_by_device_id 与 inventory_events.actor_device_id 改为 nullable／ON DELETE SET NULL；其他 RPC 正常创建仍传入真实 actor。
+
+`device_identity_links` 由成员设备 ID 更新触发器记录今后的恢复链，删除时递归清理已撤销前身。旧迁移之前已发生的恢复不能凭名称／库存猜测关联；其遗留已撤销安装记录需要带可验证身份信息的支持请求或专门保留策略处理，不能宣称历史恢复链已完成回填。
+
+`erased_device_fingerprints` 仅保存安装 ID 的 SHA-256 指纹，没有原 ID、凭证、昵称或时间，永久阻止旧身份 bootstrap。设备 INSERT trigger 与删除共用 advisory lock，迟到请求不能重建旧记录。服务端明确返回 401 `identity_erased`；客户端持久化已删除状态、卸载业务 Provider 并停止请求、清除本机通知。只有用户按“重新开始”时删除本机 SecureStore 旧密钥、清除引导与提醒缓存，再创建全新空身份。丢失删除响应后，下一次该专用错误仍恢复删除完成界面。
+
+分类生成图标路径同事务写入 `erasure_asset_queue`；立即尝试通过 Supabase Storage API 删除，成功才移除队列，失败保留待重试。Vercel 每天 03:30 UTC 调用 `/api/internal/erasure-assets`，独立服务端 CRON_SECRET 鉴权，公开／设备请求不得触发管理员存储清理。当前 cron 是否已部署须见 App Store 准备验证记录，不能仅凭配置文件视为已运行。
+
+四张新表均启用 RLS，anon/authenticated 无读写权限；恢复链与指纹写入仅由 SECURITY DEFINER trigger/RPC，队列只给 service_role SELECT/DELETE，删除 RPC 仅给 service_role EXECUTE。公开政策与元数据不承诺食品安全判定，不承诺第三方已处理数据／备份即时清除。
