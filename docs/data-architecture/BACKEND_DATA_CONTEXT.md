@@ -4,21 +4,26 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-10-05（Australia/Sydney）。
+- 2026-10-12 发布准备：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 将课程 v1 发布审核绑定原哈希，并新增导师 v3（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。该新文件按开发库先应用验证、再生产的顺序执行，结果另存本次发布记录。
+
+- 最后核对日期：2026-10-12（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 49 份 migration。CLI 当前链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库已登记并应用到 `20261005011000_learning_room_draft.sql`，Learning Room 298 次真实 HTTP 请求及版本／恢复 SQL 回滚验证通过。既有包装快照与多部件分类学习接口验证保留。生产库未应用本轮两份 learning migration，仍须按顺序补齐前置 migration 后才能发布依赖新契约的 Express 与 App。
+- 本地 schema 历史共有 56 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261008016000_fix_learning_tutor_credential_alias.sql`。2026-10-12 将生产缺少的 17 份原文件按顺序补齐，生产再次 dry-run 无待执行 migration。未运行 seed、reset 或 migration repair，未改写既有迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
-- 本轮远程只读核对 public schema 共有 44 张普通表，其中 Learning Room 新增 7 张；保留既有设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC、冰箱领域同步版本，以及成就等级和 XP 流水。
+- 本轮远程核对两端 public schema 均有 50 张普通表、500 个字段、364 个约束、79 个非扩展函数、128 个索引、32 个业务触发器与 7 个枚举。结构、函数正文（统一 CRLF/LF 后）、权限与 RLS 完全一致；两端 lint 均无错误或警告。生产 22 张有记录的既有业务表在迁移前后汇总指纹一致。完整记录与可复用核对 SQL 见 `docs/data-architecture/verification/2026-10-12/PRODUCTION_MIGRATION_VERIFICATION.md`。
 - Seed 现在包含 16 条常见食材建议和 4 条旧成就定义；`20260912020000_achievement_dashboard.sql` 会幂等扩充并统一为 8 条已确认成就定义。新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
-- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。分类管理接口尚未实现；生产发布仍须先应用 `20260912010000` 和 `20260912020000`。
+- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、自定义分类、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。库存结果记账、成就、挑战、包装分类学习、Learning Room 与 Learning Tutor 的数据库依赖现已全部进入生产；Express 与 App 发版仍须另行完成。
 - 已在开发库和生产库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。数据库契约已经进入生产，但生产知识内容摄取、OpenAI 环境变量、Express API 部署和端到端验收仍需单独完成。
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
 - `20260913170000_assistant_inventory_outcomes.sql` 将助手的整批使用、明确丢弃和录入纠错统一接入 `resolve_inventory_batch`：使用写 `consume/used`，丢弃写带稳定原因的 `discard`，只有明确录入错误才写 `adjust/data_correction`。这些权威流水会被现有成就、XP、环境指标和挑战聚合直接消费；模糊的非过期“删除”请求必须先澄清结果类型。
 - `20260922010000_fix_shared_join_assistant_scope.sql` 修复已有助手会话时加入家庭冰箱会被复合外键阻断的问题：合并前将该设备的私有会话与审计范围迁入目标冰箱，让依赖旧库存版本的待确认/已确认动作失效并解除旧批次绑定，再执行库存与分类迁移。
+
+- 2026-10-12：生产所有 50 张 public 表启用 RLS，anon/authenticated 无表权限或 security-definer RPC 执行权限，学习表的 service role 保持直接只读。`learning-tutor-retention` 已启用，每日 03:17 UTC 调用清理函数。课程 `learning-room-v1` 与导师 `learning-tutor-v1/v2` 仍为 draft，独立审核 pending，生产默认门禁继续拒绝草稿；补齐 schema 不代表内容已发布。
+- 历史登记差异：`20260830005000_restock_and_cart.sql` 在开发与生产的旧 `statements` 记录不同（开发只登记函数，生产另登记购物表与索引）；当前真实结构与函数已一致。保留历史记录，不重写迁移或修复登记。本文后续按日期保留的“生产未应用”描述均为当时状态，当前部署状态以本节及 2026-10-12 核对记录为准。
 
 实际实现的权威来源：
 

@@ -1,0 +1,332 @@
+{
+  "date": "2026-10-12",
+  "timeZone": "Australia/Sydney",
+  "sourceCommit": "57fe8336da554328ddf17f56e90864d53823a528",
+  "developmentProject": "thmbtsssvnslotoexntz",
+  "productionProject": "vcsujjaapchvcnndlhqb",
+  "applied": [
+    "20260922010000_fix_shared_join_assistant_scope.sql",
+    "20260923120000_reserve_weekly_quest_rerolls.sql",
+    "20260923121000_clean_weekly_quest_slot_reconciliation.sql",
+    "20260924010000_achievement_stage_report.sql",
+    "20261002010000_waste_sorting_learning.sql",
+    "20261003010000_skip_sync_for_deleted_fridges.sql",
+    "20261003020000_one_sorting_attempt_per_event.sql",
+    "20261004010000_inventory_waste_profiles.sql",
+    "20261005010000_learning_room_assessment.sql",
+    "20261005011000_learning_room_draft.sql",
+    "20261008010000_learning_tutor_foundation.sql",
+    "20261008011000_learning_tutor_draft.sql",
+    "20261008012000_learning_tutor_review_help.sql",
+    "20261008013000_fix_learning_tutor_support.sql",
+    "20261008014000_learning_tutor_evidence_v2.sql",
+    "20261008015000_learning_tutor_versioned_context.sql",
+    "20261008016000_fix_learning_tutor_credential_alias.sql"
+  ],
+  "localMigrationCount": 56,
+  "schemaCounts": {
+    "column": 500,
+    "constraint": 364,
+    "enum": 7,
+    "function": 79,
+    "index": 128,
+    "migration": 56,
+    "table": 50,
+    "trigger": 32
+  },
+  "schemaDifferences": [],
+  "missingObjects": [],
+  "historicalMigrationMetadataDifferences": [
+    "20260830005000"
+  ],
+  "existingDataFingerprintUnchanged": true,
+  "existingDataTablesWithRowsChecked": 22,
+  "security": {
+    "courseVersions": [
+      {
+        "hash": "0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054",
+        "independentReview": "pending",
+        "status": "draft",
+        "version": "learning-room-v1"
+      }
+    ],
+    "learningServiceWriteGrants": [],
+    "mobileDefinerFunctions": [],
+    "mobileTableGrants": [],
+    "publicTables": 50,
+    "referenceCounts": {
+      "achievements": 8,
+      "dailyQuests": 14,
+      "levels": 5,
+      "wasteMaterials": 11,
+      "weeklyQuests": 20
+    },
+    "retentionJobs": [
+      {
+        "active": true,
+        "command": "select public.cleanup_learning_tutor()",
+        "name": "learning-tutor-retention",
+        "schedule": "17 3 * * *"
+      }
+    ],
+    "tablesWithoutRls": [],
+    "tutorVersions": [
+      {
+        "contentHash": "0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054",
+        "contentVersion": "learning-room-v1",
+        "status": "draft",
+        "version": "learning-tutor-v1"
+      },
+      {
+        "contentHash": "0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054",
+        "contentVersion": "learning-room-v1",
+        "status": "draft",
+        "version": "learning-tutor-v2"
+      }
+    ]
+  },
+  "productionDryRun": "up to date; no pending migrations, seeds or roles",
+  "lint": {
+    "development": "no errors or warnings",
+    "production": "no errors or warnings"
+  },
+  "rollbackSmoke": {
+    "development": "passed",
+    "production": "passed; all fixture writes rolled back"
+  },
+  "developmentRegression": {
+    "learningRoomRequests": 298,
+    "learningTutorRequests": 61,
+    "learningTutorProvider": "verification spy",
+    "wasteLearning": "passed",
+    "questCatalogue": "passed",
+    "sharing": "passed"
+  },
+  "migrationFiles": [
+    {
+      "name": "20260829000000_initial_kitchmemo_schema.sql",
+      "sha256": "f022e7f21b364847a2f3ae722f27890ceddac60b3b58a6cfc536cb9b2d0d4d0f"
+    },
+    {
+      "name": "20260830000000_create_inventory_batch_rpc.sql",
+      "sha256": "8c43513f9c863f55eb2b4a23161cb76495b1ea6da7772ba86109e3b96b8fece2"
+    },
+    {
+      "name": "20260830005000_restock_and_cart.sql",
+      "sha256": "ac94cdc45b119bda0abafbe1ac872eca902e18f3a42fd46e0927f4ad5da9948d"
+    },
+    {
+      "name": "20260830010000_inventory_detail_mutations.sql",
+      "sha256": "7a6510e7760d1c1615dab609529a2513e0963cd28f2ae171603d6f3de15dbd2b"
+    },
+    {
+      "name": "20260830020000_fix_inventory_lifecycle_enum_cast.sql",
+      "sha256": "3c8c4f7346e0d227e790e9cc74a008e2d2128db320ee1f05840866bcaedc4511"
+    },
+    {
+      "name": "20260830200000_sync_fridge_notifications.sql",
+      "sha256": "729d2dba8c959cc230350f940c65929ca724cf736582b888b3753363372fac88"
+    },
+    {
+      "name": "20260831010000_upsert_photo_recognition_food_presets.sql",
+      "sha256": "576ce5f20dbbf7968c08b848bc3155639c4e58e96657363c3cba525ee609299f"
+    },
+    {
+      "name": "20260831020000_device_owned_shared_fridges.sql",
+      "sha256": "6a6a736b18ced7b6ce068f9b2d7d55d9ac14896e4522f4c94617fce3f28a27a9"
+    },
+    {
+      "name": "20260831030000_manage_shared_fridges.sql",
+      "sha256": "23811e9ecdcd84e98b9613de2d43d7af20aa7dc8c4eb973a4e385e0b82b7fb6f"
+    },
+    {
+      "name": "20260901000000_fridge_sync_versions.sql",
+      "sha256": "f5d97876744f7baca8399d3eb7ef560eed98dc76027dd343be391388f65b5ba8"
+    },
+    {
+      "name": "20260901010000_fridge_sync_broadcast.sql",
+      "sha256": "dd1d0c10078fd15e87d9373ecd07d40c228c2648fb5d83fc6a5e61d41fcb39ec"
+    },
+    {
+      "name": "20260901020000_shared_invite_join_errors.sql",
+      "sha256": "133aeaacd2e99efd22c3e93a4472d665d190cdba3c77e495addcf7dd6b819a0d"
+    },
+    {
+      "name": "20260902000000_ai_food_presets_and_icons.sql",
+      "sha256": "ba388429ac8096671da5e9ada607b4f1fffc5a103ff3780332f1d0ffcc6c6020"
+    },
+    {
+      "name": "20260902010000_device_profiles.sql",
+      "sha256": "bcc5e4cf9db2001a68f8a501da39512a346629caf946b31d591920b16a57c8fc"
+    },
+    {
+      "name": "20260902020000_notification_preferences.sql",
+      "sha256": "e4f333dbad367d7b4663385f9fde8a45e7f21d13f5b7bfea694b92bf4a55ad16"
+    },
+    {
+      "name": "20260902030000_add_shared_notification_type.sql",
+      "sha256": "c300f972022c5af4a635a104ec4a8bdaccd3abc373ea688aaa00220f56d242a4"
+    },
+    {
+      "name": "20260902031000_notification_delivery.sql",
+      "sha256": "b386325940c1058e53c49aee66a3759fbcd756a43012f091939d0330fa8ddcd1"
+    },
+    {
+      "name": "20260903010000_api_security_hardening.sql",
+      "sha256": "b66898e948f6638d076fc246b08cdea7db5f9b6045c28e89e230a03a4f29ed88"
+    },
+    {
+      "name": "20260904010000_fix_api_rate_limit_timestamp.sql",
+      "sha256": "fe34210bcddc974fa3ef0eca2e83f7e813bbd3ef964316f29edd509e24fcf858"
+    },
+    {
+      "name": "20260904020000_inventory_expiry_warning_days.sql",
+      "sha256": "77512203de739722ac88a5c4bf7a3426f93044aa75da2c641ec90ec69f4ee704"
+    },
+    {
+      "name": "20260907010000_inventory_input_guardrails.sql",
+      "sha256": "cdd9884b409144a55fabacbcef11de399cdeb15de359e02bdc5842bde102f14b"
+    },
+    {
+      "name": "20260908010000_unit_aware_inventory_quantity_limits.sql",
+      "sha256": "940a72a6f74b864efc0eb53ac6e3c0c3c4db9590ed2f278396c6c2957030b283"
+    },
+    {
+      "name": "20260908020000_custom_category_ai_icons.sql",
+      "sha256": "dbb26af7f1647e549791918db53ca4c1b1d7654194d05a329baf6ef94d4e01b1"
+    },
+    {
+      "name": "20260909010000_assistant_freshness_foundation.sql",
+      "sha256": "72b336d8f94bf9739cd918817d884e7146c25cda94e13b9f5d9d7f137959635b"
+    },
+    {
+      "name": "20260909020000_assistant_history_read_model.sql",
+      "sha256": "75240704c4bc100d20cc263c538eb80598c00b85631dbbd47a28146adfc6d440"
+    },
+    {
+      "name": "20260909030000_assistant_rag_foundation.sql",
+      "sha256": "0335e4df6b7a9c42dc8c51b1f2b1a11032196e77a1520e14f06d66674082caf5"
+    },
+    {
+      "name": "20260909040000_assistant_conversation_audit.sql",
+      "sha256": "97b9f3072bbee5a6b0e74bf31057dba5fe6bf6f489af1c7f944749796143672c"
+    },
+    {
+      "name": "20260910010000_fix_assistant_vector_operator.sql",
+      "sha256": "0fcbfdeb9660f0e017f72a70da945ceb6801f0e7a998088002873684b95267cb"
+    },
+    {
+      "name": "20260911010000_confirm_assistant_pending_actions.sql",
+      "sha256": "7b190d08de6ba708856c785f6506698572eeb784f9eadac47a05b163b3be7423"
+    },
+    {
+      "name": "20260911020000_harden_assistant_action_confirmation.sql",
+      "sha256": "c7ac108235cef791d472393772507d827d9ddd934091e3da318f58262fcd22da"
+    },
+    {
+      "name": "20260911030000_link_assistant_actions_to_messages.sql",
+      "sha256": "943d1f28d1f7933c7370a506aadd1b76efca29d86054b09dcced56b7e7cadad3"
+    },
+    {
+      "name": "20260911040000_reconcile_pre_assistant_schema.sql",
+      "sha256": "ad82b8d7389cf2bbfd77e55fd9122a76a5ae233b851950abd1bed7f9082059a8"
+    },
+    {
+      "name": "20260912010000_inventory_outcome_accounting.sql",
+      "sha256": "f9889d2fd8d2ff7b9617d6da3f5007c09ed3508f72b98a1e1d1a48b77e5bc613"
+    },
+    {
+      "name": "20260912020000_achievement_dashboard.sql",
+      "sha256": "f63f8b288f4f79418ed181f8d631f47c67d32f7469cc81f8815cdeb3f20e301a"
+    },
+    {
+      "name": "20260913010000_achievement_badge_progress.sql",
+      "sha256": "a4978f1fa879960feb88801727c5a4a56fff76777a1a48db2fccd149435a7c55"
+    },
+    {
+      "name": "20260913160000_fridge_daily_weekly_quests.sql",
+      "sha256": "4aa496d660da8c1451543eb851e98a3d874794f92f499ee8c0d1651d42060086"
+    },
+    {
+      "name": "20260913170000_assistant_inventory_outcomes.sql",
+      "sha256": "0a1d25456fd87aa8b6fb472adc6f58d873a43ca503c06268ec5c6dd66b4fc4a2"
+    },
+    {
+      "name": "20260913180000_expand_quest_library_and_slots.sql",
+      "sha256": "a7007b1cd88ac5850ec10fd4393cd675fcc10a171078aae86e0f872986af1f9d"
+    },
+    {
+      "name": "20260914010000_shopping_cart_input_guardrails.sql",
+      "sha256": "4a5395cd3a532f3aa619c7cf1c9b9a9ba261acec7028bd1eeb4b7f5712e14ed5"
+    },
+    {
+      "name": "20260922010000_fix_shared_join_assistant_scope.sql",
+      "sha256": "59a8e02bf8f94f86c35c63b40545b8fbcb6090710caae429917589c830a5753a"
+    },
+    {
+      "name": "20260923120000_reserve_weekly_quest_rerolls.sql",
+      "sha256": "b9d0229e1b545718b2f86bf729201c28b060c864dc69249397f6df5174c5c0e5"
+    },
+    {
+      "name": "20260923121000_clean_weekly_quest_slot_reconciliation.sql",
+      "sha256": "3723d99eebf9e0bc85f4af79016fb8d2d24a17f75df9e0e2da302d94436e093b"
+    },
+    {
+      "name": "20260924010000_achievement_stage_report.sql",
+      "sha256": "02a8a44623f1ef59dc2733d69717be1cfdb56015d83199c7fe2b1abab0d21e45"
+    },
+    {
+      "name": "20261002010000_waste_sorting_learning.sql",
+      "sha256": "3cbc862e97a5a542cf214505be524c47d8eeae74837e4cca118881be00b19918"
+    },
+    {
+      "name": "20261003010000_skip_sync_for_deleted_fridges.sql",
+      "sha256": "79cb0c535e8cba422a0369822f685ca1b3926bf767aedbc55610bb4486664065"
+    },
+    {
+      "name": "20261003020000_one_sorting_attempt_per_event.sql",
+      "sha256": "026aec866840229322f5bd07c944634c7200acd513ece9fe60328b01ff0246de"
+    },
+    {
+      "name": "20261004010000_inventory_waste_profiles.sql",
+      "sha256": "787ecc6801245a8363a2f0322ee87cf9f3ec287c053665a8f9d2e91f21d50b31"
+    },
+    {
+      "name": "20261005010000_learning_room_assessment.sql",
+      "sha256": "fdd2ea09ed3d320cf38f7c75571d8e39d2b3b414ca4e19f6d49cf50c34caa9e4"
+    },
+    {
+      "name": "20261005011000_learning_room_draft.sql",
+      "sha256": "e34b7aa8658f202ba56d4876437d35157efc12fa9e7cdcc92ed964953aa5cc54"
+    },
+    {
+      "name": "20261008010000_learning_tutor_foundation.sql",
+      "sha256": "235b66b11e862749e960bdee54c49fa677d02de4254c5d6d343dd636f706265d"
+    },
+    {
+      "name": "20261008011000_learning_tutor_draft.sql",
+      "sha256": "329e8b9ad4020b8b5155b49c003379a6d821e89c63a7d24b7692ec1ff7323087"
+    },
+    {
+      "name": "20261008012000_learning_tutor_review_help.sql",
+      "sha256": "be50724f05d12568d92deba1dc0b73f7652e9b3b804202f897f9b2aba7557e58"
+    },
+    {
+      "name": "20261008013000_fix_learning_tutor_support.sql",
+      "sha256": "9a152b01af14ffc3efe2ea392b905c0f4c8e40309059f2cef0c1f9b2b31302df"
+    },
+    {
+      "name": "20261008014000_learning_tutor_evidence_v2.sql",
+      "sha256": "711b89afc5d8303d0bc9f54670f2ab3300c49457c9114a9a1be80b94518350cf"
+    },
+    {
+      "name": "20261008015000_learning_tutor_versioned_context.sql",
+      "sha256": "f05b0c0413d10234006a3c6b56a29faa9c385b426a9d18e3d604deffc36911e2"
+    },
+    {
+      "name": "20261008016000_fix_learning_tutor_credential_alias.sql",
+      "sha256": "bc3b70b571be06bdb69115cfa2259fb2e1d2864e01bcda96125face771d8e335"
+    }
+  ],
+  "productionDataApi": "new tables visible; learning RPC credential gate verified; no writes"
+}
