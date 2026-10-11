@@ -64,7 +64,7 @@ video 引用已存在的一分钟动画与 poster，不生成新视频。提供�
 
 hash 使用 SHA-256，覆盖 catalog、activities、resources、sources 和完整私有 bank；对象 key 排序、数组顺序保留。review 元数据不进入 hash。修改内容、答案或源日期都会使旧批准失效。manifest 与实际内容不一致时只读校验失败。
 
-草稿校验：`node server/scripts/validate-learning-content.js`。明确核对草稿修改后才能运行 `--write-manifest`。发布准备检查：加 `--release`，只读且不能同时写 manifest。当前会按预期失败，因为独立校对 pending。已发布版本不得覆盖；新建内容版本并保留旧考试快照。
+内容校验：`node server/scripts/validate-learning-content.js`。明确核对草稿修改后才能运行 `--write-manifest`。发布检查：加 `--release`，只读且不能同时写 manifest。2026-10-12 已通过发布检查。已发布版本不得覆盖；新建内容版本并保留旧考试快照。v1 catalog 内的 draft 是原始作者快照的一部分，不能为了改显示状态重算已部署哈希；实际发布状态以数据库 `learning_content_versions.status` 为准，客户端公开投影不包含作者快照的 status。
 
 技术验证：`node --test server/test/learningContent.test.js`。结构测试不能代替人工校对、原生 UI 验收、抽题服务或真实等级恢复验证。本次负责人明确跳过真机验收，记录为 waived，不记为测试通过。
 

@@ -4,11 +4,11 @@
 
 ## 1. 当前状态
 
-- 2026-10-12 发布准备：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 将课程 v1 发布审核绑定原哈希，并新增导师 v3（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。该新文件按开发库先应用验证、再生产的顺序执行，结果另存本次发布记录。
+- 2026-10-12 发布完成：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 已先在开发库应用、通过 release guard 回滚检查与 lint，再以完全相同文件应用生产。课程 v1 已 published，导师新增 v3 已 published（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。生产 API 已切换，三导师开关开启，正式域名 health 200/database connected。详见 `docs/learning-room/verification/2026-10-12/RELEASE_VERIFICATION.md`。
 
 - 最后核对日期：2026-10-12（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 56 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261008016000_fix_learning_tutor_credential_alias.sql`。2026-10-12 将生产缺少的 17 份原文件按顺序补齐，生产再次 dry-run 无待执行 migration。未运行 seed、reset 或 migration repair，未改写既有迁移。
+- 本地 schema 历史共有 57 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261012050000_publish_owner_reviewed_learning.sql`。2026-10-12 先将生产缺少的 17 份原文件按顺序补齐，再按开发先验证、生产后应用的顺序发布课程和导师。生产最终 dry-run 无待执行 migration，lint 无错误或警告。未运行 seed、reset 或 migration repair，未改写既有迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
