@@ -13,7 +13,7 @@
         "ITSAppUsesNonExemptEncryption": false,
         "CADisableMinimumFrameDurationOnPhone": true
       },
-      "supportsTablet": true
+      "supportsTablet": false
     },
     "android": {
       "package": "com.gressfit5120.kitchmemo",
