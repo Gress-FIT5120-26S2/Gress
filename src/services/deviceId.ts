@@ -80,3 +80,15 @@ export async function getDeviceId(): Promise<string> {
 export async function getDeviceCredential(): Promise<string> {
   return (await getDeviceIdentity()).credential;
 }
+
+// Arthur: NarIyirm
+// 中文：仅在服务端确认删除后、用户主动重新开始时清除安装密钥；失败不会把仍有效的身份静默替换。
+// EN: Clear installation keys only after confirmed server erasure and an explicit restart; failures never silently replace a valid identity.
+export async function clearErasedDeviceIdentity() {
+  await Promise.all([
+    SecureStore.deleteItemAsync(IOS_DEVICE_ID_KEY),
+    SecureStore.deleteItemAsync(ANDROID_DEVICE_ID_KEY),
+    SecureStore.deleteItemAsync(DEVICE_CREDENTIAL_KEY),
+  ]);
+  pendingDeviceIdentity = null;
+}

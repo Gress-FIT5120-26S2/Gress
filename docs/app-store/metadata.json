@@ -1,0 +1,31 @@
+{
+  "appStoreConnectAppId": "6805763159",
+  "bundleIdentifier": "com.gressfit5120.kitchmemo",
+  "version": "1.0.0",
+  "copyright": "2026 Haoxuan Sun",
+  "price": "Free",
+  "requestedTerritories": ["AUS", "CHN"],
+  "chinaMainlandStatus": "pending_valid_app_icp_and_regional_service_review",
+  "primaryCategory": "FOOD_AND_DRINK",
+  "secondaryCategory": "LIFESTYLE",
+  "localizations": {
+    "en-AU": {
+      "name": "KitchMemo",
+      "subtitle": "Fridge, shopping & less waste",
+      "promotionalText": "Know what is in your kitchen. Keep food dates visible, share your shopping list and build small habits that help reduce household food waste.",
+      "keywords": "fridge,pantry,inventory,expiry,shopping,list,food,waste,household,storage,learning",
+      "description": "A little less waste starts with knowing what you already have.\n\nKitchMemo brings your fridge, pantry, shopping list and food-waste learning into one place.\n\nKEEP YOUR FOOD VISIBLE\nRecord food in chilled, frozen or pantry storage. Keep quantities, package dates and purchase prices together, and choose how early you want a reminder. Add items manually or use supported barcode and photo suggestions, then check the details before saving.\n\nSHOP WITH YOUR HOUSEHOLD\nCreate or join a shared fridge with an invitation code. See the same inventory and shopping list, record what was used or discarded, and plan what needs replenishing.\n\nLEARN SMALL, PRACTICAL HABITS\nExplore short food-waste lessons, activities and quizzes in English or Simplified Chinese. Follow your personal progress and see household achievements based on recorded activity. Packaging-sorting examples refer to Australian guidance; always follow your local council rules.\n\nOPTIONAL AI HELP\nAsk the kitchen assistant about your authorized inventory, or use the learning tutor for course explanations. External AI and photo processing require your permission, which you can withdraw in Profile. You can keep using manual inventory, shopping and courses without AI.\n\nCONTROL YOUR IDENTITY\nStart without an email/password account. Set an optional nickname, keep a recovery code for device changes and delete your device identity and associated data from Profile.\n\nIMPORTANT\nInternet access is required for server-backed features. Notifications are optional and delivery is not guaranteed. Barcode and photo coverage is limited. AI, freshness estimates and photos can be inaccurate and cannot establish food safety; follow package use-by labels and official guidance. KitchMemo does not provide medical advice.\n\nPrivacy: https://kitchmemo-api.vercel.app/privacy\nSupport: https://kitchmemo-api.vercel.app/support",
+      "supportUrl": "https://kitchmemo-api.vercel.app/support?lang=en",
+      "privacyPolicyUrl": "https://kitchmemo-api.vercel.app/privacy?lang=en"
+    },
+    "zh-Hans": {
+      "name": "KitchMemo",
+      "subtitle": "冰箱库存、购物清单与减废学堂",
+      "promotionalText": "购物前先看看家里还剩什么。记录食物与包装日期，共享家庭购物清单，通过小课程与日常习惯减少食物浪费。",
+      "keywords": "冰箱库存,食物管理,购物清单,到期提醒,家庭共享,减少浪费,垃圾分类",
+      "description": "少一点浪费，从看清家里已有的食物开始。\n\nKitchMemo 将冰箱、储物柜、购物清单与减废学习放在一起，帮你建立更有条理的厨房日常。\n\n让食物始终看得见\n按冷藏、冷冻或常温位置记录食物，将数量、包装日期与购买价格集中保存，并设置提前提醒天数。可以手动录入，或使用支持范围内的条码与照片建议，保存前由你核对。\n\n与家人一起购物\n通过邀请码创建或加入共享冰箱，一起查看库存和购物清单，记录食物的使用与丢弃，并了解需要补充的物品。\n\n学习实用的减废习惯\n通过英文和简体中文的短课程、活动与测验学习减少食物浪费。个人学习进度保持私密，家庭成就根据已记录的活动展示。包装分类示例参考澳大利亚指南，实际投放应遵循所在地规则。\n\n可选 AI 辅助\n厨房助手可基于你有权限访问的库存提供建议，学习导师帮助解释课程。外部 AI 与照片处理需要明确授权，可在个人页撤回；不授权也能继续使用手动库存、购物和课程。\n\n掌控设备身份\n无需邮箱／密码注册即可开始。设置可选昵称，为换机保存恢复码，并可在个人页删除设备身份及相关数据。\n\n使用说明\n服务端功能需要联网。系统通知为可选功能，不保证及时送达。条码和照片识别覆盖有限。AI、品质估算和照片可能有误，不能判定食品安全；请遵循包装的 use-by 日期与官方建议。应用不提供医疗建议。\n\n隐私政策：https://kitchmemo-api.vercel.app/privacy?lang=zh\n支持与帮助：https://kitchmemo-api.vercel.app/support?lang=zh",
+      "supportUrl": "https://kitchmemo-api.vercel.app/support?lang=zh",
+      "privacyPolicyUrl": "https://kitchmemo-api.vercel.app/privacy?lang=zh"
+    }
+  }
+}

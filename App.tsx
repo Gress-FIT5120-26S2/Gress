@@ -32,6 +32,8 @@ import { RealtimeSyncProvider, requestImmediateSyncProbe, subscribeToSync } from
 import { addSystemNotificationResponseListener, openLastSystemNotification, refreshSystemNotificationDelivery, scheduleExpiryReminders, setSystemNotificationBadge } from './src/services/systemNotifications';
 import { SpooniePetEntry } from './src/components/assistant/SpooniePetEntry';
 import { FridgeAssistantScreen } from './src/components/fridge/FridgeAssistantScreen';
+import { PrivacyConsentProvider } from './src/components/PrivacyConsentProvider';
+import { DevicePrivacyBoundary } from './src/components/DevicePrivacyBoundary';
 
 // Arthur: NarIyirm
 // 中文：3D 代码在开场主体完成后才求值，避免 Expo GL 与动画高负载阶段同时初始化。
@@ -660,15 +662,17 @@ export default function App() {
   // EN: Seed the provider with native window metrics so a full-screen Modal never receives a zero top inset on its first frame.
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
-      <RealtimeSyncProvider>
-        <AchievementDataProvider>
-          <I18nProvider>
+      <I18nProvider>
+        <DevicePrivacyBoundary>
+          <RealtimeSyncProvider>
+            <AchievementDataProvider>
             <ProfileDataProvider>
-              <KitchMemoApp />
+              <PrivacyConsentProvider><KitchMemoApp /></PrivacyConsentProvider>
             </ProfileDataProvider>
-          </I18nProvider>
-        </AchievementDataProvider>
-      </RealtimeSyncProvider>
+            </AchievementDataProvider>
+          </RealtimeSyncProvider>
+        </DevicePrivacyBoundary>
+      </I18nProvider>
     </SafeAreaProvider>
   );
 }

@@ -1,4 +1,5 @@
 import { getDeviceCredential, getDeviceId } from './deviceId';
+import { askAiConsent, needsAiConsent } from './aiConsentBridge';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -10,6 +11,13 @@ type ApiError = {
 type ApiActivityListener = (activeRequestCount: number) => void;
 
 let activeRequestCount = 0;
+let apiRequestsSuspended = false;
+export function suspendApiRequests(suspended: boolean) { apiRequestsSuspended = suspended; }
+const erasureListeners = new Set<() => void>();
+export function subscribeToIdentityErasure(listener: () => void) {
+  erasureListeners.add(listener);
+  return () => { erasureListeners.delete(listener); };
+}
 const apiActivityListeners = new Set<ApiActivityListener>();
 
 function changeApiActivity(delta: number) {
@@ -54,6 +62,12 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
   // 中文：所有前端业务请求都通过同一入口携带 Device-ID 访问 Express，避免各业务模块重复处理环境地址、请求头和错误。
   // EN: All frontend domain requests use one Express client with Device-ID so modules do not duplicate environment, header, and error handling.
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
+  if (apiRequestsSuspended && path !== '/api/privacy/device-data') throw new ApiRequestError('identity_erased', 401);
+  if (needsAiConsent(path, init.method)) {
+    if (!await askAiConsent()) throw new ApiRequestError('ai_consent_required', 403, 'AI permission is required. Manage it in Profile → Privacy.');
+  }
+  if (init.signal?.aborted) throw new Error('Request cancelled');
+  if (apiRequestsSuspended && path !== '/api/privacy/device-data') throw new ApiRequestError('identity_erased', 401);
 
   changeApiActivity(1);
   try {
@@ -83,6 +97,13 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
 
     if (!response.ok) {
       const apiError = body as ApiError | null;
+      // Arthur: NarIyirm
+      // 中文：删除响应丢失或删除后重启时，服务端专用错误仍会进入已删除界面，避免永久困在失效凭证上。
+      // EN: A dedicated server error restores the erased screen after a lost deletion response or relaunch, preventing a stale-credential dead end.
+      if (apiError?.error === 'identity_erased') {
+        apiRequestsSuspended = true;
+        erasureListeners.forEach(listener => listener());
+      }
       const message = apiError?.message ?? apiError?.error ?? `API request failed: ${response.status}`;
       if (__DEV__) console.warn(`API ${init.method ?? 'GET'} ${path} failed: ${message}`);
       throw new ApiRequestError(apiError?.error ?? message, response.status, message);

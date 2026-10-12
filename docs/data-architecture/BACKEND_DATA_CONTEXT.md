@@ -4,13 +4,13 @@
 
 ## 1. 当前状态
 
-- 2026-10-12 App Store 隐私准备：新增 `20261012100000_app_store_privacy_and_erasure.sql`，当前阶段为本地实现，尚待开发库验证及生产应用，不能据此宣称已部署。它新增 AI 授权、已删除身份指纹、资产清理队列与今后恢复链；设备、库存和共享数据的删除合同详见文末新节。此前 57 份迁移仍保持不变。
+- 2026-10-12 App Store 隐私准备：新增 `20261012100000_app_store_privacy_and_erasure.sql`，已先应用开发库并通过隔离回滚验证，再应用生产库；两库 lint 无错误，生产回滚验证也通过。当前共 58 份迁移，此前 57 份保持不变。新合同包含 AI 授权、已删除身份指纹、资产清理队列与今后恢复链，详见文末新节。对应服务端及移动端发布状态见 `docs/app-store/RELEASE_STATUS.md`。
 
 - 2026-10-12 发布完成：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 已先在开发库应用、通过 release guard 回滚检查与 lint，再以完全相同文件应用生产。课程 v1 已 published，导师新增 v3 已 published（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。生产 API 已切换，三导师开关开启，正式域名 health 200/database connected。详见 `docs/learning-room/verification/2026-10-12/RELEASE_VERIFICATION.md`。
 
 - 最后核对日期：2026-10-12（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 57 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261012050000_publish_owner_reviewed_learning.sql`。2026-10-12 先将生产缺少的 17 份原文件按顺序补齐，再按开发先验证、生产后应用的顺序发布课程和导师。生产最终 dry-run 无待执行 migration，lint 无错误或警告。未运行 seed、reset 或 migration repair，未改写既有迁移。
+- 本地 schema 历史共有 58 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261012100000_app_store_privacy_and_erasure.sql`。2026-10-12 先将生产缺少的 17 份原文件按顺序补齐，再按开发先验证、生产后应用的顺序发布课程、导师与隐私合同。未运行 seed、reset 或 migration repair，未改写既有迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
