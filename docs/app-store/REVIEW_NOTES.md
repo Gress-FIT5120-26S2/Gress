@@ -19,4 +19,4 @@ Contact first name: Haoxuan. Last name: Sun. Review phone is stored only in the 
 
 ## Before submission
 
-Select the new production build containing the privacy/deletion features. The earlier uploaded build 11 does not contain them. Paste these notes only for that new build. Upload actual iPhone and iPad screenshots because the application currently supports both. Complete privacy and age-rating questionnaires. China mainland distribution additionally requires a valid app ICP filing and regional service review; do not submit an invented filing number.
+Select production build 13 for the initial iPhone-only release. Build 12 has the privacy/deletion features but still supports iPad; build 11 lacks those privacy features. Upload actual iPhone 16 Pro screenshots (1206×2622). The owner chose to remove iPad support for the first release, and Mac/Vision Pro distribution is disabled. Privacy answers and age rating have been completed. China mainland distribution additionally requires a valid app ICP filing and regional service review; do not submit an invented filing number.
