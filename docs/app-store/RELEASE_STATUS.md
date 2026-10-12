@@ -22,11 +22,11 @@
 - [iOS 构建页](https://expo.dev/accounts/gress-fit5120-26s2/projects/kitchmemo/builds/cf0f5559-c8df-4691-8e90-31a58f712ba0)；[IPA](https://expo.dev/artifacts/eas/-4Tas3-p1vzWmloSPFK49gtTwgZNW7fXLsXs0z682W8.ipa)。实际 IPA 的 Info.plist 已读取：版本 1.0.0（13）、UIDeviceFamily `[1]`（仅 iPhone）、最低 iOS 16.4、非豁免加密 false；包内包含 12 份 SDK 隐私 manifest。
 - TestFlight 已显示 build 13，继承原有内部测试组 KitchMemo Dev 与 Team (Expo)。没有新增测试员、创建邀请或改动群组；截图可使用 TestFlight 的 1.0.0（13）。
 - Android preview 已完成：`bf42979c-bda5-4cc9-8302-ef308c5960bf`，版本 1.0.0／versionCode 3，来源提交 `22ecd7b`。APK：[下载](https://expo.dev/artifacts/eas/H9e3TQYE6Cjz9r1KkI35og0WOUDiJmd7-m4QlGXMWjQ.apk)。本次 iOS 专用支持设备配置不影响此 Android 包。
-- 正式审核尚未提交，Apple 尚未批准发布。
+- 2026-10-12 下午 3:03（Australia/Sydney）创建审核草稿，3:04 正式执行“提交以供审核”。Apple 版本页及审核记录均显示“等待审核”，审核构建为 1.0.0（13）。审核单 ID：`63e28f82-185a-4610-b566-4955c6a240e1`；Apple 尚未批准发布。凭据：`proofs/review-submitted.jpg`。
 - 澳大利亚为本次发行目标。中国大陆暂不开放：负责人确认未取得本 App 的备案号，且境外 AI 服务需完成地区方案核对。
 - Apple 在选入 build 12 后校验列出手机和平板两类截屏缺失（历史截图：proofs/review-blockers.jpg）。随后负责人明确选择首版仅 iPhone；`supportsTablet:false` 已提交并经 Expo 配置及实际 IPA 核对，Mac/Vision Pro 额外分发已关闭。
-- 选入 build 13 后，Apple 再次校验仅报告“必须上传带灵动岛的 iPhone（中等显示屏）截屏”，iPad 要求已取消。当前唯一资料阻碍为真实手机截屏（proofs/iphone-screenshot-only.jpg）；没有因此正式提交审核。
-- 负责人设备为 iPhone 16 Pro，原生 PNG 为 1206×2622。仍缺原生手机截屏，顺序和采集步骤见 `SCREENSHOTS.md`。
+- 选入 build 13 后，Apple 的历史校验仅报告手机截屏缺失，iPad 要求已取消（`proofs/iphone-screenshot-only.jpg`）。本次负责人提供五张 iPhone 16 Pro 真实 JPEG，均为 1206×2622、无透明通道，已按首页、库存、学堂、助手、成就排序上传并保存。重新载入版本页确认五张持久化、旧缺图提示消失；随后添加审核并正式提交成功。此前旧提示导致一次自动审批拦截，持久化核对后已解决。
+- 主要截图语言为英语（澳大利亚）。Apple 确认未自定义的其他 iPhone 尺寸与本地化版本使用此组素材；简体中文文字保留，尚无中文专属截图。原文件及校验清单保存于 `deliverables/app-store/screenshots/raw/en-AU/iphone/`，详见 `SCREENSHOTS.md`。
 - 公开中英页面通过正式 HTTP 检查；中文隐私／支持页另经 402px 手机宽度核对，无横向溢出，视觉截图保存在 proofs/。
 
 ## 审核资料

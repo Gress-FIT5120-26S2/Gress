@@ -1,35 +1,27 @@
-# 商店截屏采集与排版清单
+# 商店截屏记录
 
-负责人已选择首版仅 iPhone，设备为 iPhone 16 Pro。正式构建 1.0.0（13）已上传 Apple 并选入版本，实际 IPA 已核对为仅 iPhone。Apple 最终校验只剩手机截屏缺失。此清单是商店素材准备，不另行要求设备验收。
+2026-10-12，负责人提供五张 iPhone 16 Pro 实际 App 截图。原文件均为 1206×2622 JPEG、无透明通道；复制后的 SHA-256 与收到的文件完全一致，没有裁剪、缩放、补绘或改造界面。Apple 已处理并保存全部五张，iOS 1.0.0（13）已正式提交，状态为“正在等待审核”。
 
-## 采集方法
+## 已上传素材
 
-通过 TestFlight 安装 Apple 已处理的 build 13。选一个只用于展示的冰箱，手动添加公开示例食品，例如 Milk、Tomatoes、Bananas，不放真实姓名、家庭记录、邀请码、恢复码或凭证。截图时避免通知横幅、键盘、错误或加载状态。
+原文件保存于 `deliverables/app-store/screenshots/raw/en-AU/iphone/`，校验信息见同目录 `manifest.json`。Apple 英语（澳大利亚）的“带灵动岛的 iPhone（中等显示屏）”组已显示 5 张，并按下列顺序排列：
 
-在个人页设置语言为 English 后，按下表依次截图；切换简体中文后重复。保留原始 PNG，不通过聊天软件压缩，不改造按钮或数据，不用网页截图冒充原生 App。
-
-| 顺序／文件名 | 实际界面 | English 标题 | 简体中文标题 |
-| --- | --- | --- | --- |
-| 01-inventory.png | 冰箱列表，有公开样例食品、数量和包装日期 | Know what is in your kitchen | 家里还有什么，一眼看清 |
-| 02-shopping.png | 购物清单，已录入公开样例项目 | Shop with a clearer list | 购物之前，先看清单 |
-| 03-learning.png | 已发布的学堂课程／活动页 | Build habits that waste less | 用小习惯，减少食物浪费 |
-| 04-assistant.png | 授权后与厨房 AI 的真实示例对话 | Optional help for your kitchen | 厨房建议，按需开启 |
-| 05-progress.png | 成就／个人学习进度页，数值为真实示例活动结果 | See your everyday progress | 看见日常行动的进展 |
-
-如不希望授权 AI，可以改用个人页隐私弹窗：English “Your data, your choice”；中文“你的数据，由你掌控”。不要编造 AI 结果或成就数值。
-
-## 尺寸与设备
-
-| 必需设备组 | 接受的竖屏尺寸 | 处理规则 |
+| 顺序 | 文件 | 实际内容 |
 | --- | --- | --- |
-| 带灵动岛的 iPhone 中等显示屏 | 1206×2622（iPhone 16 Pro）或 1179×2556 | Apple 本次校验明确要求此组。使用 iPhone 16 Pro 原始 PNG 即可，不必调整尺寸 |
-| iPhone 其他尺寸 | 大屏 1320×2868、1290×2796、1260×2736 等 | 可选，按 Apple 当前规格及自动缩放规则处理 |
-| iPad 13 英寸 | 2064×2752 或 2048×2732 | 首版取消 iPad 支持，Apple 已确认此组不再必需；未来恢复 iPad 支持时须提供真实平板截图 |
+| 1 | 01-home.jpg | 3D 厨房首页 |
+| 2 | 02-inventory.jpg | 食物库存、数量和日期 |
+| 3 | 03-learning.jpg | 学堂课程和学习进度 |
+| 4 | 04-assistant.jpg | 厨房助手的实际对话 |
+| 5 | 05-progress.jpg | 成就和日常挑战 |
 
-Windows 当前没有可用的 iOS Simulator 或直接读取用户 iPhone 屏幕的连接。用户提供的 iPhone 16 Pro 可以完成本次所需手机素材。最少一张真实截图，建议每种语言五张。原图可以直接上传，不需要额外装饰文案。
+成就图顶部部分白色文字与山景／等级节点重叠，因此排在最后；原图保持真实，未修饰 UI。此次没有提供中文界面的独立截图。Apple 的素材说明确认：未自定义的其他 iPhone 尺寸与本地化版本使用此组素材。简体中文商店文字已保存，截图使用英文主要语言素材。
 
-PNG/JPEG 必须无透明通道；截图与对应语言一致。App 预览视频与新产品页横向标题素材是可选项，不代替必须的实际 App 截屏。
+## 规格与后续采集
 
-原图建议放入 `deliverables/app-store/screenshots/raw/<en-AU或zh-Hans>/<iphone或ipad>/`。收到原图后按上表排序、核对像素及可读性，再上传 App Store Connect。
+本次 Apple 接受的竖屏尺寸包括 1206×2622 和 1179×2556，PNG/JPEG 必须无透明通道。首版实际 IPA 的 UIDeviceFamily 为 `[1]`，仅支持 iPhone，不要求 iPad 截图。预览视频和横向标题素材是可选项。
+
+以后补充中文或购物清单截图时，使用真实安装包的对应界面，保留原尺寸，不放恢复码、邀请码、凭证、个人联系信息或通知横幅，不用网页或合成画面冒充原生 App。恢复 iPad 支持时，补充真实 iPad／原生 Simulator 截图。
+
+凭据：`docs/app-store/proofs/screenshots-uploaded.jpg`、`docs/app-store/proofs/review-submitted.jpg`。
 
 规格依据：[Apple 当前截屏规格](https://developer.apple.com/help/app-store-connect/reference/app-information/screenshot-specifications/)（2026-10-12 核对）。

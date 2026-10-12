@@ -1,0 +1,54 @@
+{
+  "receivedDate": "2026-10-12",
+  "source": "user-provided iPhone 16 Pro screenshots",
+  "locale": "en-AU",
+  "edits": "none; byte-identical copies",
+  "appleDeviceGroup": "iPhone Dynamic Island medium",
+  "files": [
+    {
+      "file": "01-home.jpg",
+      "width": 1206,
+      "height": 2622,
+      "format": "jpeg",
+      "hasAlpha": false,
+      "bytes": 159299,
+      "sha256": "f8c7c7e51010f94b92c67b9720a2223788b3ebac522a2519510eee0779ca69d3"
+    },
+    {
+      "file": "02-inventory.jpg",
+      "width": 1206,
+      "height": 2622,
+      "format": "jpeg",
+      "hasAlpha": false,
+      "bytes": 137323,
+      "sha256": "7c154b2629452442b0f48b14155938fda1df22cd72270c2bfddedeb0fa38b5bd"
+    },
+    {
+      "file": "03-learning.jpg",
+      "width": 1206,
+      "height": 2622,
+      "format": "jpeg",
+      "hasAlpha": false,
+      "bytes": 162875,
+      "sha256": "592f8944a1f989d9774f2895e37c07ffc77fa1665fa5ceed212c5c4bf7b21649"
+    },
+    {
+      "file": "04-assistant.jpg",
+      "width": 1206,
+      "height": 2622,
+      "format": "jpeg",
+      "hasAlpha": false,
+      "bytes": 196339,
+      "sha256": "23a43330d039755183de89c4d99598ef4208c21122c06a64d190670e71f81e0d"
+    },
+    {
+      "file": "05-progress.jpg",
+      "width": 1206,
+      "height": 2622,
+      "format": "jpeg",
+      "hasAlpha": false,
+      "bytes": 218015,
+      "sha256": "4919f6f13b8e8363eee912c5e2cfbee368aba9179421da33521de8f10dec4bc7"
+    }
+  ]
+}
