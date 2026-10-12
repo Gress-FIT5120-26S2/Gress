@@ -1,6 +1,6 @@
 # 学堂 AI 导师实际进度
 
-更新：2026-10-08（Australia/Sydney）。**A0 完成；A1 随堂问答、A2 测验辅导、A3 主动帮助已实现并通过开发验证；A4 自动验收及真实模型评估完成，真机、独立审核和生产发布仍 pending。**
+更新：2026-10-12（Australia/Sydney）。**A0–A3 已实现，A4 自动验证和生产发布完成。NarIyirm 确认已审阅并要求直接发布，真机验收按负责人指令 waived。课程 v1 与导师 v3 已 published，生产 API 三开关开启；iOS production build 11 成功并已上传 TestFlight，Android preview APK build 3 成功。** 详见 [发布记录](verification/2026-10-12/RELEASE_VERIFICATION.md)。导师本次是负责人复核，独立审核仍 pending，不记为独立人员验收。
 
 ## 阶段状态
 
@@ -26,9 +26,9 @@
 
 新增并提交七条migration：`20261008010000` foundation、`11000` draft v1、`12000` review/help、`13000` support修复、`14000` evidence v2、`15000` versioned context/practice signals、`16000` credential alias修复。全部先在开发库预演并已应用；最终56份本地/开发migration一致，SQL lint无错误。未重写任何已应用migration。
 
-开发Gress-development／`thmbtsssvnslotoexntz`；`npm start`／`npm run server`默认启用三导师开关，保留显式0。普通/生产启动仍关闭，内容必须published。生产`vcsujjaapchvcnndlhqb`本轮只读核对最新仍为`20260914010000`，缺后续学习依赖，未执行生产变更。
+开发Gress-development／`thmbtsssvnslotoexntz`；`npm start`／`npm run server`默认启用三导师开关，保留显式0。普通服务无开关时仍默认关闭；生产 Vercel 已明确配置三个开关为 1。生产 `vcsujjaapchvcnndlhqb` 与开发均已应用 57 份 migration，最新 `20261012050000`，最终 lint 与 production dry-run 通过。
 
-课程learning-room-v1仍draft，hash `0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054`。导师v1为62块、v2为63块；12双语独立模板仍pending。v2补足登记官方来源的再利用公开说明，hash `495079bb614ff51269ae2d183360efe2deb48e0da1ac2ac9a0bc9a76034035ae`；历史会话继续绑定原manifest。
+课程 learning-room-v1 已 published，hash `0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054`，审核人 NarIyirm，与 AI 作者不同。导师 v1/v2 继续保留原始 draft；新增 v3 已 published，63 块公开证据与 12 模板教学内容未变，仅增加负责人复核记录，hash `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`。NarIyirm 也是原作者，因此模板独立审核仍 pending，ownerReview 为 approved。新 guard 例外绑定此次版本／hash／真实授权；历史会话继续绑定原 manifest。
 
 ## 真实模型结果
 
@@ -42,12 +42,12 @@
 
 待验证：真实设备键盘／安全区／读屏／后台恢复、1.3／1.6 字体；原课程、模板、模型回答与新增配图的独立内容审核。下一项为这些验收及人工审核，生产发布仍 pending，视觉改版不替代原 A4／P5 验收。
 
-## Pending与下一项
+## 2026-10-12 发布决定与后续观察
 
-1. Android/iOS真机：键盘、安全区、底栏、Library横滚、边缘返回、视频、后台/杀进程/断网恢复、焦点/读屏、1.3/1.6字体。当前没有adb/连接设备证据；导出和HTML画布不能替代真机验收。
-2. 独立人员审核原课程、12模板和60条模型回答，核验来源、地区、统计年份、食品安全及SDG13.3；作者不能自行批准。事实/引用目标≥95%，关键错误全部修复。
-3. 原学堂P5及独立审核仍pending。生产先补并验证原学习依赖，再按schema→manifest→Express→App小范围启用；当前未部署。
-4. 生产真实限流/故障、跨实例、cron运行及账单成本仍需发布前观察；本轮记录tokens/延迟，不伪报货币成本。
+1. 原生真机验收：负责人表示有 iPhone，随后明确“不需要验收”；记录 waived-by-owner，未执行，不宣称通过。
+2. 人工审核：负责人明确表示已审阅并要求发布。课程记录真实独立审核；导师记录负责人复核的单次发布例外。60 条模型回答记录全局负责人批准，没有虚构逐条评分或实测 ≥95% 准确率。
+3. 生产 schema／课程／导师／Express／App 构建均已完成；TestFlight 上传 FINISHED，后续 Apple 处理和 App Store 审核状态由 App Store Connect 管理。
+4. 开发已验证跨实例、清除竞态、恢复、配额与故障边界。生产 cron 已 active，查询时成功／失败运行均为 0，首次自然运行尚未发生；实际货币账单、生产故障与成本属于后续运行观察，未虚报通过。
 
 ## 工作区保护
 

@@ -25,6 +25,7 @@ export async function authenticateDeviceCredentials(deviceId, credential) {
   });
 
   if (error || !fridgeUid) {
+    if (error?.message.includes('device_identity_erased')) return { error: 'identity_erased', fridgeUid: null };
     if (error && !error.message.includes('invalid_device_credential')) {
       console.error('Device authentication failed:', error.message);
     }

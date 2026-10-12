@@ -137,8 +137,13 @@ try {
   const catalog = (await api(0, '/learning/catalog')).content;
   assert.deepEqual(validateNoPrivateFields(catalog), []);
   const normal = createLearningRoomService(supabase, { ...environment, LEARNING_ROOM_ALLOW_DRAFT: '0' });
-  await assert.rejects(normal.catalog(), /content_unavailable/);
-  verified.push('real credentials, new learner, safe catalog, normal draft gate');
+  // Arthur: NarIyirm
+  // 中文：开发库发布后普通服务应能读取教材；仍为草稿时继续验证拒绝，避免测试把真实发布误判成草稿泄露。
+  // EN: Normal services must read published development content and reject drafts, so an actual release is not mistaken for draft leakage.
+  const deployedContent = await row('learning_content_versions', 'status', 'content_version', catalog.contentVersion);
+  if (deployedContent.status === 'published') assert.deepEqual((await normal.catalog()).content, catalog);
+  else await assert.rejects(normal.catalog(), /content_unavailable/);
+  verified.push('real credentials, new learner, safe catalog, normal publication gate');
   const fridge = (await row('fridge_members', 'fridge_uid', 'device_id', devices[0])).fridge_uid;
   const baseline = await counts(fridge);
   await api(0, '/learning/attempts', { stageCode: 'intermediate', mode: 'checkpoint', createKey: key() }, { status: 403, error: 'learning_stage_locked' });

@@ -1,0 +1,12 @@
+# Arthur: NarIyirm
+# 中文：Vercel 项目根目录为 server，仅上传服务端源码和依赖清单，排除移动端素材、本地环境、审核资料和生成工程。
+# EN: The Vercel project builds server; exclude mobile assets, local environments, review material, and generated workspaces from deployment uploads.
+**
+!server
+!server/**
+server/node_modules/**
+server/.env*
+server/.vercel/**
+server/data/**
+server/scripts/**
+server/test/**

@@ -1,0 +1,3 @@
+{
+  "crons": [{ "path": "/api/internal/erasure-assets", "schedule": "30 3 * * *" }]
+}

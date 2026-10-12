@@ -4,7 +4,9 @@ import { Image } from 'expo-image';
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -23,6 +25,10 @@ import { ProfileBottomSheet } from './ProfileBottomSheet';
 import { useProfileData } from './ProfileDataProvider';
 import { LanguageSettingsModal } from './ProfileSettings';
 import { subscribeNavigationMemory } from '../services/navigationMemory';
+import { privacyCopy, privacyUrl, supportUrl } from '../privacyCopy';
+import { askAiConsent, AI_CONSENT_VERSION } from '../services/aiConsentBridge';
+import { getApiErrorCode, requestApi, suspendApiRequests } from '../services/apiClient';
+import { useDevicePrivacy } from './DevicePrivacyBoundary';
 
 const AVATAR_COLOURS: Record<ProfileAvatarKey, { background: string; foreground: string }> = {
   sage: { background: '#DDEFE7', foreground: '#245846' },
@@ -347,19 +353,63 @@ function RecoveryModal({ onClose, visible }: { onClose: () => void; visible: boo
 }
 
 function PrivacyModal({ onClose, visible }: { onClose: () => void; visible: boolean }) {
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const copy = t.profile.privacy;
+  const privacy = privacyCopy(language);
+  const { completeErasure } = useDevicePrivacy();
+  const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    if (!visible) return;
+    let active = true;
+    setAllowed(null); setFailed(false);
+    requestApi<{ allowed: boolean }>('/api/privacy/ai-consent').then(value => {
+      if (active) setAllowed(value.allowed);
+    }).catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [visible]);
+  const revoke = async () => {
+    setBusy(true);
+    try {
+      await requestApi('/api/privacy/ai-consent', { method: 'PUT', body: JSON.stringify({ allowed: false, version: AI_CONSENT_VERSION }) });
+      setAllowed(false);
+    } catch { Alert.alert(privacy.failure, privacy.failureBody); }
+    finally { setBusy(false); }
+  };
+  const erase = () => Alert.alert(privacy.deleteTitle, privacy.deleteBody, [
+    { text: privacy.cancel, style: 'cancel' },
+    { text: privacy.confirmDelete, style: 'destructive', onPress: () => {
+      setBusy(true); suspendApiRequests(true);
+      // Arthur: NarIyirm
+      // 中文：先暂停后台请求；只有服务端确认原子删除后才卸载身份，失败则恢复原有会话继续重试。
+      // EN: Pause background traffic first; only confirmed atomic erasure tears down identity, while failure resumes the original session for retry.
+      void requestApi<{ deleted: boolean }>('/api/privacy/device-data', { method: 'DELETE', body: JSON.stringify({ confirm: 'DELETE' }) })
+        .then(result => { if (!result.deleted) throw new Error('Erasure not confirmed'); completeErasure(); })
+        .catch(error => {
+          if (getApiErrorCode(error) === 'identity_erased') { completeErasure(); return; }
+          suspendApiRequests(false); setBusy(false); Alert.alert(privacy.failure, privacy.failureBody);
+        });
+    } },
+  ]);
+  const open = (url: string) => void Linking.openURL(url).catch(() => Alert.alert(privacy.failure, privacy.failureBody));
   return (
     <ProfileBottomSheet onClose={onClose} title={copy.title} visible={visible}>
-      {({ requestClose }) => (
-        <View style={styles.privacyContent}>
+      {({ requestClose, onContentScroll }) => (
+        <ScrollView contentContainerStyle={styles.privacyContent} onScroll={onContentScroll}>
           <PrivacyPoint icon="phone-portrait-outline" text={copy.deviceIdentity} />
           <PrivacyPoint icon="people-outline" text={copy.sharedVisibility} />
           <PrivacyPoint icon="lock-closed-outline" text={copy.security} />
+          <Pressable accessibilityRole="link" style={styles.privacyAction} onPress={() => open(privacyUrl(language))}><Text style={styles.privacyActionText}>{privacy.policy}</Text></Pressable>
+          <Pressable accessibilityRole="link" style={styles.privacyAction} onPress={() => open(supportUrl(language))}><Text style={styles.privacyActionText}>{privacy.support}</Text></Pressable>
+          <Text style={styles.privacyText}>{failed ? privacy.failureBody : allowed === null ? privacy.loading : allowed ? privacy.allowed : privacy.notAllowed}</Text>
+          <Pressable accessibilityRole="button" disabled={busy} style={styles.privacyAction} onPress={() => requestClose(() => { void askAiConsent(true); })}><Text style={styles.privacyActionText}>{privacy.manage}</Text></Pressable>
+          {allowed ? <Pressable accessibilityRole="button" disabled={busy} style={styles.privacyAction} onPress={() => void revoke()}><Text style={styles.privacyActionText}>{privacy.revoke}</Text></Pressable> : null}
+          <Pressable accessibilityRole="button" disabled={busy} style={styles.privacyDelete} onPress={erase}><Text style={styles.privacyDeleteText}>{busy ? privacy.deleting : privacy.delete}</Text></Pressable>
           <Pressable accessibilityRole="button" onPress={() => requestClose()} style={styles.privacyCloseButton}>
             <Text style={styles.privacyCloseText}>{copy.close}</Text>
           </Pressable>
-        </View>
+        </ScrollView>
       )}
     </ProfileBottomSheet>
   );
@@ -466,6 +516,10 @@ const styles = StyleSheet.create({
   privacyText: { flex: 1, color: '#4E675E', fontSize: 13, lineHeight: 19 },
   privacyCloseButton: { minHeight: 50, alignItems: 'center', justifyContent: 'center', marginTop: 14, borderRadius: 15, backgroundColor: '#168ACB' },
   privacyCloseText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
+  privacyAction: { minHeight: 48, justifyContent: 'center', paddingVertical: 10 },
+  privacyActionText: { color: '#126DA1', fontSize: 14, fontWeight: '700' },
+  privacyDelete: { minHeight: 50, justifyContent: 'center', alignItems: 'center', marginTop: 16, borderRadius: 15, backgroundColor: '#FBE7E5' },
+  privacyDeleteText: { color: '#A93A3A', fontSize: 14, fontWeight: '800' },
   replayContent: { alignItems: 'center', paddingHorizontal: 22, paddingTop: 28, paddingBottom: 24 },
   replayIcon: { width: 64, height: 64, alignItems: 'center', justifyContent: 'center', borderRadius: 32, backgroundColor: '#FFF0E3' },
   replayDescription: { maxWidth: 420, marginTop: 18, color: '#536C63', fontSize: 14, lineHeight: 21, textAlign: 'center' },

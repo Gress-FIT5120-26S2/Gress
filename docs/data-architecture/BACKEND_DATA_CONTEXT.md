@@ -4,21 +4,29 @@
 
 ## 1. 当前状态
 
-- 最后核对日期：2026-10-05（Australia/Sydney）。
+- 2026-10-12 App Store 隐私准备：新增 `20261012100000_app_store_privacy_and_erasure.sql`，已先应用开发库并通过隔离回滚验证，再应用生产库；两库 lint 无错误，生产回滚验证也通过。当前共 58 份迁移，此前 57 份保持不变。新合同包含 AI 授权、已删除身份指纹、资产清理队列与今后恢复链，详见文末新节。对应服务端及移动端发布状态见 `docs/app-store/RELEASE_STATUS.md`。
+
+- 2026-10-12 发布完成：负责人 NarIyirm 明确确认已审阅课程／导师并要求直接发布，主动跳过真机验收。新增 `20261012050000_publish_owner_reviewed_learning.sql` 已先在开发库应用、通过 release guard 回滚检查与 lint，再以完全相同文件应用生产。课程 v1 已 published，导师新增 v3 已 published（哈希 `665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2`）。导师原作者与复核人为同一人，记录 `project-owner`，独立审核 pending；guard 例外仅适用于此版本、精确哈希和本次授权，其他版本仍要求独立审核。旧 v1/v2、模板答案、会话绑定与所有旧 migration 不改写。生产 API 已切换，三导师开关开启，正式域名 health 200/database connected。详见 `docs/learning-room/verification/2026-10-12/RELEASE_VERIFICATION.md`。
+
+- 最后核对日期：2026-10-12（Australia/Sydney）。
 - 当前数据库：Supabase PostgreSQL。
-- 本地 schema 历史共有 49 份 migration。CLI 当前链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库已登记并应用到 `20261005011000_learning_room_draft.sql`，Learning Room 298 次真实 HTTP 请求及版本／恢复 SQL 回滚验证通过。既有包装快照与多部件分类学习接口验证保留。生产库未应用本轮两份 learning migration，仍须按顺序补齐前置 migration 后才能发布依赖新契约的 Express 与 App。
+- 本地 schema 历史共有 58 份已提交 Git 的 migration。CLI 当前仍链接 `Gress-development`（thmbtsssvnslotoexntz）；开发库与 `Gress-production`（vcsujjaapchvcnndlhqb）均已登记并应用到 `20261012100000_app_store_privacy_and_erasure.sql`。2026-10-12 先将生产缺少的 17 份原文件按顺序补齐，再按开发先验证、生产后应用的顺序发布课程、导师与隐私合同。未运行 seed、reset 或 migration repair，未改写既有迁移。
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
-- 本轮远程只读核对 public schema 共有 44 张普通表，其中 Learning Room 新增 7 张；保留既有设备资料、Push Token、通知投递审计、设备凭证、恢复码、共享加入、退出与恢复 RPC、冰箱领域同步版本，以及成就等级和 XP 流水。
+- 隐私迁移前的生产补齐核对：两端 public schema 当时均有 50 张普通表、500 个字段、364 个约束、79 个非扩展函数、128 个索引、32 个业务触发器与 7 个枚举。结构、函数正文（统一 CRLF/LF 后）、权限与 RLS 完全一致；生产 22 张有记录的既有业务表在该轮迁移前后汇总指纹一致。此历史基线见 `docs/data-architecture/verification/2026-10-12/PRODUCTION_MIGRATION_VERIFICATION.md`。
+- 隐私迁移后的最终只读核对：两端均为 58 份迁移、54 张普通表、509 个字段、375 个约束、82 个非扩展函数、132 个索引、34 个业务触发器与 7 个枚举。所有 54 表启用 RLS，anon/authenticated 表授权为 0、security-definer 执行权限为 0；两库 lint 无错误，隐私回滚验证通过。已部署的生产隐私 HTTP 流程通过，当前发版状态见 `docs/app-store/RELEASE_STATUS.md`。
 - Seed 现在包含 16 条常见食材建议和 4 条旧成就定义；`20260912020000_achievement_dashboard.sql` 会幂等扩充并统一为 8 条已确认成就定义。新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
-- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。分类管理接口尚未实现；生产发布仍须先应用 `20260912010000` 和 `20260912020000`。
+- 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、自定义分类、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。库存结果记账、成就、挑战、包装分类学习、Learning Room 与 Learning Tutor 的数据库依赖现已全部进入生产；Express 与 App 发版仍须另行完成。
 - 已在开发库和生产库应用的 `20260909010000_assistant_freshness_foundation.sql` 为助手日期语义建立向后兼容基础：新增硬性 `use_by_at`、系统计算的 `estimated_quality_until` 和版本化季节品质档案。它保留旧 `expires_at`，不把历史模糊日期自动升级成安全期限。`20260909020000_assistant_history_read_model.sql` 新增只对 service role 开放的个人/共享历史聚合 RPC，结果不返回真实设备 ID。`20260909030000_assistant_rag_foundation.sql` 使用 `text-embedding-3-small` 的 1536 维向量建立审核知识源、文档、分块和 RRF 混合检索函数。`20260909040000_assistant_conversation_audit.sql` 建立创建者私有会话、消息、脱敏审计、反馈与短时待确认动作。`20260910010000_fix_assistant_vector_operator.sql` 修复混合检索函数的向量运算符解析。`20260911010000_confirm_assistant_pending_actions.sql` 新增原子确认与取消 RPC，`20260911030000_link_assistant_actions_to_messages.sql` 将动作精确关联到产生它的助手消息，供历史恢复使用。Express 已实现 GPT-5.6 Luna 编排、只读工具、RAG、结构化校验、会话历史读取和显式确认；Expo 已接入自由输入、快捷问题、当前会话续接与历史恢复。数据库契约已经进入生产，但生产知识内容摄取、OpenAI 环境变量、Express API 部署和端到端验收仍需单独完成。
 
 - `20260911020000_harden_assistant_action_confirmation.sql` 保留已部署 migration 不变，以 `create or replace function` 清理 lint 警告，并在数据库确认边界增加单位感知的补货数量上限。
 - `20260913170000_assistant_inventory_outcomes.sql` 将助手的整批使用、明确丢弃和录入纠错统一接入 `resolve_inventory_batch`：使用写 `consume/used`，丢弃写带稳定原因的 `discard`，只有明确录入错误才写 `adjust/data_correction`。这些权威流水会被现有成就、XP、环境指标和挑战聚合直接消费；模糊的非过期“删除”请求必须先澄清结果类型。
 - `20260922010000_fix_shared_join_assistant_scope.sql` 修复已有助手会话时加入家庭冰箱会被复合外键阻断的问题：合并前将该设备的私有会话与审计范围迁入目标冰箱，让依赖旧库存版本的待确认/已确认动作失效并解除旧批次绑定，再执行库存与分类迁移。
+
+- 2026-10-12：生产所有 50 张 public 表启用 RLS，anon/authenticated 无表权限或 security-definer RPC 执行权限，学习表的 service role 保持直接只读。`learning-tutor-retention` 已启用，每日 03:17 UTC 调用清理函数。课程 `learning-room-v1` 与导师 `learning-tutor-v1/v2` 仍为 draft，独立审核 pending，生产默认门禁继续拒绝草稿；补齐 schema 不代表内容已发布。
+- 历史登记差异：`20260830005000_restock_and_cart.sql` 在开发与生产的旧 `statements` 记录不同（开发只登记函数，生产另登记购物表与索引）；当前真实结构与函数已一致。保留历史记录，不重写迁移或修复登记。本文后续按日期保留的“生产未应用”描述均为当时状态，当前部署状态以本节及 2026-10-12 核对记录为准。
 
 实际实现的权威来源：
 
@@ -960,3 +968,19 @@ recommendations只统计本人当前可用版本近30天已提交正式首答，
 Learn 的个人 gateway 跨普通 Tab 切换复用，应用从后台恢复或缓存超过五分钟后在可见页面静默校验，隐藏页面延迟到下一次激活。学习提交、导师对话与判分仍调用原 API；预加载不会启动测验、自动完成课程、请求系统通知权限或写入导师提示展示事件。后台数据同步继续刷新现有 Provider/列表，不因保留视图而停止。已有成功快照（含空列表）时继续显示内容，自动刷新不切回整页加载或骨架屏；首次数据尚未取得、真实首载错误及主动提交/下拉刷新反馈仍保留。报告快照合并并发读取，父层作用域销毁后拒绝迟到响应。
 
 切换 fridge.uid 会重建冰箱范围的购物、消息与成果页面；join/leave 不清除个人 Learn。设备恢复成功后通过 navigationMemory 清除旧学习、购物、消息、成果实例、通知设置及根节点库存缓存，并通知现有同步订阅重新读取数据，即使恢复目标 fridge.uid 相同也清除旧 gateway。Profile 的恢复码展示保留，便于保存新一次性恢复码。API 与数据库合同没有变化。
+
+## 18. App Store 隐私、AI 授权与身份删除（2026-10-12 新合同）
+
+公开 `/privacy`、`/support` 无设备鉴权、无需 JavaScript，提供中英双语，运营方 Haoxuan Sun，公开邮箱 nariyirm@gmail.com。审核电话号码不进入仓库／公共页面。真实照片识别端点是 AWS CloudFront 分发的独立模型服务，不是 Gemini 照片 API。
+
+`device_privacy_choices` 以 device_id 绑定授权，版本 `2026-10-12`，默认无授权。`GET/PUT /api/privacy/ai-consent` 仅用已鉴权身份；PUT 只接受布尔 allowed 和精确版本。Express 在照片 multipart 解析或任何供应商请求前拦截七类 AI POST（助手／导师消息、照片识别、食物预设生成、自定义分类、包装建议、材质图标），未授权 403 `ai_consent_required`，数据库故障 fail closed。读取历史、人工库存、购物、静态课程与本地规则不受限制。前端用统一授权桥接和单个原生弹窗合并并发请求；明确拒绝后不反复弹窗，只能通过隐私页主动重新授权。每次 AI 请求仍复核服务端选择，撤回阻止后续请求；已在供应商处理中的请求不可召回。授权不通过身份恢复隐式迁移。
+
+`DELETE /api/privacy/device-data` 只接受 `{confirm:'DELETE'}`。`erase_device_data` 再次核验当前凭证摘要，锁住身份／成员并在单事务删除资料、凭证、恢复码、推送、私人学习／聊天，以及本人创建或拥有的库存／购物条目及依赖提醒、动作和事件。其他成员原始批次与清单保留。本人自定义分类删除，其他成员引用移到同冰箱默认 Other；无身份默认分类和共享容器保留。本人在其他成员条目的历史事件去除 actor 与自由备注；不保留当前身份可识别的 UGC。本人创建的冰箱名称恢复 My Fridge，作者关联置空。为支持真正删除，fridges/food_categories.created_by_device_id 与 inventory_events.actor_device_id 改为 nullable／ON DELETE SET NULL；其他 RPC 正常创建仍传入真实 actor。
+
+`device_identity_links` 由成员设备 ID 更新触发器记录今后的恢复链，删除时递归清理已撤销前身。旧迁移之前已发生的恢复不能凭名称／库存猜测关联；其遗留已撤销安装记录需要带可验证身份信息的支持请求或专门保留策略处理，不能宣称历史恢复链已完成回填。
+
+`erased_device_fingerprints` 仅保存安装 ID 的 SHA-256 指纹，没有原 ID、凭证、昵称或时间，永久阻止旧身份 bootstrap。设备 INSERT trigger 与删除共用 advisory lock，迟到请求不能重建旧记录。服务端明确返回 401 `identity_erased`；客户端持久化已删除状态、卸载业务 Provider 并停止请求、清除本机通知。只有用户按“重新开始”时删除本机 SecureStore 旧密钥、清除引导与提醒缓存，再创建全新空身份。丢失删除响应后，下一次该专用错误仍恢复删除完成界面。
+
+分类生成图标路径同事务写入 `erasure_asset_queue`；立即尝试通过 Supabase Storage API 删除，成功才移除队列，失败保留待重试。Vercel 每天 03:30 UTC 调用 `/api/internal/erasure-assets`，独立服务端 CRON_SECRET 鉴权，公开／设备请求不得触发管理员存储清理。当前 cron 是否已部署须见 App Store 准备验证记录，不能仅凭配置文件视为已运行。
+
+四张新表均启用 RLS，anon/authenticated 无读写权限；恢复链与指纹写入仅由 SECURITY DEFINER trigger/RPC，队列只给 service_role SELECT/DELETE，删除 RPC 仅给 service_role EXECUTE。公开政策与元数据不承诺食品安全判定，不承诺第三方已处理数据／备份即时清除。

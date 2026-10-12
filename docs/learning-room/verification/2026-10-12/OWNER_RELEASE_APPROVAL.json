@@ -1,0 +1,40 @@
+{
+  "date": "2026-10-11",
+  "decisionLocalDate": "2026-10-12",
+  "decisionTimeZone": "Australia/Sydney",
+  "reviewer": "NarIyirm",
+  "authorizationSource": "project-owner-chat-2026-10-12",
+  "userStatement": "不需要验收，我已经审阅过了，直接发布就像",
+  "decision": "Publish directly; device acceptance explicitly waived by the owner.",
+  "course": {
+    "contentVersion": "learning-room-v1",
+    "contentHash": "0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054",
+    "reviewer": "NarIyirm",
+    "author": "Codex primary agent",
+    "questions": 48,
+    "status": "approved"
+  },
+  "tutor": {
+    "sourceManifestVersion": "learning-tutor-v2",
+    "sourceManifestHash": "495079bb614ff51269ae2d183360efe2deb48e0da1ac2ac9a0bc9a76034035ae",
+    "manifestVersion": "learning-tutor-v3",
+    "manifestHash": "665f4a761224842cfadc6143f28e3f92f5374c02a04b8a48eee99159028d12a2",
+    "templates": 12,
+    "reviewType": "project-owner",
+    "independentReviewStatus": "pending"
+  },
+  "modelEvaluation": {
+    "source": "2026-10-08/TUTOR_MODEL_EVALUATION.json",
+    "sha256": "574a2c0a7789ff89a5d939343703174fa7c6ab92d65b7171edc6e142f5d84c26",
+    "answers": 60,
+    "status": "approved-by-owner",
+    "measuredHumanAccuracy": null,
+    "note": "Global owner sign-off; no invented per-answer scores or measured accuracy."
+  },
+  "deviceAcceptance": {
+    "status": "waived-by-owner",
+    "availableDevice": "iPhone",
+    "executed": false
+  },
+  "migration": "20261012050000_publish_owner_reviewed_learning.sql"
+}

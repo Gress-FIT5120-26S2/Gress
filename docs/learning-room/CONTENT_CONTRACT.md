@@ -58,15 +58,17 @@ video 引用已存在的一分钟动画与 poster，不生成新视频。提供�
 
 ## 审核与不可变版本
 
-作者已完成来源核对和第二遍文字／唯一最佳选项检查；**独立校对尚未完成**。`review.json` 保留 pending，测试中的批准副本不会写回任何文件。
+作者已完成来源核对和第二遍文字／唯一最佳选项检查。2026-10-12 项目负责人 NarIyirm 明确表示已审阅并要求直接发布；课程原作者为 Codex primary agent，`review.json` 据此记录真实审核人、UTC 审核日期、全部 48 题的批准与不变的内容哈希。原始待审核记录保留在 Git 历史中。
 
 发布门槛必须同时满足：结构通过；每题独立状态 approved；独立 reviewer 非空且不同于作者；有效审核日期；approvedContentHash 等于实际内容 hash。这个门槛是离线记录校验，不能验证 reviewer 的现实身份；真正发布仍需由内容负责人核实审核记录，不可自行填一个名字绕过。
 
 hash 使用 SHA-256，覆盖 catalog、activities、resources、sources 和完整私有 bank；对象 key 排序、数组顺序保留。review 元数据不进入 hash。修改内容、答案或源日期都会使旧批准失效。manifest 与实际内容不一致时只读校验失败。
 
-草稿校验：`node server/scripts/validate-learning-content.js`。明确核对草稿修改后才能运行 `--write-manifest`。发布准备检查：加 `--release`，只读且不能同时写 manifest。当前会按预期失败，因为独立校对 pending。已发布版本不得覆盖；新建内容版本并保留旧考试快照。
+内容校验：`node server/scripts/validate-learning-content.js`。明确核对草稿修改后才能运行 `--write-manifest`。发布检查：加 `--release`，只读且不能同时写 manifest。2026-10-12 已通过发布检查。已发布版本不得覆盖；新建内容版本并保留旧考试快照。v1 catalog 内的 draft 是原始作者快照的一部分，不能为了改显示状态重算已部署哈希；实际发布状态以数据库 `learning_content_versions.status` 为准，客户端公开投影不包含作者快照的 status。
 
-技术验证：`node --test server/test/learningContent.test.js`。结构测试不能代替独立校对、原生 UI 验收、抽题服务或真实等级恢复验证。
+技术验证：`node --test server/test/learningContent.test.js`。结构测试不能代替人工校对、原生 UI 验收、抽题服务或真实等级恢复验证。本次负责人明确跳过真机验收，记录为 waived，不记为测试通过。
+
+导师历史 manifest 的作者为 NarIyirm，因此其本次复核如实记录为 `project-owner`，独立审核仍 pending。新增 `learning-tutor-v3` 只增加模板负责人复核信息，教学正文、答案与模型提示不变。新迁移 `20261012050000_publish_owner_reviewed_learning.sql` 将例外限定到 v3 的精确哈希及本次真实授权；其他版本仍须原独立审核门槛。详见 `verification/2026-10-12/OWNER_RELEASE_APPROVAL.json`。旧 manifest 和既有 migration 不改写。
 
 P3 的数据库内容写入仍必须采用新的 timestamped migration，并遵守 BACKEND_DATA_CONTEXT.md；这些 JSON／manifest 不构成已部署的数据或 seed。
 

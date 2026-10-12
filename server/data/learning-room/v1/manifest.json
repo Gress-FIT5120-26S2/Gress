@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "contentVersion": "learning-room-v1",
   "contentHash": "0736124795fd1dbc5e5b82521f919162ea82692c27a3f127b850410ce31f6054",
-  "state": "source-checked-draft",
+  "state": "approved-for-publication",
   "counts": {
     "courses": 3,
     "activities": 9,
@@ -10,5 +10,5 @@
     "questions": 48,
     "sources": 18
   },
-  "independentReview": "pending"
+  "independentReview": "approved"
 }

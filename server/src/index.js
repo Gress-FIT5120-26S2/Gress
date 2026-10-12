@@ -19,10 +19,16 @@ import { createLearningTutorService } from './services/learningTutor.js';
 import { createCorsPolicy } from './middleware/corsPolicy.js';
 import { databaseRateLimit, getClientIp, rateLimitPolicies } from './middleware/rateLimit.js';
 import { requireDevice } from './middleware/requireDevice.js';
+import { createAiConsentMiddleware } from './middleware/aiConsent.js';
+import { createPrivacyRouter } from './routes/privacy.js';
+import { publicPagesRouter } from './routes/publicPages.js';
+import { createErasureCleanupRouter } from './routes/erasureCleanup.js';
 
 const app = express();
 const port = Number(process.env.PORT ?? 3001);
 
+app.use(publicPagesRouter);
+app.use(createErasureCleanupRouter(supabase));
 app.use(...createCorsPolicy());
 app.use(express.json());
 // Arthur: NarIyirm
@@ -56,6 +62,8 @@ app.post(
   recoverDeviceRoute,
 );
 app.use('/api', requireDevice);
+app.use('/api', createPrivacyRouter(supabase));
+app.use('/api', createAiConsentMiddleware(supabase));
 app.use(
   '/api/photo-recognition',
   databaseRateLimit(rateLimitPolicies.photoRecognition, (request) => request.deviceId),

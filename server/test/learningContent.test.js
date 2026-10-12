@@ -113,8 +113,13 @@ test('future answer data nested anywhere in public content is blocked', () => {
 });
 
 test('release rejects pending review, self approval and incomplete per-question review', () => {
-  assert.equal(validate(baseline, true).ok, false);
-  assert.match(validate(baseline, true).errors.join('\n'), /independent review approval required/);
+  // Arthur: NarIyirm
+  // 中文：显式构造待审状态，让发布门槛测试不依赖真实教材当前是否已获批准。
+  // EN: Construct a pending review explicitly so the release-gate test does not depend on the real content's current approval state.
+  const pending = structuredClone(baseline);
+  pending.review.independentReview.status = 'pending';
+  assert.equal(validate(pending, true).ok, false);
+  assert.match(validate(pending, true).errors.join('\n'), /independent review approval required/);
   const b = approvedTestCopy();
   assert.equal(validate(b, true).ok, true);
   b.review.independentReview.reviewer = ` ${b.review.authoringReview.reviewer.toUpperCase()} `;
