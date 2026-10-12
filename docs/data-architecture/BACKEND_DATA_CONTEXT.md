@@ -14,7 +14,8 @@
 - 新增库存写入与库存详情 mutation migration 必须先在测试库应用和验证，再把同一文件应用到生产库。
 - `20260907010000_inventory_input_guardrails.sql` 已由项目负责人依次应用到测试库和生产库，为库存名称、剩余数量和单位增加数据库边界；使用 `NOT VALID` 保留历史异常记录，但所有新写入与后续修改都会立即受约束。
 - 开发库远程 PostgreSQL lint 已通过，无 schema error；`20260910010000_fix_assistant_vector_operator.sql` 使用显式 `OPERATOR(extensions.<=>)` 修复空 `search_path` 下 pgvector 运算符无法解析的问题。
-- 本轮远程核对两端 public schema 均有 50 张普通表、500 个字段、364 个约束、79 个非扩展函数、128 个索引、32 个业务触发器与 7 个枚举。结构、函数正文（统一 CRLF/LF 后）、权限与 RLS 完全一致；两端 lint 均无错误或警告。生产 22 张有记录的既有业务表在迁移前后汇总指纹一致。完整记录与可复用核对 SQL 见 `docs/data-architecture/verification/2026-10-12/PRODUCTION_MIGRATION_VERIFICATION.md`。
+- 隐私迁移前的生产补齐核对：两端 public schema 当时均有 50 张普通表、500 个字段、364 个约束、79 个非扩展函数、128 个索引、32 个业务触发器与 7 个枚举。结构、函数正文（统一 CRLF/LF 后）、权限与 RLS 完全一致；生产 22 张有记录的既有业务表在该轮迁移前后汇总指纹一致。此历史基线见 `docs/data-architecture/verification/2026-10-12/PRODUCTION_MIGRATION_VERIFICATION.md`。
+- 隐私迁移后的最终只读核对：两端均为 58 份迁移、54 张普通表、509 个字段、375 个约束、82 个非扩展函数、132 个索引、34 个业务触发器与 7 个枚举。所有 54 表启用 RLS，anon/authenticated 表授权为 0、security-definer 执行权限为 0；两库 lint 无错误，隐私回滚验证通过。已部署的生产隐私 HTTP 流程通过，当前发版状态见 `docs/app-store/RELEASE_STATUS.md`。
 - Seed 现在包含 16 条常见食材建议和 4 条旧成就定义；`20260912020000_achievement_dashboard.sql` 会幂等扩充并统一为 8 条已确认成就定义。新增的视觉识别食材需先应用 `20260831010000_upsert_photo_recognition_food_presets.sql` 才会出现在已部署环境。
 - 前端的业务数据不会直连 Supabase；所有权威数据请求必须经过 Express。共享模式通过 Supabase Realtime Broadcast 接收不含业务记录的领域版本失效事件，随后静默重拉当前页面；30 秒版本探针和前台恢复对账负责补偿漏消息，Broadcast 未配置或断开时自动回退 6 秒探针。
 - 代码中已实现设备凭证验证、设备初始化、个人昵称、设备级通知偏好、共享库存事件通知、Expo 系统推送、库存读写、自定义分类、购物清单、共享命名/开启、邀请码轮换、具名成员摘要、加入、退出、设备恢复，以及已在开发库验证的成就聚合接口和真实数据页面。库存结果记账、成就、挑战、包装分类学习、Learning Room 与 Learning Tutor 的数据库依赖现已全部进入生产；Express 与 App 发版仍须另行完成。
