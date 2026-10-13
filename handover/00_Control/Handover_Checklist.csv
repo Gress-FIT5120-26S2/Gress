@@ -1,0 +1,27 @@
+﻿ID,Check,Current status,Responsible role to confirm,Evidence,Closure condition
+C-01,Three main documents authored and versioned,Prepared,Team,Main folders,Review final wording
+C-02,Word layout and product page limit checked,Pass,Team,00_Control/Document_QA.json,Eight Word documents visually reviewed; Product Document three pages
+C-03,Code and recorded release baseline registered,Prepared,Technical owner,Release Register,Freeze accepted final tag
+C-04,Latest iOS and Android links identified,Prepared,Distribution owner,Release Register,Recipient must verify access
+C-05,English actual screenshots and product film included,Prepared,Team,07_Assets; 08_Product_Video,Known progress overlap recorded
+C-06,Ethics Canvas and ACS mapping prepared,Prepared; course format pending,Ethics reviewer,Ethics Canvas,No certification claimed
+C-07,Knowledge-transfer strategy and exercises prepared,Prepared; sessions pending,Coordinator,Knowledge Transfer Plan,Record real attendance/outcomes
+C-08,Support manual and troubleshooting reviewed by receiver,Pending,Support lead,Support Document,Execute receiver task exercises
+C-09,Maintainer can start development independently,Pending,Technical owner,Maintenance section 3,Verify target project and Node version
+C-10,Current automated tests and type check,Pass,Team,Testing Report; Verification_Results.json,75 local tests; not whole-device UAT
+C-11,Latest build native UAT,Pending; earlier owner waiver recorded,QA owner,Receiver_UAT.csv,Do not label waived as tested
+C-12,Historic test failures rechecked,Pending,QA owner,Testing Report section 2,Closure not established
+C-13,Independent tutor content review,Pending,Content reviewer,Risk R-02,Owner publication exception recorded
+C-14,Actual cron and push outcomes observed,Pending,Operations owner,Maintenance section 11,Configuration is not successful execution
+C-15,Backup retention and isolated restore drill,Pending,Database owner,Maintenance section 12,Cover Storage separately
+C-16,Access and administrative ownership verified,Pending,Receiving owner,Access register,Do not include secrets in package
+C-17,Subscriptions and recurring budget assigned,Pending,Budget owner,Access register,Actual plans/costs unavailable
+C-18,Code media model rights reviewed,Pending,Receiving owner,Risk R-05,MIT file has Expo notice
+C-19,Team contacts and LinkedIn completed,Partial,Team members,INFO-05,Names and one public contact available
+C-20,Final Agile stories and acceptance outcomes registered,Pending,Product owner,Agile and PG Index,Local Epics are not final board export
+C-21,PG Google Drive link and permission verification,Pending,Portfolio owner,INFO-01,Cannot infer private URL
+C-22,Moodle pre-reading task list template reconciled,Pending,Course owner,INFO-03; INFO-04,Unseen requirements remain open
+C-23,Industry mentor or sponsor receipt/decision signed,Pending,Actual reviewer,Industry sign-off form,Blank until completed by recipient
+C-24,Separate Monash receipt/decision signed,Pending,Monash mentor,Monash form,Industry signature is not substitute
+C-25,Remaining risks explicitly accepted or assigned,Pending,Receiving owner,Risk register; sign-off,No silent exception acceptance
+C-26,Final medium package hash and source freeze recorded,Pending,Handover coordinator,Manifest and sign-off,Keep immutable accepted copy

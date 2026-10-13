@@ -1,0 +1,22 @@
+{
+  "bytes": 862695,
+  "sha256": "940ac91cc1f239a50158f3f67c8a1bf2c40d2abe1627bb6bbc05c7daa2292a11",
+  "imageElements": 19,
+  "allImageSourcesEmbedded": true,
+  "scriptTags": 0,
+  "unresolvedAssetTokens": false,
+  "plannedText": false,
+  "emDashes": false,
+  "browserWidths": [
+    1265,
+    768,
+    390,
+    320
+  ],
+  "browserChecks": [
+    "No horizontal overflow",
+    "In-page navigation works",
+    "Wins screenshots expand and collapse",
+    "All embedded images render"
+  ]
+}

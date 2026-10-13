@@ -1,0 +1,17 @@
+{
+  "prepared_date": "2026-10-12",
+  "timezone": "Australia/Sydney",
+  "source_commit": "a37304cd7746f61872673cc9d8d05e8f7536badf",
+  "scope": "Existing local compiler and fixture-based client/server tests; no new remote database or provider writes",
+  "typescript": {"command": "npx tsc --noEmit", "exit_code": 0, "status": "PASS"},
+  "client_room": {"command": "node scripts/test-learning-room.mjs", "passed": 14, "failed": 0, "status": "PASS"},
+  "client_gateway": {"command": "node scripts/test-learning-gateway.mjs", "passed": 16, "failed": 0, "status": "PASS"},
+  "server_initial_restricted_run": {"passed": 42, "failed": 3, "cause": "Loopback HTTP tests denied by execution environment with EACCES; not evidence of a product assertion failure"},
+  "server_loopback_enabled_rerun": {
+    "command": "node --test server/test/learningAssessment.test.js server/test/learningContent.test.js server/test/learningTutor.test.js server/test/privacy.test.js server/test/wasteQuestionCatalog.test.js",
+    "passed": 45, "failed": 0, "exit_code": 0, "status": "PASS"
+  },
+  "total_current_automated_tests": {"passed": 75, "failed": 0},
+  "historic_workbook": {"source": "docs/testing/KitchMemo_Test_Cases_and_Report.xlsx", "reported_test_date": "2026-09-03", "total": 99, "pass": 71, "fail": 2, "blocked": 25, "not_executed": 1, "qualification": "Historic scope; not latest build UAT"},
+  "not_performed_for_package": ["Native physical-device UAT", "Production fixture writes", "Remote SQL checks", "Live AI evaluation", "Backup restore drill", "Knowledge-transfer sessions", "Signature collection"]
+}

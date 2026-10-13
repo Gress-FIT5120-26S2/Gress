@@ -1,0 +1,289 @@
+{
+  "package": "KitchMemo Handover Package",
+  "version": "1.0",
+  "prepared_date": "2026-10-12",
+  "timezone": "Australia/Sydney",
+  "language": "English",
+  "source_baseline": "a37304cd7746f61872673cc9d8d05e8f7536badf",
+  "status": "Prepared for recipient review; course links, access decisions, UAT, knowledge-transfer completion and signatures remain as registered",
+  "word_document_count": 8,
+  "rendered_document_pages": 44,
+  "excluded_from_hash_inventory": [
+    "00_Control/Package_Manifest.json",
+    "*.zip"
+  ],
+  "files": [
+    {
+      "path": "00_Control/Document_QA.json",
+      "bytes": 1958,
+      "sha256": "d97673f709c24ec4b87d34ff1e78fe4032e78ece7de04e6cbb585cb80237d53f"
+    },
+    {
+      "path": "00_Control/Guideline_Coverage.csv",
+      "bytes": 3905,
+      "sha256": "14c778b7805a7e7af65900f9ab0858825871f592932d765c912baa04ccc0fc26"
+    },
+    {
+      "path": "00_Control/Guideline_Reference/Guideline_01.png",
+      "bytes": 132675,
+      "sha256": "3f8d4e2bae0a75d6cf82afcb8ec560a9bf65c01024dcd8d75d82f6adb60b65cd"
+    },
+    {
+      "path": "00_Control/Guideline_Reference/Guideline_02.png",
+      "bytes": 168161,
+      "sha256": "4d5ca35d03710b6e606e1a36cfe8c560f1d4a1c81b8f052116813e8c89705119"
+    },
+    {
+      "path": "00_Control/Guideline_Reference/Guideline_03.png",
+      "bytes": 172230,
+      "sha256": "6ae7328b3c58e44d697b8adccb8ea3ec0d9adb659b1dba761bc5eb6bfb39eedd"
+    },
+    {
+      "path": "00_Control/Guideline_Reference/Guideline_04.png",
+      "bytes": 173423,
+      "sha256": "e04bd67d08fca74e0a37bb6f15f0033eb2da18c7bb5ca95c0ed38087ca68074e"
+    },
+    {
+      "path": "00_Control/Guideline_Reference/Guideline_05.png",
+      "bytes": 77343,
+      "sha256": "3d633777a95d62aac476db3aafbcf03bd09163e91e5013df8becebe4630c5329"
+    },
+    {
+      "path": "00_Control/Handover_Checklist.csv",
+      "bytes": 3353,
+      "sha256": "a2900140124571ea9910407ae1cc7562584c15c91f55d3863328850af3e5c67a"
+    },
+    {
+      "path": "00_Control/Information_Required.csv",
+      "bytes": 3210,
+      "sha256": "be9cd4747276f06b067cd820a11553cffe197f53c48cd4d1aa20e07c7ff39012"
+    },
+    {
+      "path": "00_Control/Release_and_Delivery_Register.md",
+      "bytes": 4087,
+      "sha256": "47d6d50d1e6b7976029ca99266bda72389c4b7d17b723cd2fd71f46f9741ef19"
+    },
+    {
+      "path": "00_Control/Verification_Results.json",
+      "bytes": 1597,
+      "sha256": "4c53a2a2fa1aa8c9dee7f90eb61b96e9793b327dcd1f708044b5edaa0171d33d"
+    },
+    {
+      "path": "01_Product/Product_Document.docx",
+      "bytes": 167475,
+      "sha256": "af44b2bb580460ffe3554c43b16fe67ffd2e496f4433ad539d18c8240e24d601"
+    },
+    {
+      "path": "01_Product/Product_Document.md",
+      "bytes": 7517,
+      "sha256": "0c4299f8168edaa5baac4cbd1f2ed531e4c7e18e3924b21be1fcd722382f7e5d"
+    },
+    {
+      "path": "02_Support/Support_Document.docx",
+      "bytes": 587415,
+      "sha256": "2b742160730105f78493c737f35a0ba40fd5d33d0103de0ada47b913d96311ed"
+    },
+    {
+      "path": "02_Support/Support_Document.md",
+      "bytes": 24872,
+      "sha256": "cd12e4eab9b1c77d7087e78280ace0af9bf51344c40d4577188493cd43bf265f"
+    },
+    {
+      "path": "03_Maintenance/API_Request_Examples.md",
+      "bytes": 5575,
+      "sha256": "5591590511c063ad9312ecbcf65e46847b251a5c534e03f1bfe693baa220d82e"
+    },
+    {
+      "path": "03_Maintenance/Maintenance_Document.docx",
+      "bytes": 217443,
+      "sha256": "f56c0ccd598c75e5a3bdedce0f37ccd4038fc09a3775d596b28036074e269f68"
+    },
+    {
+      "path": "03_Maintenance/Maintenance_Document.md",
+      "bytes": 36556,
+      "sha256": "428ec31ecfd544b35ff7b3902e4a5972906623ef19917b648928e1a4f2f91aa4"
+    },
+    {
+      "path": "03_Maintenance/Technical_Reference_Inventory.md",
+      "bytes": 19207,
+      "sha256": "e1f1d63d2e90ab93a7e86a41db3c4935d9a318c8ce4a7dede7fe196e890407ad"
+    },
+    {
+      "path": "04_Knowledge_Transfer/Knowledge_Transfer_Plan.docx",
+      "bytes": 42329,
+      "sha256": "0caafa465d548ef3761d18d5c031c17fe5ded2e270d847aec6cd0ce86f0f28cd"
+    },
+    {
+      "path": "04_Knowledge_Transfer/Knowledge_Transfer_Plan.md",
+      "bytes": 7421,
+      "sha256": "4c4057a997815ff980d567a088a9edc9ba9e10a3f9ea2c37648516a0b528dbed"
+    },
+    {
+      "path": "04_Knowledge_Transfer/Session_and_Exercise_Record.csv",
+      "bytes": 372,
+      "sha256": "d2f1d3e18ef4451039f6f22a8945671342f5c17ffc1b0d5138cf6cab95cd7903"
+    },
+    {
+      "path": "05_Sign_Off/Industry_and_Sponsor_Sign_Off.docx",
+      "bytes": 39554,
+      "sha256": "995a9837e061856effa7dbbfe232197450a1be2d4c2d6eb291d35567bdc37004"
+    },
+    {
+      "path": "05_Sign_Off/Industry_and_Sponsor_Sign_Off.md",
+      "bytes": 3271,
+      "sha256": "10eb20ef9867915314735eb9e3716d60bc3f237d78cb9deb85118b42f2beec26"
+    },
+    {
+      "path": "05_Sign_Off/Monash_Receipt_and_Acceptance.docx",
+      "bytes": 39292,
+      "sha256": "5ba2fec5ff68a3b28b1eb0dea25261ff5a96ef584d27cfde39eeae23e695ece9"
+    },
+    {
+      "path": "05_Sign_Off/Monash_Receipt_and_Acceptance.md",
+      "bytes": 2578,
+      "sha256": "652dc064e667b66b3983d7ccbbabe58b33304e7baffa7f528d880fc57141e275"
+    },
+    {
+      "path": "06_Appendices/Access_and_Ownership_Register.csv",
+      "bytes": 3107,
+      "sha256": "1c3343242a9621d149bddcaa3385a8049748934eeea9b752d44e949a100de7a9"
+    },
+    {
+      "path": "06_Appendices/Agile_and_PG_Index.md",
+      "bytes": 4374,
+      "sha256": "cb579800f867dff1a99da9af7bfa944072b7e0930ff2df70eb4eaaae39b3705f"
+    },
+    {
+      "path": "06_Appendices/Ethics_Canvas_and_ACS_Mapping.docx",
+      "bytes": 43649,
+      "sha256": "84ceaf795ea6d7eacde383c957c8a3de803d820a19c8199dcfc83b3e31a2b905"
+    },
+    {
+      "path": "06_Appendices/Ethics_Canvas_and_ACS_Mapping.md",
+      "bytes": 9350,
+      "sha256": "d0ba87b008b96f186fd3985f930ffa1a2852f73f11eb908a64fbd73a3826a717"
+    },
+    {
+      "path": "06_Appendices/Feature_Coverage.csv",
+      "bytes": 1631,
+      "sha256": "bdc9269554922fae56d9c350c8f3df8b39096cc6efe0d25b6241ac864e4e7fbf"
+    },
+    {
+      "path": "06_Appendices/Operating_Cost_and_Responsibility_Plan.md",
+      "bytes": 4242,
+      "sha256": "77c40adfb490de28c826a695398b3369961cc352a8f145b4a9be92cf6a236f85"
+    },
+    {
+      "path": "06_Appendices/Receiver_UAT.csv",
+      "bytes": 3076,
+      "sha256": "98a567aa16207464984a11c72b580c059515e056ba136fd1b7c65f83bb0b4cc8"
+    },
+    {
+      "path": "06_Appendices/Risk_and_Future_Backlog.csv",
+      "bytes": 4044,
+      "sha256": "ea6a38131139c7333ba2e558dfb3202dc892bf2846b0a673ca59d5188f650417"
+    },
+    {
+      "path": "06_Appendices/Source_and_Evidence_Register.md",
+      "bytes": 6087,
+      "sha256": "59db13855637900a6903adcf7f2f1ffb796ebb16ff5b38dddde3adcc50466821"
+    },
+    {
+      "path": "06_Appendices/Testing_and_Acceptance_Report.docx",
+      "bytes": 43931,
+      "sha256": "dcfa4654247b3827aed3fda394d024a102cf4109aab06457ca91e4cd5c24e3de"
+    },
+    {
+      "path": "06_Appendices/Testing_and_Acceptance_Report.md",
+      "bytes": 9416,
+      "sha256": "29e59274f6319a9725d3081df20e3dcd2288a9f7ce0a72c852c60fc0edf2ecd6"
+    },
+    {
+      "path": "07_Assets/01-home.jpg",
+      "bytes": 159299,
+      "sha256": "f8c7c7e51010f94b92c67b9720a2223788b3ebac522a2519510eee0779ca69d3"
+    },
+    {
+      "path": "07_Assets/02-inventory.jpg",
+      "bytes": 137323,
+      "sha256": "7c154b2629452442b0f48b14155938fda1df22cd72270c2bfddedeb0fa38b5bd"
+    },
+    {
+      "path": "07_Assets/03-learning.jpg",
+      "bytes": 162875,
+      "sha256": "592f8944a1f989d9774f2895e37c07ffc77fa1665fa5ceed212c5c4bf7b21649"
+    },
+    {
+      "path": "07_Assets/04-assistant.jpg",
+      "bytes": 196339,
+      "sha256": "23a43330d039755183de89c4d99598ef4208c21122c06a64d190670e71f81e0d"
+    },
+    {
+      "path": "07_Assets/05-progress.jpg",
+      "bytes": 218015,
+      "sha256": "4919f6f13b8e8363eee912c5e2cfbee368aba9179421da33521de8f10dec4bc7"
+    },
+    {
+      "path": "07_Assets/Asset_Register.md",
+      "bytes": 865,
+      "sha256": "5adc5e2ea3467b38197252ff48c9fd5eb2099dc68ac5901176d438cc3c04b986"
+    },
+    {
+      "path": "07_Assets/Data_Ownership.png",
+      "bytes": 80318,
+      "sha256": "bd5751e39fd96f879e886e7fb0022bc36406e61269732989d17c2ef6daf78897"
+    },
+    {
+      "path": "07_Assets/System_Architecture.png",
+      "bytes": 98950,
+      "sha256": "67db26eaa416cb0c81ab98fc18296e5b472dea9e1756960cf7dcd5db01f51517"
+    },
+    {
+      "path": "08_Product_Video/KitchMemo_90s_Final_v12.mp4",
+      "bytes": 32831711,
+      "sha256": "846de477ae302bf0f0c0714e37d1bf72de609f600d9f5cfce8cf3fbfb3215ba1"
+    },
+    {
+      "path": "08_Product_Video/README.md",
+      "bytes": 776,
+      "sha256": "5e46b7b46da00dd921ca4efa94445a6ba2521ca9ad7bf910ae7436d1fb68ab92"
+    },
+    {
+      "path": "README.md",
+      "bytes": 6026,
+      "sha256": "91221675b8d967af4e2a40c5cc015859d8a39465dbf85119a3d34588ee5a6b05"
+    }
+  ],
+  "unchanged_asset_sources": [
+    {
+      "package_path": "07_Assets/01-home.jpg",
+      "source_path": "deliverables/app-store/screenshots/raw/en-AU/iphone/01-home.jpg",
+      "unchanged_copy": true
+    },
+    {
+      "package_path": "07_Assets/02-inventory.jpg",
+      "source_path": "deliverables/app-store/screenshots/raw/en-AU/iphone/02-inventory.jpg",
+      "unchanged_copy": true
+    },
+    {
+      "package_path": "07_Assets/03-learning.jpg",
+      "source_path": "deliverables/app-store/screenshots/raw/en-AU/iphone/03-learning.jpg",
+      "unchanged_copy": true
+    },
+    {
+      "package_path": "07_Assets/04-assistant.jpg",
+      "source_path": "deliverables/app-store/screenshots/raw/en-AU/iphone/04-assistant.jpg",
+      "unchanged_copy": true
+    },
+    {
+      "package_path": "07_Assets/05-progress.jpg",
+      "source_path": "deliverables/app-store/screenshots/raw/en-AU/iphone/05-progress.jpg",
+      "unchanged_copy": true
+    },
+    {
+      "package_path": "08_Product_Video/KitchMemo_90s_Final_v12.mp4",
+      "source_path": "docs/art-direction/product-video/production-90s-v4/final-v12/KitchMemo_90s_Final_v12.mp4",
+      "unchanged_copy": true
+    }
+  ]
+}

@@ -1,7 +1,7 @@
 import { useTabActive, TabModal as Modal } from '../../RetainedTab';
 import { useEffect, useRef, useState } from 'react';
 import { AccessibilityInfo, AppState, KeyboardAvoidingView, Linking, Platform } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../../i18n';
 import { getApiErrorCode } from '../../../services/apiClient';
 import { learningTutorApi as defaultApi, newTutorKey } from '../../../services/learningTutorApi';
@@ -115,5 +115,10 @@ export function LearningTutorPanel({context,label,restricted,onClose,onAction,on
         canAbandon={Boolean(onAbandon)} />
     </KeyboardAvoidingView>
   </SafeAreaView>;
-  return embedded?content:<Modal visible transparent={false} animationType="none" onRequestClose={close}>{content}</Modal>;
+  // Arthur: NarIyirm
+  // 中文：原生弹窗有独立视图根，需要在内部测量安全区；内嵌预览继续使用父级，避免重复偏移。
+  // EN: Native modals have a separate view root and must measure safe areas inside it; embedded previews retain their parent provider to avoid duplicate offsets.
+  return embedded?content:<Modal visible transparent={false} presentationStyle="fullScreen" animationType="none" onRequestClose={close}>
+    <SafeAreaProvider>{content}</SafeAreaProvider>
+  </Modal>;
 }
