@@ -1,0 +1,16 @@
+﻿ID,Required information,Responsible role to confirm,Current evidence,Completion action,Required by
+INFO-01,PG Google Drive URL and receiver permissions,Portfolio owner,Not supplied; cannot infer a private sharing URL,Enter URL and verify access as each intended viewer,Before submission
+INFO-02,Final Agile board and backlog export,Product owner,Local Epic documents available; final board not established,Register actual board and freeze story/AC/status export,Before final scope acceptance
+INFO-03,Moodle pre-reading and earlier task list,Course submission owner,Only five guideline screenshots supplied,Reconcile all additional requirements with coverage matrix,Before submission
+INFO-04,Official Moodle sign-off template,Course submission owner,Project-adapted unsigned forms supplied,Map to official template and retain separate Monash sign-off,Before signing
+INFO-05,Individual team emails and LinkedIn URLs,Team members,Five names/degrees and one public contact established,Provide verified personal professional links and agreed emails,Before Product Document submission
+INFO-06,Confirmed sponsor and receiving representatives,Team and recipient,No sponsor adoption recorded,"Record organisation, role, contacts and scope of adoption",Before operational transfer
+INFO-07,Authorised iOS tester installation access,Apple/EAS account owner,Build 13 in existing internal groups,Add or verify recipient access through authorised account process,Before iOS UAT
+INFO-08,"Budget, subscriptions and ongoing costs",Receiving budget owner,Providers known; invoices/plans not supplied,"Review actual tiers, usage, billing and limits privately",Before sustained operation
+INFO-09,"Backup retention, RPO/RTO and restore evidence",Database owner,No documented complete restore drill established,Confirm backup method plus Storage; perform isolated drill,Before operational acceptance
+INFO-10,External photo-service deployment and ownership,Model/infrastructure owner,CloudFront endpoint and eight-class scope known,"Provide deploy/runbook, account ownership, model/data rights and service limits",Before independent maintenance
+INFO-11,Native acceptance and independent tutor review,QA and content reviewer,Native checks waived; independent review pending,Execute and register actual results or explicit receiver exception,Before broad release acceptance
+INFO-12,"Account permissions, code/media rights and signatures",Team and receiving owner,Accounts and incomplete MIT provenance identified,"Verify transferability/licences, grant access and obtain real signatures",Before ownership transfer
+INFO-13,Hosted product film and PG ethics URL,Portfolio owner,Local English film and canvas included,Publish through agreed course medium and enter final URLs,Before submission
+INFO-14,Final release tag and source/archive freeze,Technical owner,Baseline commit registered; introduction artefact untracked,Freeze accepted source and included presentation materials,Before final acceptance
+INFO-15,Operational support arrangement,Receiving support owner,Public contact known; no post-handover SLA established,"Agree channel, responsibility, duration and response expectations",Before operational transfer

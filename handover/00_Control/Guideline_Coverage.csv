@@ -1,0 +1,25 @@
+﻿ID,Requirement,Origin,Package location,Status,Qualification
+G-01,Three main documents,Explicit,01_Product; 02_Support; 03_Maintenance,Prepared,Word and Markdown versions
+G-02,Product document approximately one to five pages,Explicit,01_Product/Product_Document.docx,Prepared; rendered page count checked,Lean sponsor-oriented report
+G-03,Product reasoning audience and importance,Explicit,Product sections 1 and 2,Covered,No invented impact measurement
+G-04,Resources people and future possibilities,Explicit,Product section 4; ownership register,Covered; roles and costs need agreement,Proposed staffing clearly labelled
+G-05,Ethics Canvas artefact linked from PG,Explicit,Ethics Canvas; Agile and PG Index,Canvas prepared; PG URL pending,Reconcile Moodle canvas format
+G-06,ACS Code of Conduct alignment,Explicit,Product section 5; Ethics Canvas section 7,Covered with evidence and limits,Course-prescribed edition to confirm
+G-07,Team emails and LinkedIn,Explicit,Product section 6; Information Required INFO-05,Names and public contact found; personal links pending,No inferred private contacts
+G-08,Future sponsor,Explicit,Product section 4,Potential sponsor types covered,No partnership fabricated
+G-09,Build link password video access,Explicit,Release Register; Product section 6; local film,Links/local film prepared; receiver iOS access pending,No app password required; admin secrets private
+G-10,Running product loading data backup,Explicit,Support sections 1 to 12; Maintenance sections 3 and 12,Procedures covered; backup drill pending,No admin console invented
+G-11,Security and confidential information,Explicit,Support sections 10 to 14; Maintenance sections 5 and 13,Covered,Creator/owner erasure effects disclosed
+G-12,Comprehensive usable feature instructions,Explicit,Support sections 2 to 11; Feature Coverage,Covered in document; receiver UAT pending,Code-grounded workflows
+G-13,Visual aids illustrations,Explicit,Actual screenshots; architecture/ownership diagrams,Included,Capture overlap documented rather than retouched
+G-14,Troubleshooting common issues,Explicit,Support section 13; Maintenance section 11,Covered,Support and technical audiences distinguished
+G-15,Integration data APIs and security,Explicit,Maintenance sections 2 to 8; technical inventory,Covered,Authoritative payload references included
+G-16,Applicable standards and regulations,Explicit,Ethics Canvas section 8; Maintenance section 13,Relevant references scoped; no compliance certificate,Recipient determines actual applicable obligations
+G-17,Maintenance for changing or adding features,Explicit,Maintenance sections 7 to 10 and 14,Covered,Development-first immutable migration history
+G-18,Knowledge transfer strategy,Explicit,04_Knowledge_Transfer,Plan prepared; execution pending,Receiver exercises and completion record
+G-19,Industry mentor approval,Explicit,Industry and Sponsor Sign Off,Unsigned facility prepared,Actual approval must be obtained
+G-20,Separate Monash acceptance sign off,Explicit,Monash Receipt and Acceptance,Separate unsigned facility prepared,Moodle template reconciliation pending
+G-21,Transfer medium and complete shipping package,Explicit,README; release register; manifest; package archive,Local package prepared; final transfer URL pending,Source repository is separate dependency
+G-22,Meaningful PG folder convention and Google Drive link,Explicit,Agile and PG Index; INFO-01,Convention supplied; private link pending,Verify actual viewer permissions
+G-23,Additional pre-reading and submitted task list,Referenced by guideline,INFO-03 and INFO-04,Unavailable; not assumed complete,Coverage cannot certify unseen requirements
+G-24,Rollback backups ownership and remaining work,Supplement,Maintenance; risk/access registers,Prepared; real ownership/drill decisions pending,Adds operational completeness without changing three-document structure

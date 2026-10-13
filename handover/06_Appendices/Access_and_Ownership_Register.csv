@@ -1,0 +1,15 @@
+﻿Service or asset,Identifier,Recorded custody,Receiving role to appoint,Transfer verification,Secure transfer method,Status
+GitHub,Gress-FIT5120-26S2/Gress,Team repository,Repository admin and receiving maintainer,Grant appropriate repo/admin roles; protect default branch,Private account process,Pending receiver verification
+Vercel,nariyirms-projects/kitchmemo-api,Recorded under existing account,Receiving API and billing owner,"Verify project transfer and roles, env, deployment history and cron access",Private account process,Pending transfer agreement
+Supabase development,Gress-development / thmbtsssvnslotoexntz,Named team development project,Database owner,Verify project role and development secret custody,Secret manager,Pending receiver access
+Supabase production,Gress-production / vcsujjaapchvcnndlhqb,Named production project,Production database/billing owner,"Review privileged permissions, backups and logs",Secret manager,Pending receiver access and backup review
+Expo EAS,gress-fit5120-26s2 / f23fe306-086e-4865-80b1-865c99f43862,Recorded organisation/project,Build and signing owner,"Verify organisation roles, environment, signing and quota",Private account process,Pending receiver verification
+Apple,App 6805763159 / com.gressfit5120.kitchmemo,Publisher Haoxuan Sun recorded,App Store account owner,"Verify transfer eligibility, roles, TestFlight and review state",Private Apple account process,Waiting-for-review record; current state to recheck
+OpenAI,Assistant/tutor and embedding usage,Server key configured by project operator,AI budget/secret owner,Review scope usage caps and key rotation,Secret manager,Account and budget not established from code
+Google Gemini,Food/packaging enrichment,Server-only integration,AI budget/secret owner,Review project key permissions and data processing,Secret manager,Account and budget to confirm
+Cloudflare,Workers AI icons,Server-only account/token integration,AI infrastructure owner,Verify scoped token and ownership,Secret manager,Account and budget to confirm
+Photo model / AWS,d12q94a0v4ih7q.cloudfront.net/predict,Separate deployed service,Model/cloud owner,"Provide infrastructure source/runbook, model/data rights and continuity plan",Private infrastructure transfer,Independent rebuild details pending
+Open Food Facts,Barcode source,Public data integration,Maintainer,Identify client with monitored contact and review data/image attribution,No administrative password supplied,Licensing/contact review pending
+Media and model sources,assets; models; final product film,Project source materials,Team and sponsor rights owner,Confirm generated/external/source asset rights and notices,Source archive/rights register,Chain of title not fully established
+PG portfolio,Google Drive URL not supplied,Local governance references,Portfolio owner,Publish/index and verify recipient viewing access,Controlled Drive sharing,Pending URL
+Public support,nariyirm@gmail.com,Haoxuan Sun in current public pages,Support owner,Agree continued ownership or replace public contact,Organisation contact process,No ongoing SLA assumed

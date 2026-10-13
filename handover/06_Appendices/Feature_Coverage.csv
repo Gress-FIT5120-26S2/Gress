@@ -1,0 +1,23 @@
+﻿Feature,Support coverage,Technical coverage,Receiver UAT
+Onboarding and identity,Support 1,Maintenance 3 and 5,UAT-01
+3D kitchen navigation and story,Support 2 and 8,Maintenance 2,UAT-01; UAT-20
+Manual stock and categories,Support 3,Maintenance 5 and 6,UAT-02; UAT-03
+Barcode lookup,Support 3.2,Maintenance 4 and 8,UAT-04
+Photo recognition,Support 3.3,Maintenance 4 and 8,UAT-04
+Food presets and generated icons,Support 3.1 and 3.6,Maintenance 4 and 8,UAT-04
+Batch edit use discard and correction,Support 3.4 and 3.5,Maintenance 5,UAT-05; UAT-06
+Dates and replenishment,Support 3.6 and 4,Maintenance 5,UAT-05; UAT-07
+Cart and checkout,Support 5,Maintenance 6,UAT-07
+Shared-fridge join manage leave,Support 6,Maintenance 5.2,UAT-08; UAT-09
+In-app notifications and reads,Support 4,Maintenance 5 and 11,UAT-10
+Local/remote reminders and quiet hours,Support 4 and 13,Maintenance 11,UAT-10
+Fridge assistant and confirmations,Support 7,Maintenance 5 and 8,UAT-11
+Learning courses activities resources,Support 8.1,Maintenance 5.3 and 8,UAT-12
+Formal assessments and resume,Support 8.1,Maintenance 5.3,UAT-12
+Learning tutor and recommendations,Support 8.2,Maintenance 5.3 and 8,UAT-13
+Packaging components and sorting,Support 8.3,Maintenance 5,UAT-14
+Achievements quests and stage report,Support 9,Maintenance 5 and 6,UAT-15
+Nickname language and preferences,Support 1 and 4,Maintenance 6,UAT-01; UAT-19
+Device recovery,Support 10,Maintenance 5.2,UAT-16
+AI consent withdrawal and deletion,Support 11,Maintenance 5.4 and 11,UAT-17
+Foreground sync and retained screens,Support 2 and 13,Maintenance 2 and 11,UAT-09

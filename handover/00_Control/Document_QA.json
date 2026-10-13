@@ -1,0 +1,50 @@
+{
+  "prepared_date": "2026-10-12",
+  "documents": [
+    {
+      "document": "01_Product/Product_Document.docx",
+      "pages": 3,
+      "sha256": "af44b2bb580460ffe3554c43b16fe67ffd2e496f4433ad539d18c8240e24d601"
+    },
+    {
+      "document": "02_Support/Support_Document.docx",
+      "pages": 11,
+      "sha256": "2b742160730105f78493c737f35a0ba40fd5d33d0103de0ada47b913d96311ed"
+    },
+    {
+      "document": "03_Maintenance/Maintenance_Document.docx",
+      "pages": 13,
+      "sha256": "f56c0ccd598c75e5a3bdedce0f37ccd4038fc09a3775d596b28036074e269f68"
+    },
+    {
+      "document": "04_Knowledge_Transfer/Knowledge_Transfer_Plan.docx",
+      "pages": 4,
+      "sha256": "0caafa465d548ef3761d18d5c031c17fe5ded2e270d847aec6cd0ce86f0f28cd"
+    },
+    {
+      "document": "05_Sign_Off/Industry_and_Sponsor_Sign_Off.docx",
+      "pages": 2,
+      "sha256": "995a9837e061856effa7dbbfe232197450a1be2d4c2d6eb291d35567bdc37004"
+    },
+    {
+      "document": "05_Sign_Off/Monash_Receipt_and_Acceptance.docx",
+      "pages": 2,
+      "sha256": "5ba2fec5ff68a3b28b1eb0dea25261ff5a96ef584d27cfde39eeae23e695ece9"
+    },
+    {
+      "document": "06_Appendices/Ethics_Canvas_and_ACS_Mapping.docx",
+      "pages": 4,
+      "sha256": "84ceaf795ea6d7eacde383c957c8a3de803d820a19c8199dcfc83b3e31a2b905"
+    },
+    {
+      "document": "06_Appendices/Testing_and_Acceptance_Report.docx",
+      "pages": 5,
+      "sha256": "dcfa4654247b3827aed3fda394d024a102cf4109aab06457ca91e4cd5c24e3de"
+    }
+  ],
+  "total_pages": 44,
+  "automated_layout_and_link_findings": [],
+  "visual_review": "All rendered document pages visually inspected. No document clipping, unreadable tables or missing figures found. Known overlap in the original app progress screenshot remains disclosed.",
+  "renderer": "Bundled Documents skill render_docx.py with native LibreOffice and runtime Poppler",
+  "intermediate_pngs_in_deliverable": false
+}

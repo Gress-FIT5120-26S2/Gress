@@ -1,0 +1,337 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#fbfcf7">
+  <meta name="description" content="Meet KitchMemo: a connected kitchen for young households. Explore our three iterations, from food inventory and Spoonie AI to Learning Academy and shared household action.">
+  <title>KitchMemo | Remember your food. Rethink your waste.</title>
+  <link rel="icon" href="@@logo@@" type="image/webp">
+  <style>
+    :root { color-scheme: light; --page: #fbfcf7; --ink: #163c2c; --body: #42584a; --muted: #556957; --accent: #245b3e; --sage: #edf3e3; --soft: #f2f5ec; --line: #dce5d5; --radius: 20px; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; scroll-padding-top: 28px; }
+    body { margin: 0; background: var(--page); color: var(--body); font: 17px/1.6 "Segoe UI", Arial, Helvetica, sans-serif; -webkit-font-smoothing: antialiased; }
+    img { display: block; max-width: 100%; height: auto; }
+    a { color: var(--accent); text-underline-offset: 4px; }
+    a:hover { text-decoration-thickness: 2px; }
+    a:focus-visible, summary:focus-visible { outline: 3px solid var(--accent); outline-offset: 5px; border-radius: 4px; }
+    h1, h2, h3, h4, p, figure { margin: 0; }
+    h1, h2, h3, h4 { color: var(--ink); font-weight: 750; letter-spacing: -.045em; line-height: 1.15; }
+    h2 { font-size: clamp(30px, 3.1vw, 44px); }
+    h3 { font-size: clamp(27px, 2.55vw, 36px); }
+    h4 { font-size: 25px; letter-spacing: -.03em; }
+    .container { width: min(1180px, calc(100% - 64px)); margin-inline: auto; }
+    .skip { position: absolute; left: 24px; top: -100px; padding: 12px 20px; background: var(--page); z-index: 10; }
+    .skip:focus { top: 12px; }
+    .nav { min-height: 80px; display: flex; justify-content: space-between; align-items: center; gap: 24px; }
+    .brand { display: inline-flex; align-items: center; gap: 12px; text-decoration: none; color: var(--ink); font-size: 27px; font-weight: 750; letter-spacing: -.04em; flex-shrink: 0; }
+    .brand img { width: 45px; height: 45px; }
+    .nav ul { display: flex; gap: 32px; list-style: none; padding: 0; margin: 0; }
+    .nav li a { text-decoration: none; font-size: 15px; font-weight: 600; white-space: nowrap; }
+    .nav li a:hover { text-decoration: underline; }
+    .hero { display: grid; grid-template-columns: 1.04fr 1fr; align-items: center; gap: 4px; padding: 24px 0 48px; min-height: 445px; }
+    .hero-copy { position: relative; z-index: 1; }
+    h1 { font-size: clamp(34px, 4.05vw, 56px); line-height: 1.08; letter-spacing: -.05em; }
+    h1 span { display: block; }
+    .hero-description { margin-top: 22px; font-size: 19px; line-height: 1.65; }
+    .hero-description span { display: block; color: var(--muted); font-size: 16px; margin-top: 5px; }
+    .actions { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 28px; }
+    .button { display: inline-flex; justify-content: center; align-items: center; gap: 18px; min-height: 50px; padding: 11px 23px; border: 1px solid var(--accent); border-radius: 12px; font-weight: 650; font-size: 15px; text-decoration: none; white-space: nowrap; transition: transform .18s ease, background .18s ease; }
+    .button:hover { transform: translateY(-2px); }
+    .button:active { transform: translateY(0); }
+    .button.primary { color: #fff; background: var(--accent); }
+    .button.primary:hover { background: #1c4931; }
+    .button.secondary { color: var(--accent); background: var(--page); }
+    .button.secondary:hover { background: var(--sage); }
+    .hero-art { width: 100%; max-width: 100%; }
+    .welcome { display: grid; grid-template-columns: 1fr 190px; align-items: center; gap: 28px; background: var(--sage); border-radius: var(--radius); padding: 34px 48px; }
+    .welcome h2 { font-size: 36px; }
+    .welcome .role { margin-top: 5px; font-size: 17px; }
+    .welcome .thanks { margin: 13px 0 10px; max-width: 760px; font-size: 16px; }
+    .welcome img { width: 165px; justify-self: center; }
+    .text-link { font-size: 15px; font-weight: 600; }
+    .story { padding: 62px 42px 48px; }
+    .story .problem { margin: 12px 0 8px; font-size: 22px; color: var(--ink); font-weight: 650; letter-spacing: -.025em; }
+    .story .explanation { max-width: 850px; }
+    .purpose { margin-top: 12px; max-width: 850px; font-size: 16px; }
+    .routine { list-style: none; padding: 0; margin: 30px 0 0; display: grid; grid-template-columns: repeat(3, 1fr); gap: 44px; }
+    .routine li { position: relative; padding-top: 15px; border-top: 2px solid var(--line); }
+    .routine li:not(:last-child)::after { content: "\2192"; position: absolute; right: -28px; top: 21px; color: var(--accent); font-size: 22px; }
+    .routine h3 { font-size: 24px; letter-spacing: -.025em; }
+    .routine p { font-size: 15px; margin-top: 5px; max-width: 26ch; }
+    .film { scroll-margin-top: 28px; }
+    .film-cover { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 2.55; background: var(--sage); }
+    .film-cover > img { width: 100%; height: 100%; object-fit: cover; }
+    .film-title { position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center; padding: 42px; background: linear-gradient(90deg, rgba(13,32,23,.74), rgba(13,32,23,.25) 49%, transparent 75%); }
+    .film-title h2 { max-width: 11ch; color: #fff; font-size: clamp(28px, 3.1vw, 43px); letter-spacing: -.035em; }
+    .film-title p { margin-top: 12px; color: #fff; font-size: 17px; }
+    .film-caption { padding: 14px 4px 0; color: var(--muted); font-size: 14px; }
+    .journey { padding-top: 60px; }
+    .section-heading { padding: 0 42px 28px; }
+    .section-heading p { margin-top: 10px; font-size: 19px; }
+    .iteration { background: var(--soft); border-radius: var(--radius); padding: 38px 42px; margin-bottom: 22px; }
+    .iteration-label { color: var(--accent); font-size: 15px; font-weight: 700; margin-bottom: 12px; }
+    .iteration-intro { margin-top: 11px; max-width: 65ch; }
+    .foundation { display: grid; grid-template-columns: 1.1fr 1fr; align-items: center; gap: 42px; }
+    .feature-list { padding: 0; list-style: none; margin: 28px 0 24px; display: grid; gap: 12px; }
+    .feature-list li { position: relative; padding-left: 29px; }
+    .feature-list li::before { content: "\2713"; position: absolute; left: 0; color: var(--accent); font-weight: 800; }
+    .foundation-gallery { text-align: center; }
+    .screens { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: start; max-width: 390px; margin: auto; }
+    .screen { width: 100%; border-radius: 14px; border: 1px solid var(--line); box-shadow: 0 9px 25px rgba(36,70,43,.07); }
+    figcaption { margin-top: 12px; color: var(--muted); font-size: 13px; line-height: 1.5; }
+    .iteration-two > h3 { max-width: 26ch; }
+    .support-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 26px; margin-top: 26px; }
+    .assistant-feature { display: grid; grid-template-columns: 135px 1fr; align-items: center; gap: 17px; background: var(--page); border-radius: 16px; padding: 26px; }
+    .assistant-feature > img { width: 140px; }
+    .example-question { font-weight: 650; color: var(--accent); margin-bottom: 12px; font-size: 17px; }
+    .assistant-feature p:not(.example-question) { margin-top: 8px; font-size: 15px; }
+    .wins-feature { border-radius: 16px; overflow: hidden; background: var(--page); }
+    .mountain { height: 180px; width: 100%; object-fit: contain; object-position: center bottom; background: #e6f2f5; }
+    .wins-copy { padding: 18px 24px 24px; }
+    .wins-copy p { margin-top: 8px; font-size: 15px; }
+    .medals { display: flex; gap: 8px; margin-top: 12px; }
+    .medals img { width: 43px; height: 43px; object-fit: contain; }
+    .support-note { margin-top: 25px; padding-top: 19px; border-top: 1px solid var(--line); font-size: 14px; text-align: center; }
+    details { margin-top: 22px; }
+    summary { cursor: pointer; color: var(--accent); font-size: 15px; font-weight: 650; padding: 8px 0; width: fit-content; }
+    details[open] summary { margin-bottom: 16px; }
+    .evidence { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; max-width: 740px; margin-inline: auto; }
+    .evidence figure { min-width: 0; }
+    .evidence figcaption { text-align: center; }
+    .third { background: var(--sage); padding-bottom: 34px; }
+    .third h3 { font-size: clamp(30px, 3.2vw, 45px); max-width: 17ch; }
+    .third > .iteration-intro { max-width: 76ch; }
+    .third-features { display: grid; grid-template-columns: 1.05fr 1fr; gap: 24px; margin-top: 29px; }
+    .third-feature { background: var(--page); border-radius: 16px; overflow: hidden; display: flex; flex-direction: column; }
+    .feature-copy { padding: 25px 28px 0; }
+    .feature-copy p { margin-top: 10px; font-size: 16px; }
+    .feature-copy .feature-tagline { color: var(--ink); font-weight: 650; font-size: 18px; }
+    .learning-art { display: grid; grid-template-columns: 1fr 168px; align-items: center; gap: 12px; padding: 25px 28px 0; flex: 1; }
+    .learning-decoration img:first-child { border-radius: 14px; }
+    .learning-decoration .learning-spoonie { width: 100px; margin: 13px auto 0; }
+    .learning-screen { max-width: 168px; }
+    .feature-caption { padding: 0 28px 22px; margin-top: 10px; font-size: 12px; }
+    .shared-art { width: 100%; margin: auto 0 0; padding: 20px 14px 0; }
+    .household-actions { display: flex; flex-wrap: wrap; gap: 8px 14px; padding: 4px 28px 24px; font-size: 14px; color: var(--accent); font-weight: 600; }
+    .learning-outcome { margin-top: 25px; font-size: 15px; color: var(--ink); text-align: center; font-weight: 600; }
+    .team { padding: 44px 32px 39px; }
+    .team h2 { font-size: 32px; }
+    .team > p { margin-top: 7px; font-size: 16px; }
+    .members { display: grid; grid-template-columns: repeat(5, 1fr); gap: 20px; padding: 0; list-style: none; margin: 25px 0 0; }
+    .members li { text-align: center; }
+    .members strong { display: block; color: var(--ink); font-size: 15px; }
+    .members span { display: block; font-size: 13px; margin-top: 4px; }
+    footer { border-top: 1px solid var(--line); padding: 23px 0 30px; display: flex; gap: 22px; align-items: center; justify-content: space-between; }
+    footer .brand { font-size: 20px; gap: 9px; }
+    footer .brand img { width: 30px; height: 30px; }
+    footer p { font-size: 12px; }
+    .footer-left { display: flex; align-items: center; gap: 22px; }
+    @media (max-width: 1050px) {
+      h1 { font-size: clamp(34px, 4.35vw, 46px); }
+      .hero { min-height: 390px; }
+      .hero-description { font-size: 17px; }
+      .welcome { padding-inline: 34px; }
+      .iteration { padding-inline: 30px; }
+      .assistant-feature { grid-template-columns: 95px 1fr; padding: 22px; }
+      .assistant-feature > img { width: 100px; }
+      .learning-art { grid-template-columns: 1fr 140px; padding-inline: 22px; }
+      .learning-screen { max-width: 140px; }
+      .feature-copy { padding-inline: 22px; }
+      .foundation { gap: 26px; }
+    }
+    /* Arthur: NarIyirm
+       中文：窄屏按阅读顺序排列图文，保留所有内容和原生交互。
+       EN: Stack text and imagery in reading order on narrow screens, preserving content and native interactions. */
+    @media (max-width: 760px) {
+      .container { width: calc(100% - 36px); }
+      .nav { min-height: 76px; gap: 12px; }
+      .brand { font-size: 23px; gap: 8px; }
+      .brand img { width: 36px; height: 36px; }
+      .nav ul { gap: 15px; }
+      .nav li a { font-size: 13px; }
+      .hero { grid-template-columns: 1fr; min-height: auto; padding: 27px 0 30px; gap: 12px; }
+      h1 { font-size: clamp(34px, 6.8vw, 48px); }
+      .hero-description { margin-top: 16px; }
+      .actions { margin-top: 22px; gap: 10px; }
+      .button { padding-inline: 18px; }
+      .hero-art { width: min(100%, 560px); max-width: 100%; margin: 0 auto; }
+      .welcome { grid-template-columns: 1fr 104px; gap: 15px; padding: 25px; }
+      .welcome h2 { font-size: 30px; }
+      .welcome .thanks { font-size: 15px; }
+      .welcome img { width: 104px; }
+      .story { padding: 39px 9px 35px; }
+      .story .problem { font-size: 20px; }
+      .routine { gap: 28px; }
+      .routine h3 { font-size: 22px; }
+      .routine li:not(:last-child)::after { right: -20px; }
+      .routine p { font-size: 14px; }
+      .film-cover { aspect-ratio: 1.85; }
+      .film-title { padding: 25px; }
+      .film-title h2 { font-size: 30px; }
+      .film-title p { font-size: 15px; }
+      .journey { padding-top: 38px; }
+      .section-heading { padding: 0 9px 22px; }
+      .section-heading p { font-size: 17px; }
+      .iteration { padding: 27px 25px; }
+      .foundation { grid-template-columns: 1fr; gap: 25px; }
+      .feature-list { margin-block: 22px; }
+      .screens { max-width: 360px; }
+      .support-grid, .third-features { grid-template-columns: 1fr; gap: 18px; }
+      .assistant-feature { grid-template-columns: 110px 1fr; }
+      .assistant-feature > img { width: 110px; }
+      .mountain { height: 200px; }
+      .third h3 { font-size: 35px; }
+      .learning-art { grid-template-columns: 1fr 168px; }
+      .learning-screen { max-width: 168px; }
+      .shared-art { max-height: 330px; object-fit: contain; }
+      .team { padding-inline: 9px; }
+      .members { grid-template-columns: repeat(3, 1fr); row-gap: 24px; }
+      .members li { text-align: left; }
+      footer { flex-direction: column; align-items: flex-start; gap: 12px; }
+    }
+    @media (max-width: 480px) {
+      body { font-size: 16px; }
+      .nav { flex-wrap: wrap; align-content: center; gap: 11px; padding-top: 15px; }
+      .nav ul { gap: 24px; width: 100%; padding-left: 2px; padding-bottom: 6px; }
+      .nav li a { font-size: 14px; }
+      h1 { font-size: clamp(25px, 8vw, 36px); }
+      .hero-description { font-size: 16px; }
+      .hero-description span { font-size: 14px; }
+      .button { padding-inline: 15px; font-size: 13px; gap: 10px; min-height: 46px; }
+      .welcome { position: relative; display: block; padding: 24px; }
+      .welcome h2, .welcome .role { padding-right: 62px; }
+      .welcome h2 { font-size: 27px; }
+      .welcome .role { font-size: 14px; }
+      .welcome img { position: absolute; width: 77px; right: 14px; top: 18px; }
+      .welcome .thanks { margin-top: 18px; }
+      .routine { grid-template-columns: 1fr; gap: 18px; margin-top: 25px; }
+      .routine li { display: grid; grid-template-columns: 85px 1fr; gap: 12px; align-items: baseline; padding-top: 12px; }
+      .routine li::after { display: none; }
+      .routine h3 { font-size: 22px; }
+      .routine p { max-width: none; margin: 0; }
+      .film-cover { aspect-ratio: 1.25; }
+      .film-cover > img { object-position: 56% center; }
+      .film-title { justify-content: flex-end; padding: 24px; background: linear-gradient(0deg, rgba(13,32,23,.85), rgba(13,32,23,.12) 85%); }
+      .film-title h2 { font-size: 28px; max-width: 15ch; }
+      .film-title p { margin-top: 8px; }
+      .iteration { padding: 24px 20px; }
+      h3 { font-size: 29px; }
+      .support-grid { gap: 16px; }
+      .assistant-feature { grid-template-columns: 78px 1fr; padding: 20px 15px; gap: 12px; }
+      .assistant-feature > img { width: 78px; }
+      h4 { font-size: 23px; }
+      .example-question { font-size: 15px; }
+      .assistant-feature p:not(.example-question) { font-size: 14px; }
+      .evidence { grid-template-columns: 1fr; max-width: 210px; gap: 24px; }
+      .third h3 { font-size: 32px; }
+      .feature-copy { padding: 23px 20px 0; }
+      .feature-copy p { font-size: 15px; }
+      .learning-art { grid-template-columns: 1fr 128px; gap: 9px; padding: 20px 14px 0; }
+      .learning-screen { max-width: 128px; }
+      .learning-decoration .learning-spoonie { width: 70px; }
+      .feature-caption { padding-inline: 20px; }
+      .household-actions { padding-inline: 20px; font-size: 13px; }
+      .members { grid-template-columns: repeat(2, 1fr); gap: 22px 15px; }
+      .footer-left { flex-wrap: wrap; gap: 10px; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } .button { transition: none; } .button:hover { transform: none; } }
+    @media print { .skip, .actions, nav ul { display: none; } .container { width: 100%; } body { background: #fff; font-size: 12px; } .iteration, .welcome, .third-feature { break-inside: avoid; } .hero { min-height: 0; } footer { padding-bottom: 0; } }
+  </style>
+</head>
+<body>
+  <a class="skip" href="#main">Skip to content</a>
+  <header class="container">
+    <nav class="nav" aria-label="Main navigation">
+      <a class="brand" href="#main" aria-label="KitchMemo home"><img src="@@logo@@" width="45" height="45" alt="">KitchMemo</a>
+      <ul><li><a href="#story">Our story</a></li><li><a href="#journey">Our journey</a></li><li><a href="#team">Our team</a></li></ul>
+    </nav>
+  </header>
+  <main id="main" class="container">
+    <section class="hero" aria-labelledby="hero-heading">
+      <div class="hero-copy">
+        <h1 id="hero-heading"><span>Remember your food.</span><span>Rethink your waste.</span></h1>
+        <p class="hero-description">Know what you have. Use it in time. Waste less.<span>A connected kitchen for young households.</span></p>
+        <div class="actions"><a class="button primary" href="#journey">Explore our journey <span aria-hidden="true">&#8594;</span></a><a class="button secondary" href="#film">Our film <span aria-hidden="true">&#8599;</span></a></div>
+      </div>
+      <img class="hero-art" src="@@kitchen@@" width="1536" height="1024" fetchpriority="high" alt="A warm miniature kitchen with coral cabinets, a fridge, fresh vegetables and plants.">
+    </section>
+
+    <aside class="welcome" aria-labelledby="welcome-heading">
+      <div><h2 id="welcome-heading">Welcome, Hilda!</h2><p class="role">Our Industry Mentor</p><p class="thanks">Thank you for your guidance, thoughtful feedback, and support throughout the KitchMemo journey.</p><a class="text-link" href="https://www.linkedin.com/in/hilda-permata-9387a2a2" target="_blank" rel="noopener noreferrer">Hilda Permata on LinkedIn <span aria-hidden="true">&#8599;</span></a></div>
+      <img src="@@spoonie@@" width="256" height="256" alt="Spoonie, our friendly kitchen companion, waving hello.">
+    </aside>
+
+    <section id="story" class="story" aria-labelledby="story-heading">
+      <h2 id="story-heading">Why KitchMemo?</h2>
+      <p class="problem">Forgotten food. Repeat purchases. Everyday effort.</p>
+      <p class="explanation">Young Australian households can lose track of what is at home, what needs using, and what to buy next.</p>
+      <p class="purpose">Our starting point is simple: make food easier to remember. KitchMemo connects inventory, freshness, shopping and learning so households can make confident decisions and waste less together.</p>
+      <ol class="routine" aria-label="How KitchMemo works">
+        <li><h3>Capture</h3><p>Add food through photo-assisted, barcode or manual entry.</p></li>
+        <li><h3>Know</h3><p>See what you have and what needs attention.</p></li>
+        <li><h3>Act</h3><p>Use food in time, plan shopping and learn practical actions.</p></li>
+      </ol>
+    </section>
+
+    <section id="film" class="film" aria-labelledby="film-heading">
+      <!-- Arthur: NarIyirm
+           中文：这是静态视频封面；在托管网站手动加入视频时，可替换此 figure，保留下方标题与说明。
+           EN: This is a static film cover; replace this figure when manually adding the hosted video, retaining its heading and caption. -->
+      <figure>
+        <div class="film-cover"><img src="@@film@@" width="1672" height="941" loading="lazy" alt="A couple making everyday food decisions together in their kitchen."><div class="film-title"><h2 id="film-heading">A glimpse of the KitchMemo story</h2><p>Our AI-created product film</p></div></div>
+        <figcaption class="film-caption">An AI-created story about everyday food choices, practical learning and shared responsibility.</figcaption>
+      </figure>
+    </section>
+
+    <section id="journey" class="journey" aria-labelledby="journey-heading">
+      <div class="section-heading"><h2 id="journey-heading">Our journey</h2><p>From food awareness to shared household action.</p></div>
+
+      <article class="iteration foundation" aria-labelledby="iteration-one-heading">
+        <div>
+          <p class="iteration-label">Iteration 1</p><h3 id="iteration-one-heading">Know your kitchen</h3>
+          <p class="iteration-intro">A foundation for knowing what is at home.</p>
+          <ul class="feature-list"><li>Interactive 3D kitchen</li><li>Food entry and shared inventory</li><li>Freshness reminders and shopping awareness</li></ul>
+          <p>We connected the fridge, reminders and shopping around the same household information, making daily food decisions easier to follow.</p>
+          <p style="margin-top:16px"><a class="text-link" href="https://eportfolio.monash.edu/view/view.php?t=437f0c2c53a9242490ab" target="_blank" rel="noopener noreferrer">View the Iteration 1 portfolio <span aria-hidden="true">&#8599;</span></a></p>
+        </div>
+        <figure class="foundation-gallery"><div class="screens"><img class="screen" src="@@inventory@@" width="390" height="844" loading="lazy" alt="KitchMemo inventory screen showing stored tomatoes and leftover rice."><img class="screen" src="@@detail@@" width="390" height="844" loading="lazy" alt="KitchMemo food detail screen showing storage and freshness information for tomatoes."></div><figcaption>Current App screens illustrating our inventory foundation.</figcaption></figure>
+      </article>
+
+      <article class="iteration iteration-two" aria-labelledby="iteration-two-heading">
+        <p class="iteration-label">Iteration 2</p><h3 id="iteration-two-heading">Turn knowledge into action</h3>
+        <p class="iteration-intro">Fridge-aware guidance and positive feedback for everyday food habits.</p>
+        <div class="support-grid">
+          <section class="assistant-feature" aria-labelledby="spoonie-heading"><img src="@@spoonie@@" width="256" height="256" loading="lazy" alt="Spoonie, the KitchMemo AI assistant."><div><p class="example-question">“What should I use first?”</p><h4 id="spoonie-heading">Spoonie AI</h4><p>Ask freely or use quick prompts. Spoonie grounds its guidance in your household fridge, helping you review food and plan restocking.</p><p>Inventory changes only happen after you confirm. Requests outside its purpose are safely declined.</p></div></section>
+          <section class="wins-feature" aria-labelledby="wins-heading"><img class="mountain" src="@@mountain@@" width="1200" height="595" loading="lazy" alt="Mountain artwork used to represent progress in Kitchen Wins."><div class="wins-copy"><h4 id="wins-heading">Kitchen Wins</h4><p>Save food. Earn XP. Climb higher.</p><p>Levels, a medal wall and daily / weekly quests reward real food actions, encouraging better habits through positive feedback.</p><div class="medals" aria-hidden="true"><img src="@@medal1@@" width="43" height="43" loading="lazy" alt=""><img src="@@medal2@@" width="43" height="43" loading="lazy" alt=""><img src="@@medal3@@" width="43" height="43" loading="lazy" alt=""></div></div></section>
+        </div>
+        <p class="support-note">Also improved: barcode entry, shopping and restocking, fridge filters, and inventory outcome tracking.</p>
+        <details><summary>Explore the Wins App screens</summary><div class="evidence"><figure><img class="screen" src="@@wins@@" width="549" height="1170" loading="lazy" alt="Iteration 2 Kitchen Wins screen with mountain progress and impact milestones."><figcaption>Levels and progress</figcaption></figure><figure><img class="screen" src="@@medals@@" width="545" height="1170" loading="lazy" alt="Iteration 2 medal wall showing unlocked and locked achievements."><figcaption>Medal wall</figcaption></figure><figure><img class="screen" src="@@quests@@" width="559" height="1170" loading="lazy" alt="Iteration 2 daily and weekly food-management quests."><figcaption>Daily and weekly quests</figcaption></figure></div></details>
+        <p style="margin-top:16px"><a class="text-link" href="https://eportfolio.monash.edu/view/view.php?t=91864bcd6724f3369d72" target="_blank" rel="noopener noreferrer">View the Iteration 2 portfolio <span aria-hidden="true">&#8599;</span></a></p>
+      </article>
+
+      <article class="iteration third" aria-labelledby="iteration-three-heading">
+        <p class="iteration-label">Iteration 3</p><h3 id="iteration-three-heading">Learn together.<br>Waste less together.</h3>
+        <p class="iteration-intro">We brought practical waste education and deeper household collaboration into the kitchen, building on our shared-inventory foundation.</p>
+        <div class="third-features">
+          <section class="third-feature" aria-labelledby="learning-heading">
+            <div class="feature-copy"><h4 id="learning-heading">Learning Academy</h4><p class="feature-tagline">Understand waste. Know what to do next.</p><p>Learn about food waste and connect that knowledge to practical everyday actions through short lessons and hands-on activities.</p></div>
+            <div class="learning-art"><div class="learning-decoration"><img src="@@learningCover@@" width="600" height="600" loading="lazy" alt="Food and packaging artwork from the waste-basics learning course."><img class="learning-spoonie" src="@@spoonie@@" width="256" height="256" loading="lazy" alt=""></div><img class="screen learning-screen" src="@@learning@@" width="390" height="844" loading="lazy" alt="Learning Academy App screen with waste-basics lessons, learning activities and resources."></div>
+            <p class="feature-caption">The Learning Academy interface and course artwork.</p>
+          </section>
+          <section class="third-feature" aria-labelledby="shared-heading">
+            <div class="feature-copy"><h4 id="shared-heading">Shared Fridge</h4><p class="feature-tagline">One household. One shared view.</p><p>Household members share the same inventory, coordinate what needs using, and plan shopping together. Food management becomes a shared routine.</p></div>
+            <img class="shared-art" src="@@family@@" width="1536" height="1024" loading="lazy" alt="Two household members standing beside one shared fridge, representing family food management.">
+            <div class="household-actions"><span>Share inventory</span><span>Coordinate food use</span><span>Plan together</span></div>
+          </section>
+        </div>
+        <p class="learning-outcome">Understand the impact. Take practical action. Make it a household habit.</p>
+      </article>
+    </section>
+
+    <section id="team" class="team" aria-labelledby="team-heading"><h2 id="team-heading">Meet Team Gress</h2><p>Monash University · FIT5120 Industry Experience</p><ul class="members"><li><strong>Guanxin Wu</strong><span>MIT</span></li><li><strong>Jingduo Zhang</strong><span>MIT</span></li><li><strong>Haoxuan Sun</strong><span>MBIS</span></li><li><strong>Yang Qiao</strong><span>MDS</span></li><li><strong>Chang Lei</strong><span>MCS</span></li></ul></section>
+  </main>
+  <footer class="container"><div class="footer-left"><a class="brand" href="#main"><img src="@@logo@@" width="30" height="30" alt="">KitchMemo</a><p>A Monash FIT5120 student project by Team Gress.</p></div><p>Remember your food. Rethink your waste.</p></footer>
+</body>
+</html>
