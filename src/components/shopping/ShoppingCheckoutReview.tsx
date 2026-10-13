@@ -80,6 +80,20 @@ export function ShoppingCheckoutReview({
     [items, status],
   );
 
+  // Arthur: NarIyirm
+  // 中文：用 useMemo 钉住表单初值引用；否则购物车实时同步引起的重渲染会把用户正在改的选项重置。
+  // EN: Pin the form's initialValues reference; otherwise re-renders from cart realtime sync reset the user's in-progress choices.
+  const editingInitialValues = useMemo(
+    () => (editing ? {
+      name: editing.name,
+      quantity: editing.quantity ? String(editing.quantity) : '1',
+      // 中文：带上购物车里选好的单位，不然会退回默认的 "item"。
+      // EN: Carry over the cart's unit, or it falls back to the default "item".
+      ...(editing.unit ? { unit: editing.unit as InventoryUnit } : {}),
+    } : undefined),
+    [editing],
+  );
+
   const isDuplicate = (item: CartItem) => inventoryNames.has(item.name.trim().toLowerCase());
 
   const handleDraftSubmit = async (item: CartItem, submission: InventoryEntrySubmission) => {
@@ -234,13 +248,7 @@ export function ShoppingCheckoutReview({
         <InventoryEntryFlow
           visible
           source="recognition"
-          initialValues={{
-            name: editing.name,
-            quantity: editing.quantity ? String(editing.quantity) : '1',
-            // 中文：带上购物车里选好的单位，不然会退回默认的 "item"。
-            // EN: Carry over the cart's unit, or it falls back to the default "item".
-            ...(editing.unit ? { unit: editing.unit as InventoryUnit } : {}),
-          }}
+          initialValues={editingInitialValues}
           onClose={() => setEditing(null)}
           onSubmit={(submission) => handleDraftSubmit(editing, submission)}
         />
