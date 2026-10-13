@@ -9,7 +9,7 @@ import { APP_TAB_DOCK_HEIGHT, FloatingTabBar, type AppTab } from '../../Floating
 import { learningColors as c } from '../learningTheme';
 import { createLearningPreview, previewScenarios, type LearningPreviewScenario } from './learningFixtures';
 import { LearningTutorPreview, tutorPreviewScreens, type TutorPreviewScreen } from './LearningTutorPreview';
-import { LearningWidthContext } from '../learningViewport';
+import { LearningBottomSafeAreaContext, LearningWidthContext } from '../learningViewport';
 
 function Preview() {
   const { language, setLanguage, t } = useI18n();
@@ -25,6 +25,10 @@ function Preview() {
   const preview = useMemo(() => scenario ? createLearningPreview(scenario) : null, [scenario, revision]);
   const width = params.get('width') === '320' ? 320 : 390;
   const height = params.get('height') === '667' ? 667 : 844;
+  // Arthur: NarIyirm
+  // 中文：开发画布可切换刘海与灵动岛尺寸来核对布局；这些固定值只用于预览，正式页面仍读取设备安全区。
+  // EN: Switch notch and Dynamic Island sizes in the development canvas to inspect layouts; these fixed values are preview-only and production reads device safe areas.
+  const topSafeArea = ['0', '44', '59', '62'].includes(params.get('safeTop') ?? '') ? Number(params.get('safeTop')) : 44;
   const origin = tabPreview ? 'tab' : params.get('origin') === 'profile' ? 'profile' : 'home';
   const content = tutorPreviewScreens.includes(tutorScreen) ? <LearningTutorPreview key={tutorScreen} screen={tutorScreen} />
     : preview && (!tabPreview || activeTab === 'learn') ? <LearningRoomFlow key={`${scenario}:${revision}`} {...preview} origin={origin} embedded onClose={() => setScenario(null)} />
@@ -48,7 +52,9 @@ function Preview() {
   // EN: The web canvas simulates content insets only; native uses real safe areas. The development label sits outside the canvas, with no drawn phone frame or status bar.
   if (Platform.OS === 'web') return <ScrollView style={styles.desktop} contentContainerStyle={[styles.desktopContent, !showChrome ? { paddingBottom: 0 } : null]}>
     {showChrome ? chrome : null}<View testID="learning-preview-canvas" style={{ width, height, maxWidth: '100%', backgroundColor: c.background }}>
-      <LearningWidthContext.Provider value={width}><SafeAreaInsetsContext.Provider value={{ top: 44, bottom: 24, left: 0, right: 0 }}>{canvas}</SafeAreaInsetsContext.Provider></LearningWidthContext.Provider>
+      <LearningWidthContext.Provider value={width}><LearningBottomSafeAreaContext.Provider value={!tabPreview}>
+        <SafeAreaInsetsContext.Provider value={{ top: topSafeArea, bottom: 24, left: 0, right: 0 }}>{canvas}</SafeAreaInsetsContext.Provider>
+      </LearningBottomSafeAreaContext.Provider></LearningWidthContext.Provider>
     </View>
   </ScrollView>;
   return <View style={{ flex: 1, backgroundColor: c.background }}>{chrome}{canvas}</View>;

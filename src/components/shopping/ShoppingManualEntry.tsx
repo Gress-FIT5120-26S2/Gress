@@ -22,6 +22,7 @@ import {
   Platform,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { InventoryBatch } from '../../services/inventoryApi';
 import { getApiErrorCode } from '../../services/apiClient';
 import { MAX_INVENTORY_NAME_LENGTH, getMaxInventoryQuantity } from '../../utils/inventoryValidation';
@@ -60,6 +61,7 @@ export function ShoppingManualEntry({
   mode,
 }: ShoppingManualEntryProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.shopping.manual;
   const isEditing = (mode ?? (initialValues !== null ? 'edit' : 'add')) === 'edit';
   const [name, setName] = useState('');
@@ -148,7 +150,7 @@ export function ShoppingManualEntry({
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
       <KeyboardAvoidingView
-        style={styles.root}
+        style={[styles.root, { paddingTop: insets.top + 8 }]}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.backdrop} pointerEvents="none" />

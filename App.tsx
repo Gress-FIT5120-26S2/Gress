@@ -658,8 +658,8 @@ function KitchMemoApp() {
 
 export default function App() {
   // Arthur: NarIyirm
-  // 中文：首帧注入原生窗口安全区，避免首次打开全屏 Modal 时顶部 inset 暂时为 0。
-  // EN: Seed the provider with native window metrics so a full-screen Modal never receives a zero top inset on its first frame.
+  // 中文：首帧注入主窗口安全区；原生弹窗由公共 AppModal 在各自的视图根重新测量。
+  // EN: Seed the main window's first-frame safe area; shared AppModal measures each native modal's own view root.
   return (
     <SafeAreaProvider initialMetrics={initialWindowMetrics} style={styles.root}>
       <I18nProvider>

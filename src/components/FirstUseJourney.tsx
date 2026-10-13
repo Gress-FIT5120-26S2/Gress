@@ -1,8 +1,10 @@
+import { AppModal as Modal } from './RetainedTab';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useEffect, useRef, useState, type ComponentProps } from 'react';
-import { AccessibilityInfo, Animated, Easing, Modal, Pressable, ScrollView, StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Pressable, ScrollView, StyleSheet, Text, View, type TextStyle, type ViewStyle } from 'react-native';
 import { useI18n } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { EdgeSwipeBackView } from './navigation/EdgeSwipeBackView';
 
 type FirstUseJourneyProps = {
@@ -29,6 +31,7 @@ const EASE_OUT = Easing.bezier(0.23, 1, 0.32, 1);
 
 export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
   const { language, setLanguage, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const [pageIndex, setPageIndex] = useState(0);
   const [reducedMotion, setReducedMotion] = useState(false);
   const reveal = useRef(new Animated.Value(1)).current;
@@ -76,7 +79,7 @@ export function FirstUseJourney({ onComplete, visible }: FirstUseJourneyProps) {
 
   return (
     <Modal animationType="fade" onRequestClose={pageIndex > 0 ? goBack : () => undefined} presentationStyle="fullScreen" visible={visible}>
-      <EdgeSwipeBackView enabled={pageIndex > 0} onBack={goBack} resetKey={pageIndex}><View style={[styles.screen, sceneStyles[page].screen]}>
+      <EdgeSwipeBackView enabled={pageIndex > 0} onBack={goBack} resetKey={pageIndex}><View style={[styles.screen, sceneStyles[page].screen, { paddingTop: insets.top + 8, paddingBottom: insets.bottom }]}>
         <View style={styles.topBar}>
           <Text style={[styles.brand, sceneStyles[page].foreground]}>KITCHMEMO</Text>
           <Text accessibilityLiveRegion="polite" style={[styles.progressLabel, sceneStyles[page].muted]}>
@@ -269,7 +272,7 @@ const sceneStyles: Record<JourneyPage, SceneTheme> = {
 };
 
 const styles = StyleSheet.create({
-  screen: { flex: 1, paddingTop: 54 },
+  screen: { flex: 1 },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 22 },
   brand: { fontSize: 13, fontWeight: '900', letterSpacing: 1.2 },
   progressLabel: { fontSize: 13, fontWeight: '700' },

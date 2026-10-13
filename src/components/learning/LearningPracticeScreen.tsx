@@ -8,6 +8,7 @@ import { WasteSortingInteraction } from '../fridge/WasteSortingInteraction';
 import { LearningButton, LearningIcon, LearningImage, LearningLink, LearningPage, LearningProgress, LearningSourceLink, ui } from './LearningUi';
 import { useLearningViewport } from './learningViewport';
 import { LearningQuizScreen } from './LearningQuizScreen';
+import { useLearningFeedbackFocus } from './useLearningFeedbackFocus';
 
 const streams: Record<string, WasteStream | undefined> = { organics: 'organics', 'food-organics': 'organics', recycling: 'recycling', general: 'general' };
 
@@ -30,6 +31,7 @@ export function LearningPracticeScreen({ quiz, selectedOptionId, selectionLocked
   const [reducedMotion, setReducedMotion] = useState(false);
   const [fallbackSelection, setFallbackSelection] = useState<string | null>(selectedOptionId);
   const feedback = quiz.feedback;
+  const feedbackFocus = useLearningFeedbackFocus(feedback ? `${quiz.attemptUid}:${quiz.question.questionUid}` : null);
   const disabled = busy || (Boolean(feedback) && !demonstrating) || (selectionLocked && !feedback);
   const current = useRef({ disabled, demonstrating, feedback, options: quiz.question.options, onAnswer });
   current.current = { disabled, demonstrating, feedback, options: quiz.question.options, onAnswer };
@@ -74,7 +76,7 @@ export function LearningPracticeScreen({ quiz, selectedOptionId, selectionLocked
   // 中文：若未来课程的选项并非这三条收集流，回退到原测验选项，避免强行套用某地的三桶规则。
   // EN: Fall back to quiz options for future collection streams instead of imposing a local three-bin model.
   if (quiz.question.options.length !== 3 || quiz.question.options.some(o => !streams[o.optionId])) return <LearningQuizScreen quiz={quiz} stageTitle={{ en: copy.handsOn, zh: copy.handsOn }} selectedOptionId={selectionLocked ? selectedOptionId : fallbackSelection} sources={sources} busy={busy} error={error} selectionLocked={selectionLocked} onBack={onBack} onClose={onClose} onSelect={setFallbackSelection} onSubmit={() => { const option = selectionLocked ? selectedOptionId : fallbackSelection; if (option) onAnswer(option); }} onNext={onNext} />;
-  return <LearningPage backLabel={copy.title} onBack={onBack} onClose={onClose} error={error} scrollEnabled={!dragging} testID="learning-practice"
+  return <LearningPage scrollRef={feedbackFocus.scrollRef} onContentSizeChange={feedbackFocus.onContentSizeChange} backLabel={copy.title} onBack={onBack} onClose={onClose} error={error} scrollEnabled={!dragging} testID="learning-practice"
     footer={feedback ? <LearningButton label={busy ? copy.saving : quiz.questionNumber === quiz.questionCount ? copy.seeResults : copy.nextQuestion} onPress={onNext} disabled={busy} />
       : selectionLocked ? <LearningButton label={busy ? copy.checking : copy.retry} disabled={busy} onPress={() => { if (selectedOptionId) onAnswer(selectedOptionId); }} /> : undefined}>
     <LearningProgress value={quiz.questionNumber / quiz.questionCount} label={copy.questionProgress(quiz.questionNumber, quiz.questionCount)} />
@@ -87,7 +89,7 @@ export function LearningPracticeScreen({ quiz, selectedOptionId, selectionLocked
       choices={quiz.question.options.map(o => ({ stream: streams[o.optionId]!, label: o.label[language], highlighted: feedback?.correctOptionId === o.optionId }))}
       item={quiz.question.imageAssetKey ? <LearningImage assetKey={quiz.question.imageAssetKey} style={{ width: 90, height: 110 }} /> : <LearningIcon name="cube-outline" size={72} />} />
     {selectionLocked && !feedback ? <Text accessibilityLiveRegion="polite" style={ui.caption}>{copy.selectionPending}</Text> : null}
-    {feedback ? <View accessibilityLiveRegion="polite" style={ui.panel}><Text style={ui.listTitle}>{demonstrated ? copy.demonstrationDone : feedback.isCorrect ? copy.correct : copy.incorrect}</Text>
+    {feedback ? <View onLayout={feedbackFocus.onFeedbackLayout} testID="learning-answer-feedback" accessibilityLiveRegion="polite" style={ui.panel}><Text style={ui.listTitle}>{demonstrated ? copy.demonstrationDone : feedback.isCorrect ? copy.correct : copy.incorrect}</Text>
       <Text style={ui.body}>{feedback.explanation[language]}</Text><Text style={ui.caption}>{copy.firstAnswer}</Text>
       {!feedback.isCorrect && !demonstrated ? <LearningLink label={copy.demonstrate} onPress={() => { if (!busy) { setDemonstrating(true); returnItem(); } }} /> : null}
       {feedback.sourceRefs.map(code => { const source = sources.find(s => s.sourceCode === code); return source ? <LearningSourceLink key={code} label={source.publisher} url={source.url} /> : null; })}

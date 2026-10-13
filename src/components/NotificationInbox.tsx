@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, FlatList, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n, type Translation } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { fetchNotifications, markNotificationRead, type KitchenNotification, type NotificationType } from '../services/notificationApi';
 import { subscribeToSync } from '../services/realtimeSync';
 
@@ -51,6 +52,7 @@ type NotificationInboxProps = {
 export function NotificationInbox({ initialNotificationId, initialNotificationToken = 0, onBack, onCountsChange, onGoToRestock }: NotificationInboxProps) {
   const tabActive = useTabActive();
   const { language, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<KitchenNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [badgeCount, setBadgeCount] = useState(0);
@@ -137,7 +139,7 @@ export function NotificationInbox({ initialNotificationId, initialNotificationTo
     <View style={styles.screen}>
       <View pointerEvents="none" style={styles.skyGlow} />
       <View pointerEvents="none" style={styles.warmGlow} />
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable accessibilityLabel={t.notifications.back} accessibilityRole="button" hitSlop={8} onPress={onBack} style={({ pressed }) => [styles.backButton, pressed && styles.backPressed]}><Ionicons color="#294B40" name="chevron-back" size={28} /></Pressable>
         <Text style={styles.pageTitle}>{t.notifications.pageTitle}</Text>
         <Pressable accessibilityLabel={t.notifications.refresh} accessibilityRole="button" hitSlop={8} onPress={() => { void load(); }} style={({ pressed }) => [styles.refreshButton, pressed && styles.backPressed]}><Ionicons color="#4F7065" name="refresh-outline" size={20} /></Pressable>
@@ -196,7 +198,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, overflow: 'hidden', backgroundColor: '#F7FBFA' },
   skyGlow: { position: 'absolute', top: 80, right: -90, width: 260, height: 260, borderRadius: 130, backgroundColor: 'rgba(205,239,249,0.40)' },
   warmGlow: { position: 'absolute', bottom: 40, left: -110, width: 300, height: 300, borderRadius: 150, backgroundColor: 'rgba(255,231,208,0.30)' },
-  header: { minHeight: 118, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 18, paddingBottom: 15 },
+  header: { minHeight: 60, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 18, paddingBottom: 15 },
   backButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.86)' },
   refreshButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 24, backgroundColor: 'rgba(255,255,255,0.62)' },
   backPressed: { opacity: 0.66, transform: [{ scale: 0.97 }] },

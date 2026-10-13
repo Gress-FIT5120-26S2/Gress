@@ -418,7 +418,10 @@ export function SpooniePetEntry({ activitySignal, onOpen, visible }: SpooniePetE
   if (!visible) return null;
 
   return (
-    <View pointerEvents="box-none" style={styles.layer}>
+    // Arthur: NarIyirm
+    // 中文：浮动助手只在安全区以下裁切；动画坐标仍用全窗口坐标，渲染时减去容器偏移，避免顶部探头遮挡状态栏。
+    // EN: Clip the floating pet below the safe area; keep animation coordinates in window space and subtract the container offset so top peeking cannot cover the status bar.
+    <View pointerEvents="box-none" style={[styles.layer, { top: insets.top }]}>
       {showGreeting ? (
         <Animated.View
           accessibilityLiveRegion="polite"
@@ -427,7 +430,7 @@ export function SpooniePetEntry({ activitySignal, onOpen, visible }: SpooniePetE
             styles.greetingBubble,
             { left: side === 'top' ? -(BUBBLE_WIDTH - PET_SIZE) / 2 : side === 'right' ? -BUBBLE_WIDTH + PET_SIZE - 18 : PET_SIZE - 18 },
             side === 'top' && styles.greetingBubbleTop,
-            { transform: [{ translateX: position.x }, { translateY: position.y }] },
+            { transform: [{ translateX: position.x }, { translateY: Animated.subtract(position.y, insets.top) }] },
           ]}
         >
           <Text style={styles.greetingText}>{t.fridge.assistant.petGreeting}</Text>
@@ -445,7 +448,7 @@ export function SpooniePetEntry({ activitySignal, onOpen, visible }: SpooniePetE
           {
             transform: [
               { translateX: position.x },
-              { translateY: Animated.add(position.y, Animated.add(bob, jump)) },
+              { translateY: Animated.subtract(Animated.add(position.y, Animated.add(bob, jump)), insets.top) },
               { translateX: inwardBreathX },
               { translateY: inwardBreathY },
               { perspective: 700 },

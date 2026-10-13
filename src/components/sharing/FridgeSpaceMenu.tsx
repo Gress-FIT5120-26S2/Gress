@@ -1,6 +1,8 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { ActivityIndicator, Modal, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FridgeAccessContext } from '../../services/sharingApi';
 
 type FridgeSpaceMenuProps = {
@@ -30,6 +32,7 @@ export function FridgeSpaceMenu({
   visible,
 }: FridgeSpaceMenuProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.sharing;
   const isShared = context?.fridge.mode === 'shared';
 
@@ -37,8 +40,8 @@ export function FridgeSpaceMenu({
     <Modal animationType="fade" onRequestClose={onClose} statusBarTranslucent transparent visible={visible}>
       <View style={styles.root}>
         <Pressable accessibilityLabel={copy.close} onPress={onClose} style={StyleSheet.absoluteFill} />
-        <View style={styles.pointer} />
-        <View style={styles.panel}>
+        <View style={[styles.pointer, { top: insets.top + 59 }]} />
+        <View style={[styles.panel, { top: insets.top + 66 }]}>
           <Text style={styles.panelTitle}>{copy.spaceTitle}</Text>
           {loading ? (
             <View style={styles.stateRow}>
@@ -94,8 +97,8 @@ export function FridgeSpaceMenu({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: 'rgba(25, 49, 62, 0.14)' },
-  pointer: { position: 'absolute', top: 107, left: 54, width: 16, height: 16, transform: [{ rotate: '45deg' }], backgroundColor: '#FFFFFF' },
-  panel: { position: 'absolute', top: 114, left: 16, width: '82%', maxWidth: 320, padding: 12, borderRadius: 20, borderCurve: 'continuous', backgroundColor: '#FFFFFF', boxShadow: '0 14px 28px rgba(30, 75, 98, 0.18)' },
+  pointer: { position: 'absolute', left: 54, width: 16, height: 16, transform: [{ rotate: '45deg' }], backgroundColor: '#FFFFFF' },
+  panel: { position: 'absolute', left: 16, width: '82%', maxWidth: 320, padding: 12, borderRadius: 20, borderCurve: 'continuous', backgroundColor: '#FFFFFF', boxShadow: '0 14px 28px rgba(30, 75, 98, 0.18)' },
   panelTitle: { marginBottom: 8, color: '#6B8190', fontSize: 12, fontWeight: '700' },
   stateRow: { minHeight: 96, alignItems: 'center', justifyContent: 'center', gap: 8 },
   stateText: { color: '#6B8190', fontSize: 12 },

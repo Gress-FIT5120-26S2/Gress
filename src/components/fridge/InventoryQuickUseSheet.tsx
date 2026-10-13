@@ -1,6 +1,7 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, ActivityIndicator, Animated, Easing, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
 import { ApiRequestError, getApiErrorCode } from '../../services/apiClient';
@@ -29,6 +30,11 @@ export function InventoryQuickUseSheet({ initialBatch, onClose, onUsed }: Invent
   const [quantityText, setQuantityText] = useState(() => String(clampQuickUseQuantity(quickUseStep(initialBatch.unit), initialBatch.remainingQuantity)));
   const [inputFocused, setInputFocused] = useState(false);
   const [sheetSpace, setSheetSpace] = useState(height);
+  // Arthur: NarIyirm
+  // 中文：键盘缩小可用高度时也扣除上下安全区，不能用最小面板高度把标题挤回状态栏。
+  // EN: Reserve both safe-area edges when the keyboard reduces available height; a minimum sheet height must not push the title back into the status bar.
+  const bottomMargin = Math.max(insets.bottom, 10);
+  const maximumSheetHeight = Math.max(0, sheetSpace - insets.top - bottomMargin - 24);
   const compact = sheetSpace < 650;
   const compactFooter = sheetSpace < 450;
   const [saving, setSaving] = useState(false);
@@ -160,7 +166,7 @@ export function InventoryQuickUseSheet({ initialBatch, onClose, onUsed }: Invent
         <Pressable accessibilityLabel={t.fridge.itemDetail.close} onPress={requestClose} style={StyleSheet.absoluteFill} />
         <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} pointerEvents="box-none" style={styles.keyboardRoot}>
         <View onLayout={({ nativeEvent }) => setSheetSpace(nativeEvent.layout.height)} pointerEvents="box-none" style={styles.root}>
-        <Animated.View accessibilityViewIsModal style={[styles.sheet, { maxHeight: Math.max(220, sheetSpace - insets.top - 24), marginBottom: Math.max(insets.bottom, 10), opacity, transform: [{ translateY }] }]}>
+        <Animated.View accessibilityViewIsModal style={[styles.sheet, { maxHeight: maximumSheetHeight, marginBottom: bottomMargin, opacity, transform: [{ translateY }] }]}>
           <View style={styles.grabber} />
           <View style={styles.header}>
             <Text accessibilityRole="header" style={styles.title}>{copy.title}</Text>

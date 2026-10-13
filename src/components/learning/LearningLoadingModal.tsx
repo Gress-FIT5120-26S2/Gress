@@ -16,8 +16,11 @@ export function LearningLoadingModal({ onClose, closeLabel, failed = false, onRe
     const subscription = BackHandler.addEventListener('hardwareBackPress', () => { onClose(); return true; });
     return () => subscription.remove();
   }, [embedded, onClose, active]);
+  // Arthur: NarIyirm
+  // 中文：普通内嵌加载页不显示关闭按钮；动画的外层弹窗传入 closeLabel，加载或失败时仍能退出。
+  // EN: Regular inline loading omits Close; the animation's modal supplies closeLabel so loading and failure remain dismissible.
   const body = <SafeAreaView edges={embedded ? ['top', 'left', 'right'] : ['top', 'bottom', 'left', 'right']} style={{ flex: 1, backgroundColor: c.background, paddingHorizontal: 24 }}>
-      {embedded ? null : <Pressable accessibilityRole="button" onPress={onClose} style={{ minHeight: 52, justifyContent: 'center' }}><Text style={{ color: c.learningGreenReadable }}>{closeLabel ?? t.learning.close}</Text></Pressable>}
+      {embedded && !closeLabel ? null : <Pressable accessibilityRole="button" onPress={onClose} style={{ minHeight: 52, justifyContent: 'center' }}><Text style={{ color: c.learningGreenReadable }}>{closeLabel ?? t.learning.close}</Text></Pressable>}
       <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
         {failed ? <><Text style={{ color: c.textPrimary }}>{t.learning.errorTitle}</Text><Text style={{ color: c.textSecondaryReadable }}>{t.learning.errorBody}</Text>
           <Pressable accessibilityRole="button" onPress={onRetry} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: c.learningGreenReadable }}>{t.learning.retry}</Text></Pressable></>

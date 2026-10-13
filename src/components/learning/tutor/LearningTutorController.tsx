@@ -9,7 +9,7 @@ import type { TutorAction, TutorContext, TutorIntervention, TutorRecommendations
 import { LearningLink, ui } from '../LearningUi';
 import { LearningTutorSlot } from './LearningTutorSlot';
 import { LearningTutorPanel } from './LearningTutorPanel';
-import { TutorEntryButton, TutorHelpCard } from './LearningTutorView';
+import { TutorToolbarButton, TutorHelpCard } from './LearningTutorView';
 
 type Props={children:ReactNode;content:PublicLearningContent;route:LearningRoute;gateway:LearningRoomGateway;
   busy:boolean;storyVisible:boolean;onNavigate:(route:LearningRoute)=>void;onResume:(uid:string)=>void;onAbandoned:()=>void;};
@@ -71,9 +71,13 @@ export function LearningTutorController({children,content,route,gateway,busy,sto
     const hintVisit=visit.current;
     try{const result=await api.hint({kind:'practice-question',contentVersion:content.contentVersion,attemptUid:quiz.attemptUid,questionUid:quiz.question.questionUid},hintKey.current);if(hintVisit===visit.current){setHint(result.hint[language]);hintKey.current=null;}}
     catch{setError(t.learning.actionFailed);}finally{hintBusy.current=false;}};
-  const footer=formalUnanswered?<Text style={ui.caption}>{copy.checkpointNote}</Text>:route.name==='quiz'&&quiz?.mode==='practice'&&!quiz.feedback?
-    <TutorEntryButton label={copy.hint} disabled={busy} onPress={()=>{void askHint();}}/>:
-    <TutorEntryButton label={quiz?.feedback?copy.explain:copy.ask} disabled={busy} onPress={()=>open()}/>;
+  // Arthur: NarIyirm
+  // 中文：所有页面共用顶部入口；未答正式题隐藏助手，练习仍只给提示，已答题仍进入原题解释，不改变考试限制。
+  // EN: Share the header entry across pages; hide it for unanswered formal questions, retain hints for practice and explanations for answered questions without changing assessment restrictions.
+  const header=formalUnanswered?undefined:route.name==='quiz'&&quiz?.mode==='practice'&&!quiz.feedback?
+    <TutorToolbarButton label={copy.hint} disabled={busy} onPress={()=>{void askHint();}}/>:
+    <TutorToolbarButton label={quiz?.feedback?copy.explain:copy.ask} disabled={busy} onPress={()=>open()}/>;
+  const notice=formalUnanswered?<Text style={ui.caption}>{copy.checkpointNote}</Text>:undefined;
   const body=hint||intervention&&canOffer||recommendations?.topics.length||error?<View style={{gap:16}}>
     {hint?<View style={ui.panel}><Text style={ui.body}>{hint}</Text></View>:null}
     {intervention&&canOffer?<TutorHelpCard prompt={intervention.prompt[language]} onAccept={()=>{void accept();}} onDismiss={()=>{void dismiss();}}
@@ -84,7 +88,7 @@ export function LearningTutorController({children,content,route,gateway,busy,sto
         <LearningLink label={copy.similar} onPress={()=>open({kind:'practice-template',entityCode:item.templateCode,contentVersion:content.contentVersion})}/></View></View>)}</View>:null}
     {error?<Text style={ui.error}>{error}</Text>:null}
   </View>:undefined;
-  const slot={body,footer};
+  const slot={body,header,notice};
   const panelCover=panel&&'entityCode' in panel?panel.kind==='resource'?content.resources.find(r=>r.resourceCode===panel.entityCode)?.coverAssetKey
     :panel.kind==='course'?content.courses.find(course=>course.courseCode===panel.entityCode)?.coverAssetKey
     :content.courses.find(course=>course.activityCodes.includes(panel.entityCode))?.coverAssetKey:undefined;

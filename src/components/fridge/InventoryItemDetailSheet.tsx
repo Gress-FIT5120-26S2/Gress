@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import Slider from '@react-native-community/slider';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
@@ -6,12 +7,10 @@ import {
   ActivityIndicator,
   Animated,
   Easing,
-  Modal,
   PanResponder,
   Platform,
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Switch,
   Text,
@@ -19,6 +18,7 @@ import {
   useWindowDimensions,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   getInventoryBatchDetail,
   resolveInventoryBatch,
@@ -101,10 +101,14 @@ export function InventoryItemDetailSheet({
   const { height, width } = useWindowDimensions();
   const { language, t } = useI18n();
   const copy = t.fridge.itemDetail;
-  const expandedTopInset = Platform.OS === 'ios' ? 58 : Math.max(StatusBar.currentHeight ?? 24, 24) + 10;
+  const insets = useSafeAreaInsets();
+  // Arthur: NarIyirm
+  // 中文：完全展开仍保留实际安全区与抓手间距，小屏也不让最小高度把抽屉顶进状态栏。
+  // EN: Fully expanded sheets retain the actual safe area and handle gap; minimum heights cannot push a small-screen sheet into the status bar.
+  const expandedTopInset = insets.top + 8;
   const sheetBottomInset = Platform.OS === 'ios' ? 12 : 10;
   const footerHeight = Platform.OS === 'ios' ? 103 : 88;
-  const sheetHeight = Math.max(440, height - expandedTopInset - sheetBottomInset);
+  const sheetHeight = Math.max(0, height - expandedTopInset - sheetBottomInset);
   // Arthur: NarIyirm
   // 中文：半屏停靠点保留约 63% 的可视高度，让库存卡和固定操作栏在打开时完整可用，同时仍露出背景库存页。
   // EN: The preview detent keeps about 63% visible so the stock card and fixed actions are usable on open while the inventory page remains visible behind it.

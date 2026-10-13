@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, Modal as NativeModal, Platform, StyleSheet, View, type ModalProps, type StyleProp, type ViewStyle } from 'react-native';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const TabActiveContext = createContext(true);
 export const useTabActive = () => useContext(TabActiveContext);
@@ -31,9 +32,16 @@ export function RetainedTab({ active, preload = false, children, style }: {
 }
 
 // Arthur: NarIyirm
+// 中文：原生弹窗有独立视图根，统一在内部测量安全区；这里只提供尺寸，不自动加 padding，避免已有安全区布局重复留白。
+// EN: Native modals have separate view roots, so measure safe areas inside every modal; provide metrics without padding to avoid doubling existing safe-area layouts.
+export function AppModal({ children, ...props }: ModalProps) {
+  return <NativeModal {...props}><SafeAreaProvider>{children}</SafeAreaProvider></NativeModal>;
+}
+
+// Arthur: NarIyirm
 // 中文：原生弹窗不受父视图透明度影响，跟随所属 Tab 可见性，保留外层详情和输入状态。
 // EN: Native modals ignore parent opacity, so follow their tab's visibility while retaining outer detail and input state.
 export function TabModal({ visible = true, ...props }: ModalProps) {
   const active = useTabActive();
-  return <NativeModal {...props} visible={active && visible} />;
+  return <AppModal {...props} visible={active && visible} />;
 }

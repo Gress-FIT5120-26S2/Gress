@@ -5,6 +5,7 @@ import type { LearningSource, LearningText } from '../../types/learningContent';
 import type { LearningQuizView } from '../../types/learningRoom';
 import { LearningButton, LearningIcon, LearningImage, LearningLink, LearningPage, LearningProgress, LearningSourceLink, ui } from './LearningUi';
 import { learningColors as c, learningStyles as s, learningTypography } from './learningTheme';
+import { useLearningFeedbackFocus } from './useLearningFeedbackFocus';
 
 export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources, onSelect, onSubmit, onNext, onBack, onClose, busy, error, reviewing = false, selectionLocked = false, onRestart }: {
   quiz: LearningQuizView; stageTitle: LearningText; selectedOptionId: string | null; sources: LearningSource[];
@@ -15,11 +16,12 @@ export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources
   const copy = t.learning;
   const [confirmRestart, setConfirmRestart] = useState(false);
   const feedback = quiz.feedback;
+  const feedbackFocus = useLearningFeedbackFocus(feedback && !reviewing ? `${quiz.attemptUid}:${quiz.question.questionUid}` : null);
   const frozen = feedback !== null || reviewing || selectionLocked;
   const selected = feedback?.selectedOptionId ?? selectedOptionId;
   const last = quiz.questionNumber === quiz.questionCount;
   const nextLabel = reviewing ? last ? copy.reviewComplete : copy.nextQuestion : last ? copy.seeResults : copy.nextQuestion;
-  return <LearningPage backLabel={copy.title} onBack={onBack} onClose={onClose} error={error} testID="learning-quiz"
+  return <LearningPage scrollRef={feedbackFocus.scrollRef} onContentSizeChange={feedbackFocus.onContentSizeChange} backLabel={copy.title} onBack={onBack} onClose={onClose} error={error} testID="learning-quiz"
     footer={<><LearningButton label={busy ? copy.checking : feedback || reviewing ? nextLabel : copy.checkAnswer}
       disabled={busy || (!selected && !reviewing)} onPress={feedback || reviewing ? onNext : onSubmit} testID="learning-check-answer" />
       <Text style={[ui.caption, { textAlign: 'center', paddingTop: 4 }]}>{copy.noTimeLimit}</Text></>}>
@@ -50,7 +52,7 @@ export function LearningQuizScreen({ quiz, stageTitle, selectedOptionId, sources
       <Text style={[ui.caption, ui.flex]}>{copy.councilHint}</Text></View> : null}
     <Text style={ui.caption}>{quiz.question.serviceAssumptions[language]}</Text>
     {selectionLocked && !feedback ? <Text accessibilityLiveRegion="polite" style={ui.caption}>{copy.selectionPending}</Text> : null}
-    {feedback ? <View accessibilityLiveRegion="polite" style={[ui.panel, feedback.isCorrect ? null : styles.feedbackError]}>
+    {feedback ? <View onLayout={feedbackFocus.onFeedbackLayout} testID="learning-answer-feedback" accessibilityLiveRegion="polite" style={[ui.panel, feedback.isCorrect ? null : styles.feedbackError]}>
       <View style={ui.row}><LearningIcon name={feedback.isCorrect ? 'checkmark-circle-outline' : 'information-circle-outline'} color={feedback.isCorrect ? c.learningGreenReadable : c.error} />
         <Text style={ui.listTitle}>{feedback.isCorrect ? copy.correct : copy.incorrect}</Text></View>
       <Text style={ui.body}>{feedback.explanation[language]}</Text><Text style={ui.caption}>{copy.firstAnswer}</Text>

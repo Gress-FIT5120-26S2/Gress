@@ -18,6 +18,7 @@ import type { BarcodeProduct } from '../services/barcodeApi';
 import { getFridgeAccessContext, type FridgeAccessContext } from '../services/sharingApi';
 import { requestImmediateSyncProbe, subscribeToSync } from '../services/realtimeSync';
 import { useI18n } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { AddItemMethodSheet, type AddItemMethod } from './AddItemMethodSheet';
 import { FridgeCategoryButton } from './fridge/FridgeCategoryButton';
 import { CreateCategoryModal } from './fridge/CreateCategoryModal';
@@ -187,6 +188,7 @@ export function FridgeScreen({
   onOpenAssistant,
 }: FridgeScreenProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const [searchTerm, setSearchTerm] = useState('');
   const [activeFilter, setActiveFilter] = useState<FridgeFilter | null>(initialFilter);
   const [filtersExpanded, setFiltersExpanded] = useState(initialFilter !== null);
@@ -746,7 +748,7 @@ export function FridgeScreen({
 
   return (
     <View style={styles.screen}>
-      <View style={styles.topArea}>
+      <View style={[styles.topArea, { paddingTop: insets.top + 8 }]}>
         <View style={styles.toolbar}>
           <Pressable accessibilityLabel={t.fridge.switchA11y(currentScopeLabel)} accessibilityRole="button" onPress={openSpaceMenu} style={({ pressed }) => [styles.fridgeSwitcher, pressed ? styles.pressed : null]}>
             <MaterialCommunityIcons name="fridge-outline" size={20} color="#168ACB" />
@@ -1017,7 +1019,7 @@ function EmptyInventory({ buttonLabel, description, onClear, title }: { buttonLa
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FBFA' },
-  topArea: { paddingTop: 64, paddingBottom: 12, backgroundColor: '#F3F8F7' },
+  topArea: { paddingBottom: 12, backgroundColor: '#F3F8F7' },
   toolbar: { flexDirection: 'row', alignItems: 'center', gap: 7, paddingHorizontal: 16 },
   fridgeSwitcher: { width: 142, minHeight: 46, flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 11, borderWidth: 1, borderColor: '#BFE3F3', borderRadius: 14, borderCurve: 'continuous', backgroundColor: '#EAF7FD' },
   fridgeSwitcherText: { flex: 1, color: '#24566E', fontSize: 13, fontWeight: '800' },

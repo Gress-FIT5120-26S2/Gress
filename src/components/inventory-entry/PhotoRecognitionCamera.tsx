@@ -15,6 +15,7 @@ import {
   View,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { recogniseFoodPhoto, type PhotoRecognitionResult } from '../../services/recognitionApi';
 import { lookupBarcodeProduct, type BarcodeProduct } from '../../services/barcodeApi';
 import { getApiErrorCode } from '../../services/apiClient';
@@ -46,6 +47,7 @@ export function PhotoRecognitionCamera({
 }: PhotoRecognitionCameraProps) {
   const tabActive = useTabActive();
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.photoRecognition;
   const barcodeCopy = t.fridge.barcodeRecognition;
   const cameraRef = useRef<CameraView>(null);
@@ -175,7 +177,7 @@ export function PhotoRecognitionCamera({
     setFacing((current) => current === 'back' ? 'front' : 'back');
   }, []);
 
-  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 52;
+  const topInset = insets.top + 8;
   const isCameraAvailable = permission?.granted === true;
   const flashLabel = flash === 'auto' ? copy.flashAuto : flash === 'on' ? copy.flashOn : copy.flashOff;
   const flashIcon = flash === 'off' ? 'flash-off-outline' : flash === 'on' ? 'flash' : 'flash-outline';

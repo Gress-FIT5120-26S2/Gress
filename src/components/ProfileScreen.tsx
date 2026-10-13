@@ -16,6 +16,7 @@ import {
   View,
 } from 'react-native';
 import { useI18n } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { updateDeviceProfile, type DeviceProfile, type ProfileAvatarKey } from '../services/profileApi';
 import { useAchievementData } from './AchievementDataProvider';
 import { AchievementMedalWall } from './achievement/AchievementMedalWall';
@@ -48,6 +49,7 @@ type ProfileScreenProps = {
 // EN: The profile screen combines device identity, shared-space context, and working settings while keeping taste preferences as a non-persisting placeholder.
 export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: ProfileScreenProps) {
   const { language, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.profile;
   const { failed, fridgeContext: context, loading, profile, refresh, setProfile } = useProfileData();
   const { dashboard: achievementDashboard, refresh: refreshAchievements } = useAchievementData();
@@ -90,7 +92,7 @@ export function ProfileScreen({ onOpenNotifications, onReplayOnboarding }: Profi
 
   return (
     <View style={styles.screen}>
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingTop: insets.top + 12 }]} showsVerticalScrollIndicator={false}>
         <Text style={styles.eyebrow}>{copy.eyebrow}</Text>
         <Text adjustsFontSizeToFit minimumFontScale={0.74} numberOfLines={1} style={styles.greeting}>
           {displayName ? copy.greeting(displayName) : copy.greetingWithoutName}
@@ -258,6 +260,7 @@ function EditProfileModal({ currentName, onClose, onSaved, visible }: {
   visible: boolean;
 }) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.profile.edit;
   const [name, setName] = useState(currentName);
   const [saving, setSaving] = useState(false);
@@ -292,7 +295,7 @@ function EditProfileModal({ currentName, onClose, onSaved, visible }: {
 
   return (
     <Modal animationType="fade" onRequestClose={onClose} presentationStyle="overFullScreen" transparent visible={visible}>
-      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.modalRoot}>
+      <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={[styles.modalRoot, { paddingTop: insets.top + 8 }]}>
         <Pressable accessibilityLabel={t.settings.close} onPress={onClose} style={StyleSheet.absoluteFill} />
         <View style={styles.sheet}>
           <View style={styles.handle} />
@@ -448,9 +451,10 @@ function PrivacyPoint({ icon, text }: { icon: keyof typeof Ionicons.glyphMap; te
 }
 
 function ProfileSkeleton() {
+  const insets = useSafeAreaInsets();
   return (
     <View style={styles.screen}>
-      <View style={styles.skeletonContent}>
+      <View style={[styles.skeletonContent, { paddingTop: insets.top + 12 }]}>
         <View style={[styles.skeletonLine, { width: 92 }]} />
         <View style={[styles.skeletonLine, styles.skeletonHeading]} />
         <View style={styles.skeletonHero} />
@@ -463,7 +467,7 @@ function ProfileSkeleton() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F7FBFA' },
-  content: { paddingHorizontal: 18, paddingTop: 68, paddingBottom: 132 },
+  content: { paddingHorizontal: 18, paddingBottom: 132 },
   eyebrow: { color: '#3C6659', fontSize: 14, fontWeight: '700' },
   greeting: { marginTop: 7, color: '#173D31', fontSize: 32, fontWeight: '800', letterSpacing: -0.8 },
   identityPanel: { minHeight: 190, marginTop: 22, padding: 18, paddingRight: 92, borderRadius: 16, borderCurve: 'continuous', backgroundColor: '#EAF7FD', overflow: 'hidden' },
@@ -528,7 +532,7 @@ const styles = StyleSheet.create({
   replayCancelText: { color: '#4F675E', fontSize: 14, fontWeight: '800' },
   replayConfirmButton: { minHeight: 50, flex: 1.35, alignItems: 'center', justifyContent: 'center', borderRadius: 15, backgroundColor: '#F58220' },
   replayConfirmText: { color: '#FFFFFF', fontSize: 14, fontWeight: '900' },
-  skeletonContent: { paddingHorizontal: 18, paddingTop: 72 },
+  skeletonContent: { paddingHorizontal: 18 },
   skeletonLine: { height: 15, borderRadius: 8, backgroundColor: '#E3EEEA' },
   skeletonHeading: { width: 220, height: 34, marginTop: 12 },
   skeletonHero: { height: 190, marginTop: 22, borderRadius: 16, backgroundColor: '#EAF4F2' },
