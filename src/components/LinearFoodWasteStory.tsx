@@ -88,7 +88,7 @@ const CueCard = memo(function CueCard({ cue, language, reducedMotion }: { cue: C
   );
 });
 
-export function LinearFoodWasteStory({ onClose }: { onClose: () => void }) {
+export function LinearFoodWasteStory({ onClose, embedded = false }: { onClose: () => void; embedded?: boolean }) {
   const tabActive = useTabActive();
   const { language } = useI18n();
   const t = labels[language];
@@ -196,8 +196,7 @@ export function LinearFoodWasteStory({ onClose }: { onClose: () => void }) {
   const cueAtTop = cue?.id === 'weight' || cue?.id === 'cost';
   const timeLabel = `${Math.floor(visibleTime / 60).toString().padStart(2, '0')}:${Math.floor(visibleTime % 60).toString().padStart(2, '0')} / 01:00`;
 
-  return (
-    <Modal animationType="fade" onRequestClose={close} presentationStyle="fullScreen" visible>
+  const content = (
       <View style={styles.screen}>
         <View style={[styles.scene, { width: sceneWidth, height: sceneHeight }]}>
           <Image source={POSTER} resizeMode="stretch" style={styles.media} />
@@ -272,8 +271,11 @@ export function LinearFoodWasteStory({ onClose }: { onClose: () => void }) {
           ) : null}
         </View>
       </View>
-    </Modal>
   );
+  // Arthur: NarIyirm
+  // 中文：学堂把加载与播放器放进同一个原生弹窗；首页独立观看仍由播放器提供弹窗，避免加载切换时互相争抢呈现。
+  // EN: Learn hosts loading and playback in one native modal; standalone Home playback retains its own modal so loading transitions cannot compete for presentation.
+  return embedded ? content : <Modal animationType="fade" onRequestClose={close} presentationStyle="fullScreen" visible>{content}</Modal>;
 }
 
 const styles = StyleSheet.create({

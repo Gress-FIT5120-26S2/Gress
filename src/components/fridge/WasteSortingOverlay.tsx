@@ -1,8 +1,9 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
 import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { AccessibilityInfo, Animated, Easing, Linking, Modal, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { AccessibilityInfo, Animated, Easing, Linking, PanResponder, Pressable, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MaterialArtwork, WasteSortingInteraction } from './WasteSortingInteraction';
 import { useI18n } from '../../i18n';

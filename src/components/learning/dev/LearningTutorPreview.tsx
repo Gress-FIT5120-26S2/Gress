@@ -4,12 +4,13 @@ import { useI18n } from '../../../i18n';
 import type { learningTutorApi } from '../../../services/learningTutorApi';
 import type { TutorContext, TutorConversation, TutorMessage, TutorPreferences, TutorReply } from '../../../types/learningTutor';
 import { LearningResourceScreen } from '../LearningResourceScreen';
+import { LearningBody, LearningButton, LearningPage, ui } from '../LearningUi';
 import { LearningTutorPanel } from '../tutor/LearningTutorPanel';
 import { LearningTutorSlot } from '../tutor/LearningTutorSlot';
-import { TutorEntryButton, TutorHelpCard } from '../tutor/LearningTutorView';
+import { TutorEntryButton, TutorToolbarButton, TutorHelpCard } from '../tutor/LearningTutorView';
 import { learningPreviewContent } from './learningPreviewContent';
 
-export const tutorPreviewScreens = ['welcome', 'explanation', 'submitted', 'proactive', 'restricted', 'failure', 'practice', 'withdrawn'] as const;
+export const tutorPreviewScreens = ['welcome', 'explanation', 'submitted', 'proactive', 'lesson', 'restricted', 'failure', 'practice', 'withdrawn'] as const;
 export type TutorPreviewScreen = typeof tutorPreviewScreens[number];
 
 // Arthur: NarIyirm
@@ -61,19 +62,36 @@ export function LearningTutorPreview({ screen }: { screen: TutorPreviewScreen })
   const { t, language } = useI18n(); const copy = t.learningTutor;
   const service = useMemo(() => createService(screen, language), [screen, language]);
   const [closed, setClosed] = useState(false); const [offer, setOffer] = useState(true); const [read, setRead] = useState(false);
+  const [lessonTutorOpen, setLessonTutorOpen] = useState(false);
   if (!__DEV__) return null;
   const label = screen === 'submitted' ? { zh: '减少食物浪费，为什么有助于气候行动？', en: 'Why can preventing food waste support climate action?' }
-    : { zh: '食物浪费与气候', en: 'Food waste & climate' };
+    : screen === 'lesson' ? learningPreviewContent.activities.find(item => item.activityCode === 'beginner-materials')!.title
+      : { zh: '食物浪费与气候', en: 'Food waste & climate' };
   if (closed) return <View style={{ padding: 24, gap: 16 }}><Text>{language === 'zh' ? '预览面板已关闭' : 'Preview panel closed'}</Text><TutorEntryButton label={copy.ask} onPress={() => setClosed(false)} /></View>;
+  // Arthur: NarIyirm
+  // 中文：离线课程情景复用真实页头、正文和完成按钮，便于检查中英窄屏布局；助手仅使用本模块内存服务。
+  // EN: The offline lesson scenario reuses the real header, content and completion button for bilingual narrow-screen checks; its tutor uses only this module's in-memory service.
+  if (screen === 'lesson' && !lessonTutorOpen) {
+    const activity = learningPreviewContent.activities.find(item => item.activityCode === 'beginner-materials')!;
+    return <LearningTutorSlot.Provider value={{ header: <TutorToolbarButton label={copy.ask} onPress={() => setLessonTutorOpen(true)} /> }}>
+      <LearningPage backLabel={t.learning.title} onBack={() => setClosed(true)} testID="learning-lesson-preview"
+        footer={<LearningButton label={t.learning.lessonComplete} onPress={() => undefined} disabled />}>
+        <View style={ui.group}><Text style={ui.eyebrow}>{t.learning.lessonSummary} · {t.learning.minutes(activity.durationEstimate.minutes)}</Text>
+          <Text accessibilityRole="header" style={ui.title}>{activity.title[language]}</Text><Text style={ui.secondary}>{activity.objective[language]}</Text></View>
+        <LearningBody blocks={activity.body} sources={learningPreviewContent.sources} />
+      </LearningPage>
+    </LearningTutorSlot.Provider>;
+  }
   if (screen === 'proactive') return <LearningTutorSlot.Provider value={{
     body: offer ? <TutorHelpCard prompt={copy.invitationBody} onAccept={() => setOffer(false)} onDismiss={() => setOffer(false)} onTurnOff={() => setOffer(false)} /> : null,
-    footer: <TutorEntryButton label={copy.ask} onPress={() => setClosed(true)} />,
+    header: <TutorToolbarButton label={copy.ask} onPress={() => setClosed(true)} />,
   }}><LearningResourceScreen content={learningPreviewContent} resourceCode="waste-climate-sdg13" read={read} busy={false} error={null}
     onBack={() => setClosed(true)} onMarkRead={() => setRead(true)} onNews={() => setClosed(true)} /></LearningTutorSlot.Provider>;
   const context: TutorContext = screen === 'submitted' ? { kind: 'submitted-question', contentVersion: learningPreviewContent.contentVersion, attemptUid: 'ui-preview-attempt', questionUid: 'ui-preview-submitted' }
     : screen === 'practice' ? { kind: 'practice-template', contentVersion: learningPreviewContent.contentVersion, entityCode: 'ui-preview-template' }
-      : { kind: 'resource', contentVersion: learningPreviewContent.contentVersion, entityCode: 'waste-climate-sdg13' };
+      : screen === 'lesson' ? { kind: 'activity', contentVersion: learningPreviewContent.contentVersion, entityCode: 'beginner-materials' }
+        : { kind: 'resource', contentVersion: learningPreviewContent.contentVersion, entityCode: 'waste-climate-sdg13' };
   return <LearningTutorPanel key={`${screen}:${language}`} embedded service={service} context={context} label={label} coverAssetKey="waste-climate-cover" showLifecycle
-    restricted={screen === 'restricted' || screen === 'submitted'} onClose={() => setClosed(true)} onAction={() => undefined}
+    restricted={screen === 'restricted' || screen === 'submitted'} onClose={() => screen === 'lesson' ? setLessonTutorOpen(false) : setClosed(true)} onAction={() => undefined}
     onResume={screen === 'restricted' ? () => setClosed(true) : undefined} onAbandon={screen === 'restricted' ? async () => setClosed(true) : undefined} />;
 }

@@ -1,6 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
-import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { AccessibilityInfo, Animated, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useI18n } from '../../i18n';
@@ -96,13 +96,13 @@ export function LearningProgress({ value, label }: { value: number; label: strin
   </View>;
 }
 
-export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true, tutorBodyInContent = false }: {
+export function LearningPage({ backLabel, onBack, onClose, brand = false, children, footer, error, testID, contentGap = 18, scrollEnabled = true, tutorBodyInContent = false, scrollRef, onContentSizeChange }: {
   backLabel?: string; onBack?: () => void; onClose?: () => void; brand?: boolean;
   children: ReactNode; footer?: ReactNode; error?: string | null; testID?: string; contentGap?: number; scrollEnabled?: boolean; tutorBodyInContent?: boolean;
+  scrollRef?: RefObject<ScrollView | null>; onContentSizeChange?: (width: number, height: number) => void;
 }) {
   const { t } = useI18n();
-  const { width, fontScale } = useLearningViewport();
-  const stackFooter = width < 360 || fontScale > 1.2;
+  const { width } = useLearningViewport();
   const bottomSafeArea = useContext(LearningBottomSafeAreaContext);
   const tutorSlot = useContext(LearningTutorSlot);
   const gutter = width < learningLayout.narrowWidth ? 18 : 24;
@@ -127,22 +127,23 @@ export function LearningPage({ backLabel, onBack, onClose, brand = false, childr
         <LearningIcon name="chevron-back" size={25} /><Text style={ui.backText}>{backLabel}</Text>
       </Pressable> : null}
       {brand ? <View style={[ui.row, { gap: 3 }]}><Text style={ui.brand}>KitchMemo</Text><LearningIcon name="leaf" size={18} /></View> : null}
-      {onClose ? <Pressable accessibilityRole="button" accessibilityLabel={t.learning.close} onPress={onClose} style={ui.iconButton}><LearningIcon name="close-outline" size={27} color={c.textPrimary} /></Pressable> : null}
+      {tutorSlot?.header || onClose ? <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0, marginLeft: 'auto' }}>
+        {tutorSlot?.header}
+        {onClose ? <Pressable accessibilityRole="button" accessibilityLabel={t.learning.close} onPress={onClose} style={ui.iconButton}><LearningIcon name="close-outline" size={27} color={c.textPrimary} /></Pressable> : null}
+      </View> : null}
     </View>
     <Animated.View style={{ flex: 1, opacity }}>
-      <ScrollView scrollEnabled={scrollEnabled} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
+      <ScrollView ref={scrollRef} onContentSizeChange={onContentSizeChange} scrollEnabled={scrollEnabled} contentInsetAdjustmentBehavior="never" showsVerticalScrollIndicator={false}
         contentContainerStyle={{ paddingHorizontal: gutter, paddingTop: 14, paddingBottom: 20, gap: contentGap }}>
         {children}
         {!tutorBodyInContent ? tutorSlot?.body : null}
-        {error && !footer && !tutorSlot?.footer ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
+        {error && !footer && !tutorSlot?.notice ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
       </ScrollView>
     </Animated.View>
-    {footer || tutorSlot?.footer ? <View style={[ui.footer, { paddingHorizontal: gutter }]}>
+    {footer || tutorSlot?.notice ? <View style={[ui.footer, { paddingHorizontal: gutter }]}>
       {error ? <Text accessibilityLiveRegion="polite" style={ui.error}>{error}</Text> : null}
-      <View style={{ flexDirection: stackFooter ? 'column' : 'row', gap: 8, alignItems: 'stretch' }}>
-        {tutorSlot?.footer ? <View style={{ flex: footer && !stackFooter ? 1 : undefined }}>{tutorSlot.footer}</View> : null}
-        {footer ? <View style={{ flex: !stackFooter ? 1 : undefined }}>{footer}</View> : null}
-      </View>
+      {tutorSlot?.notice}
+      {footer}
     </View> : null}
   </SafeAreaView>;
 }

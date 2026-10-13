@@ -26,6 +26,7 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   fetchCart,
   addCartItem,
@@ -103,6 +104,7 @@ function useCartNames() {
 
 export function ShoppingScreen() {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const screen = t.screens.shopping;
   const [tab, setTab] = useState<Tab>('restock');
 
@@ -152,7 +154,7 @@ export function ShoppingScreen() {
   }, []);
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { paddingTop: insets.top + 12 }]}>
       <Text style={styles.eyebrow}>{screen.eyebrow}</Text>
 
       <View style={[styles.toggle, styles.toggleNoTitle]} onLayout={(e) => setToggleWidth(e.nativeEvent.layout.width)}>
@@ -837,7 +839,7 @@ function DeleteConfirmCard({
 const styles = StyleSheet.create({
   // 中文：跟冰箱页/个人页对齐：同一个页面底色、18px 水平边距、白色连续圆角卡片、橙色主按钮。
   // EN: Aligned with the fridge/profile pages: same page ground, 18px side padding, white continuous-corner cards, orange primary actions.
-  container: { flex: 1, paddingHorizontal: 18, paddingTop: 64, backgroundColor: '#F7FBFA' },
+  container: { flex: 1, paddingHorizontal: 18, backgroundColor: '#F7FBFA' },
   spinner: { marginTop: 24 },
   grow: { flex: 1 },
   pager: { flex: 1 },

@@ -8,7 +8,6 @@ import {
   PanResponder,
   Platform,
   Pressable,
-  StatusBar,
   StyleSheet,
   Text,
   View,
@@ -17,6 +16,7 @@ import {
   type NativeSyntheticEvent,
 } from 'react-native';
 import { useI18n } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export type ProfileSheetControls = {
   expand: () => void;
@@ -45,9 +45,13 @@ export function ProfileBottomSheet({ children, contentKey = 'content', onClose, 
   const { t } = useI18n();
   const [reducedMotion, setReducedMotion] = useState(false);
   const dimensions = useWindowDimensions();
-  const topInset = Platform.OS === 'ios' ? 56 : Math.max(StatusBar.currentHeight ?? 24, 24) + 10;
+  const insets = useSafeAreaInsets();
+  // Arthur: NarIyirm
+  // 中文：展开高度从真实顶部安全区以下计算，语言、隐私与通知设置抽屉均不会伸进灵动岛。
+  // EN: Compute expanded height below the actual top safe area so language, privacy and notification sheets never extend into the Dynamic Island.
+  const topInset = insets.top + 8;
   const bottomInset = Platform.OS === 'ios' ? 10 : 8;
-  const sheetHeight = Math.max(420, dimensions.height - topInset - bottomInset);
+  const sheetHeight = Math.max(0, dimensions.height - topInset - bottomInset);
   const previewVisibleHeight = Math.min(sheetHeight - 34, Math.max(430, dimensions.height * 0.72));
   const previewOffset = Math.max(54, sheetHeight - previewVisibleHeight);
   const dismissedOffset = sheetHeight + bottomInset + 40;
@@ -200,6 +204,10 @@ export function ProfileBottomSheet({ children, contentKey = 'content', onClose, 
   const backdropOpacity = translateY.interpolate({ inputRange: [0, previewOffset, dismissedOffset], outputRange: [1, 0.92, 0], extrapolate: 'clamp' });
   const sheetOpacity = translateY.interpolate({ inputRange: [dismissedOffset - 140, dismissedOffset], outputRange: [1, 0], extrapolate: 'clamp' });
   const sheetScaleX = translateY.interpolate({ inputRange: [0, previewOffset, dismissedOffset], outputRange: [1, previewScaleX, previewScaleX], extrapolate: 'clamp' });
+  // Arthur: NarIyirm
+  // 中文：手势和弹簧可保留回弹状态，但实际绘制最多上移到安全区边缘，防止快速上甩把标题拖进灵动岛。
+  // EN: Keep gesture and spring rebound state while clamping the rendered sheet to the safe-area edge so upward flicks cannot pull its header into the Dynamic Island.
+  const safeTranslateY = translateY.interpolate({ inputRange: [-8, 0, 1], outputRange: [-8, 0, 1], extrapolateLeft: 'clamp', extrapolateRight: 'extend' });
   const controls = useMemo<ProfileSheetControls>(() => ({ expand, onContentScroll, requestClose }), [expand, onContentScroll, requestClose]);
   const renderedChildren = typeof children === 'function' ? children(controls) : children;
 
@@ -208,7 +216,7 @@ export function ProfileBottomSheet({ children, contentKey = 'content', onClose, 
       <View style={styles.modalRoot}>
         <Animated.View pointerEvents="none" style={[styles.backdrop, { opacity: backdropOpacity }]} />
         <Pressable accessibilityLabel={t.settings.close} accessibilityRole="button" onPress={() => requestClose()} style={StyleSheet.absoluteFill} />
-        <Animated.View style={[styles.sheet, { bottom: bottomInset, height: sheetHeight, opacity: sheetOpacity, transform: [{ translateY }, { scaleX: sheetScaleX }] }]}>
+        <Animated.View style={[styles.sheet, { bottom: bottomInset, height: sheetHeight, opacity: sheetOpacity, transform: [{ translateY: safeTranslateY }, { scaleX: sheetScaleX }] }]}>
           <View style={styles.header}>
             <View {...panResponder.panHandlers} accessibilityHint={t.fridge.addItem.dragHint} style={styles.grabberTarget}>
               <View style={styles.grabber} />

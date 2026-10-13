@@ -3,6 +3,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { Platform, Pressable, ScrollView, StatusBar, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BarcodeProduct } from '../../services/barcodeApi';
 import type { FoodPresetSuggestion } from '../../services/inventoryApi';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
@@ -50,6 +51,7 @@ export function buildBarcodeInitialValues(product: BarcodeProduct, suggestion: F
 // EN: A successful barcode lookup follows the photo flow's review-to-shared-form rhythm; packaging data only prefills while price and dates remain user-confirmed.
 export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visible, context = 'inventory' }: BarcodeResultReviewProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.barcodeRecognition;
   const isCart = context === 'cart';
   if (!draft) return null;
@@ -57,7 +59,7 @@ export function BarcodeResultReview({ draft, onClose, onContinue, onRescan, visi
   const displayImage = product.imageUrl ?? suggestion?.iconUrl ?? null;
   const categoryCode = suggestion?.categoryCode ?? product.categoryCode;
   const storageZone = suggestion?.storageZone ?? product.storageZone;
-  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 50;
+  const topInset = insets.top;
   const rows: Array<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = [
     { icon: 'barcode-outline', label: copy.barcode, value: product.barcode },
     { icon: 'cube-outline', label: copy.packageSize, value: product.packageLabel ?? copy.notProvided },

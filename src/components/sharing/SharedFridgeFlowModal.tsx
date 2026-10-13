@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import * as Clipboard from 'expo-clipboard';
 import { CameraView, useCameraPermissions } from 'expo-camera';
@@ -8,12 +9,10 @@ import {
   ActivityIndicator,
   Alert,
   KeyboardAvoidingView,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
   Share,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -23,6 +22,7 @@ import QRCode from 'react-native-qrcode-svg';
 import { captureRef } from 'react-native-view-shot';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { getApiErrorCode } from '../../services/apiClient';
 import {
   activateSharedFridge,
@@ -314,7 +314,7 @@ export function SharedFridgeFlowModal({
     onClose();
   }, [onClose, screen]);
 
-  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 50;
+  const topInset = useSafeAreaInsets().top;
 
   return (
     <Modal animationType="slide" onRequestClose={goBack} presentationStyle="fullScreen" statusBarTranslucent visible={visible}>

@@ -1,6 +1,7 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createInventoryCategory, type InventoryCategory } from '../../services/inventoryApi';
 
 type Copy = { aiHint: string; cancel: string; close: string; create: string; creating: string; error: string; example: string; nameLabel: string; placeholder: string; title: string };

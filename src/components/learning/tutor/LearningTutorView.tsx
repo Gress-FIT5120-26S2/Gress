@@ -44,6 +44,14 @@ export function TutorEntryButton({ label, onPress, disabled = false }: { label: 
   </Pressable>;
 }
 
+export function TutorToolbarButton({ label, onPress, disabled = false }: { label: string; onPress: () => void; disabled?: boolean }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress}
+    testID="learning-tutor-entry" style={({ pressed }) => [styles.toolbarEntry, disabled ? styles.disabled : null, pressed ? styles.pressed : null]}>
+    <Image source={spoonie} contentFit="contain" style={styles.toolbarAvatar} accessible={false} />
+    <View pointerEvents="none" style={styles.toolbarBadge}><LearningIcon name="chatbubble-ellipses" size={12} color={c.learningGreenReadable} /></View>
+  </Pressable>;
+}
+
 export function TutorHelpCard({ prompt, onAccept, onDismiss, onTurnOff, disabled = false }: {
   prompt: string; onAccept: () => void; onDismiss: () => void; onTurnOff: () => void; disabled?: boolean;
 }) {
@@ -259,6 +267,9 @@ export function LearningTutorView(props: Props) {
 }
 
 const styles = StyleSheet.create({
+  toolbarEntry: { width: 44, height: 44, flexShrink: 0, alignItems: 'center', justifyContent: 'center', borderRadius: 22, backgroundColor: c.mintSurface, borderWidth: 1, borderColor: c.border },
+  toolbarAvatar: { width: 34, height: 38 },
+  toolbarBadge: { position: 'absolute', right: -1, bottom: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: c.surface, alignItems: 'center', justifyContent: 'center' },
   screen: { flex: 1, backgroundColor: c.background }, body: { fontSize: 17, lineHeight: 27, fontWeight: '500', color: c.textPrimary },
   coachingText: { fontSize: 17, lineHeight: 28, fontWeight: '500', color: c.textPrimary }, secondary: { fontSize: 15, lineHeight: 23, color: c.textSecondaryReadable },
   caption: { fontSize: 13, lineHeight: 20, color: c.textSecondaryReadable }, sectionTitle: { fontSize: 22, lineHeight: 29, fontWeight: '800', color: c.textPrimary },

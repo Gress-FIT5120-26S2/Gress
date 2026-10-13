@@ -15,6 +15,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { InventoryEntryFlow, type InventoryEntrySubmission, type InventoryUnit } from '../inventory-entry/InventoryEntryFlow';
 import {
   createInventoryBatch,
@@ -58,6 +59,7 @@ export function ShoppingCheckoutReview({
   onAllStocked,
 }: ShoppingCheckoutReviewProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.shopping.checkout;
 
   const [status, setStatus] = useState<Record<string, DraftStatus>>({});
@@ -172,7 +174,7 @@ export function ShoppingCheckoutReview({
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={requestClose}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable hitSlop={8} onPress={requestClose}>
             <Text style={styles.headerBtn}>{copy.close}</Text>
           </Pressable>
@@ -229,9 +231,12 @@ export function ShoppingCheckoutReview({
         </View>
       </View>
 
-      {/* B1: each draft opens the shared inventory form, prefilled from the cart item */}
+      {/* Arthur: NarIyirm
+          中文：每个购物项使用独立表单实例，切换商品会重新预填，同一商品的页面刷新则保留草稿。
+          EN: Each cart item gets its own form instance; changing items reseeds the form while refreshes of the same item retain the draft. */}
       {editing ? (
         <InventoryEntryFlow
+          key={editing.item_uid}
           visible
           source="recognition"
           initialValues={{
@@ -277,7 +282,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 18,
-    paddingTop: 56,
     paddingBottom: 12,
   },
   headerBtn: { color: '#C95F14', fontSize: 15, fontWeight: '800', width: 44 },

@@ -1,3 +1,4 @@
+import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
@@ -8,7 +9,6 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Linking,
-  Modal,
   Platform,
   Pressable,
   ScrollView,
@@ -21,6 +21,7 @@ import {
   type TextStyle,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ApiRequestError } from '../../services/apiClient';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import {
@@ -101,6 +102,7 @@ export function FridgeAssistantScreen({
   visible,
 }: FridgeAssistantScreenProps) {
   const { language, t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.assistant;
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
   const [draft, setDraft] = useState('');
@@ -398,7 +400,7 @@ export function FridgeAssistantScreen({
   return (
     <Modal animationType="slide" onRequestClose={onClose} presentationStyle="fullScreen" visible={visible}>
       <EdgeSwipeBackView onBack={onClose}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.screen}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <View style={styles.headerSide}>
             <Pressable accessibilityLabel={isHistoryVisible ? copy.backToChat : copy.back} accessibilityRole="button" hitSlop={8} onPress={isHistoryVisible ? () => setIsHistoryVisible(false) : onClose} style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}>
               <Ionicons color="#255043" name="chevron-back" size={22} />
@@ -939,7 +941,7 @@ function ActionConfirmationCard({ action, disabled, onCancel, onConfirm, status 
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: '#F4F8F7' },
-  header: { minHeight: 112, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 18, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D8E2DE', backgroundColor: '#F8FBFA' },
+  header: { minHeight: 60, flexDirection: 'row', alignItems: 'flex-end', paddingHorizontal: 18, paddingBottom: 14, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: '#D8E2DE', backgroundColor: '#F8FBFA' },
   headerSide: { width: 84, alignItems: 'flex-start' },
   headerActions: { width: 84, flexDirection: 'row', justifyContent: 'flex-end', gap: 4 },
   headerIconButton: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: '#E7F0ED' },

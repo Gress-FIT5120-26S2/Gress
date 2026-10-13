@@ -9,7 +9,6 @@ import {
   Platform,
   Pressable,
   ScrollView,
-  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -17,6 +16,7 @@ import {
 } from 'react-native';
 import { generateFoodPreset, getFoodPresetSuggestion } from '../../services/inventoryApi';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ReminderSettingsSection } from './ReminderSettingsSection';
 import { StorageSuggestionCard, type StorageSuggestion } from './StorageSuggestionCard';
 import { WasteProfileSection } from './WasteProfileSection';
@@ -125,6 +125,7 @@ export function InventoryEntryFlow({
   visible,
 }: InventoryEntryFlowProps) {
   const { t, language } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.manualEntry;
   const [reduceMotion, setReduceMotion] = useState(false);
   const [name, setName] = useState('');
@@ -160,16 +161,21 @@ export function InventoryEntryFlow({
   const [pendingSubmission, setPendingSubmission] = useState<InventoryEntrySubmission | null>(null);
   const [confirmationReasons, setConfirmationReasons] = useState<string[]>([]);
   const latestNameRef = useRef('');
+  const wasVisible = useRef(false);
+  const [sessionInitialValues, setSessionInitialValues] = useState(initialValues);
   const unitLabel = copy.units[unit];
 
   useLayoutEffect(() => {
-    if (!visible) return;
+    const opening = visible && !wasVisible.current;
+    wasVisible.current = visible;
+    if (!opening) return;
     const now = new Date();
     const defaultExpiry = addDays(now, 7);
 
     // Arthur: NarIyirm
-    // 中文：每次打开都由 initialValues 初始化草稿；新增、编辑和识别录入因此可以复用同一套表单。
-    // EN: Each opening initialises its draft from initialValues so create, edit, and recognition flows can share one form.
+    // 中文：只在打开时固定预填快照，父页面刷新或重建 initialValues 不覆盖用户草稿；关闭后再次打开才重新初始化。
+    // EN: Capture prefill only on opening; parent refreshes or recreated initialValues cannot overwrite the draft, and reopening starts fresh.
+    setSessionInitialValues(initialValues);
     setName(initialValues?.name ?? '');
     setWasteProfile(null);
     setWasteReady(false);
@@ -438,7 +444,10 @@ export function InventoryEntryFlow({
     void submitInventory(submission);
   }, [pendingSubmission, submitInventory]);
 
-  const topInset = presentation === 'embedded' ? 0 : Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 47;
+  // Arthur: NarIyirm
+  // 中文：独立录入按真实安全区避开灵动岛；抽屉内编辑由外层负责顶部间距，不重复添加。
+  // EN: Standalone entry clears the actual device safe area; embedded editing relies on its sheet's top spacing without adding it twice.
+  const topInset = presentation === 'embedded' ? 0 : insets.top;
 
   return (
     <InventoryEntryPresentation blurTarget={blurTarget} onClose={onClose} presentation={presentation} reduceMotion={reduceMotion} visible={visible}>
@@ -506,7 +515,7 @@ export function InventoryEntryFlow({
                 ))}
               </ScrollView>
 
-              <WasteProfileSection enabled={visible && Number(quantity) > 0} initialName={initialValues?.name} initialUnit={initialValues?.unit} initialProfile={initialValues?.wasteProfile} name={name} unit={unit} onChange={updateWasteProfile} />
+              <WasteProfileSection enabled={visible && Number(quantity) > 0} initialName={sessionInitialValues?.name} initialUnit={sessionInitialValues?.unit} initialProfile={sessionInitialValues?.wasteProfile} name={name} unit={unit} onChange={updateWasteProfile} />
 
               <View style={styles.sectionDivider} />
               <FieldHeading icon="snow-outline" label={copy.storageLabel} tone="#168ACB" tint="#E8F6FD" />

@@ -284,7 +284,14 @@ function LearningRoomContent({ gateway, origin, onClose, initialRoute, embedded 
       selectedOptionId={quiz.feedback?.selectedOptionId ?? null} sources={frozenSources(quiz.attemptUid)} busy={false} error={null} onBack={back} onClose={back} onSelect={() => undefined} onSubmit={() => undefined}
       onNext={() => route.index + 1 < route.questions.length ? dispatch({ type: 'replace', route: { ...route, index: route.index + 1 } }) : back()} />;
   }
-  const body = <View style={{ flex: 1 }} {...edge.panHandlers}>{screen}{storyVisible ? <LearningLazyModal load={loadStory} componentProps={{ onClose: () => setStoryVisible(false) }} onClose={() => setStoryVisible(false)} closeLabel={copy.cancel} /> : null}</View>;
+  const closeStory = () => setStoryVisible(false);
+  // Arthur: NarIyirm
+  // 中文：加载、失败重试与视频共用一个原生弹窗，不能在 Suspense 切换时关闭加载弹窗并同时打开播放器弹窗，否则 iOS 再次观看可能被残留窗口阻塞。
+  // EN: Loading, retry and video share one native modal; replacing a loading modal with a player modal during Suspense can leave iOS blocking repeat playback.
+  const body = <View style={{ flex: 1 }} {...edge.panHandlers}>{screen}{storyVisible ?
+    <Modal visible presentationStyle="fullScreen" animationType="fade" onRequestClose={closeStory}>
+      <LearningLazyModal embedded load={loadStory} componentProps={{ onClose: closeStory, embedded: true }} onClose={closeStory} closeLabel={copy.cancel} />
+    </Modal> : null}</View>;
   return present(gateway.getState ? <LearningTutorController content={content} route={route} gateway={gateway} busy={busy} storyVisible={storyVisible}
     onNavigate={navigate} onResume={(uid) => { void run(() => gateway.resumeQuiz(uid), value => dispatch({ type: 'push', route: outcomeRoute(value) })); }}
     onAbandoned={() => { hydrate(); dispatch({ type: 'hub', route: { name: 'hub', segment: 'learn' } }); }}>{body}</LearningTutorController> : body);

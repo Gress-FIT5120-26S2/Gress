@@ -1,6 +1,13 @@
 # App Store 发布状态
 
-更新日期：2026-10-12（Australia/Sydney）。发行方：Haoxuan Sun，公开邮箱：nariyirm@gmail.com。审核电话只保存于 App Store Connect 和本机忽略目录。
+更新日期：2026-10-13（Australia/Sydney）。发行方：Haoxuan Sun，公开邮箱：nariyirm@gmail.com。审核电话只保存于 App Store Connect 和本机忽略目录。
+
+## 2026-10-13 安全区域修复构建
+
+- 本次两端来源提交均为 `dea1a8e`，包含 Learn AI 问答原生弹窗独立安全区域容器修复；`.easignore` 额外排除非运行时交接资料 `handover/`。
+- iOS production 1.0.0（14）构建 `9bf04aa6-7cdb-4aa6-9302-a71213c0ce31` 为 FINISHED；[构建页](https://expo.dev/accounts/gress-fit5120-26s2/projects/kitchmemo/builds/9bf04aa6-7cdb-4aa6-9302-a71213c0ce31)。自动提交 `25166ef7-e5a6-4a87-bf79-998496b48aff` 为 FINISHED、error 为 null；[提交页](https://expo.dev/accounts/gress-fit5120-26s2/projects/kitchmemo/submissions/25166ef7-e5a6-4a87-bf79-998496b48aff)。已完成向 Apple 上传；本次只读 TestFlight 查询仍仅显示旧 build 13，尚未确认 build 14 已处理并可安装。
+- Android preview 1.0.0／versionCode 3 构建 `fec5c662-1a61-46b2-84d6-8629152484b6` 为 FINISHED；[构建页](https://expo.dev/accounts/gress-fit5120-26s2/projects/kitchmemo/builds/fec5c662-1a61-46b2-84d6-8629152484b6)，[APK 下载](https://expo.dev/artifacts/eas/qD_JezA5Yxt8AVtx07SpsnREXbweU3Mo19xuRnYSRcg.apk)。
+- 本次仅创建构建与 TestFlight 上传，没有改动既有 App Store 正式审核单或替换其 build 13。
 
 ## 数据库与隐私
 

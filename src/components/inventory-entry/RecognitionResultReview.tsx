@@ -13,6 +13,7 @@ import {
   View,
 } from 'react-native';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { FoodPresetSuggestion } from '../../services/inventoryApi';
 import { EdgeSwipeBackView } from '../navigation/EdgeSwipeBackView';
 import type { RecognitionFreshness, RecognisedFood } from '../../services/recognitionApi';
@@ -95,6 +96,7 @@ function formatTime(date: Date) {
 
 export function RecognitionResultReview({ draft, onClose, onContinue, onRetake, visible }: RecognitionResultReviewProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.fridge.photoRecognition;
   const [reduceMotion, setReduceMotion] = useState(false);
   const [whyExpanded, setWhyExpanded] = useState(false);
@@ -117,7 +119,7 @@ export function RecognitionResultReview({ draft, onClose, onContinue, onRetake, 
 
   if (!draft) return null;
   const tone = FRESHNESS_TONES[draft.freshness];
-  const topInset = Platform.OS === 'android' ? (StatusBar.currentHeight ?? 24) : 50;
+  const topInset = insets.top;
   const foodName = copy.foodNames[draft.food];
   const quantity = `${draft.initialValues.quantity ?? '1'} ${t.fridge.manualEntry.units[draft.unit]}`;
   const summaryRows: Array<{ icon: keyof typeof Ionicons.glyphMap; label: string; value: string }> = [

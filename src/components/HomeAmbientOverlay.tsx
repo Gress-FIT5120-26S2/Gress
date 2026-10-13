@@ -3,6 +3,7 @@ import { BlurView } from 'expo-blur';
 import type { RefObject } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useI18n } from '../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { KitchenTimePhase } from './KitchenTimeLighting';
 
 type HomeAmbientOverlayProps = {
@@ -35,6 +36,7 @@ export function HomeAmbientOverlay({
   unreadCount,
 }: HomeAmbientOverlayProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const isNight = phase === 'night';
   const hasExpiring = expiringCount > 0;
   const headline = hasExpiring ? t.home.expiring(expiringCount) : t.home.useFirst;
@@ -69,7 +71,7 @@ export function HomeAmbientOverlay({
         hitSlop={8}
         onPress={onOpenExpiring}
         pressRetentionOffset={12}
-        style={({ pressed }) => [styles.freshnessCopy, pressed && styles.copyPressed]}
+        style={({ pressed }) => [styles.freshnessCopy, { top: insets.top + 59 }, pressed && styles.copyPressed]}
       >
         <Text style={[styles.periodLabel, isNight ? styles.nightPrimary : styles.dayPrimary]}>
           {t.home.period[phase]}
@@ -92,7 +94,7 @@ export function HomeAmbientOverlay({
         hitSlop={8}
         onPress={onOpenNotifications}
         pressRetentionOffset={12}
-        style={({ pressed }) => [styles.mailButton, pressed && styles.mailPressed]}
+        style={({ pressed }) => [styles.mailButton, { top: insets.top + 13 }, pressed && styles.mailPressed]}
       >
         <BlurView
           blurMethod="dimezisBlurViewSdk31Plus"
@@ -123,7 +125,7 @@ export function HomeAmbientOverlay({
 
 const styles = StyleSheet.create({
   star: { position: 'absolute', backgroundColor: '#DDEBFF' },
-  freshnessCopy: { position: 'absolute', top: 118, right: 92, left: 24, alignSelf: 'flex-start' },
+  freshnessCopy: { position: 'absolute', right: 92, left: 24, alignSelf: 'flex-start' },
   copyPressed: { opacity: 0.72, transform: [{ scale: 0.98 }] },
   periodLabel: { fontSize: 14, fontWeight: '600', lineHeight: 19 },
   freshnessHeadline: { marginTop: 7, fontSize: 23, fontWeight: '700', lineHeight: 30, letterSpacing: -0.35 },
@@ -132,7 +134,7 @@ const styles = StyleSheet.create({
   dayPrimary: { color: '#633F2D' },
   nightSecondary: { color: 'rgba(218,231,242,0.72)' },
   daySecondary: { color: 'rgba(55,78,70,0.70)' },
-  mailButton: { position: 'absolute', top: 72, right: 22, width: 52, height: 52 },
+  mailButton: { position: 'absolute', right: 22, width: 52, height: 52 },
   mailPressed: { opacity: 0.8, transform: [{ scale: 0.97 }] },
   mailGlass: { flex: 1, alignItems: 'center', justifyContent: 'center', overflow: 'hidden', borderRadius: 26, borderWidth: 1 },
   mailGlassNight: { borderColor: 'rgba(226,237,247,0.22)', backgroundColor: 'rgba(91,112,132,0.26)' },

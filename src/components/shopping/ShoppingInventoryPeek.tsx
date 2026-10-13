@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useI18n } from '../../i18n';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PresetFoodIcon } from '../fridge/PresetFoodIcon';
 import { getInventorySnapshot, type InventoryBatch } from '../../services/inventoryApi';
 
@@ -55,6 +56,7 @@ function getDaysLeft(iso: string | null): number | null {
 
 export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPeekProps) {
   const { t } = useI18n();
+  const insets = useSafeAreaInsets();
   const copy = t.shopping.peek;
   const [batches, setBatches] = useState<InventoryBatch[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,7 +94,7 @@ export function ShoppingInventoryPeek({ visible, onClose }: ShoppingInventoryPee
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
-        <View style={styles.header}>
+        <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
           <Pressable hitSlop={8} onPress={onClose}>
             <Text style={styles.headerBtn}>{copy.close}</Text>
           </Pressable>
@@ -158,7 +160,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    paddingTop: 56,
     paddingBottom: 8,
   },
   headerBtn: { color: '#C95F14', fontSize: 15, fontWeight: '800', width: 44 },

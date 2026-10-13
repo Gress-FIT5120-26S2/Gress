@@ -1,9 +1,10 @@
+import { AppModal as Modal } from './RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
 import { useEventListener } from 'expo';
 import { useAudioPlayer } from 'expo-audio';
 import { VideoView, useVideoPlayer } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
-import { AccessibilityInfo, Image, Linking, Modal, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { AccessibilityInfo, Image, Linking, Pressable, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useI18n } from '../i18n';
 
