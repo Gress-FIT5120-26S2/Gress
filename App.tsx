@@ -139,6 +139,19 @@ function KitchMemoApp() {
   const screenOpacity = useRef(new Animated.Value(1)).current;
   const screenScale = useRef(new Animated.Value(1)).current;
   const transitionOverlayOpacity = useRef(new Animated.Value(0)).current;
+  // Arthur: NarIyirm
+  // 中文：系统中断转场时也移除拦触遮罩并恢复导航，不能只依赖动画完成回调。
+  // EN: Interrupted transitions release the touch-blocking veil and restore navigation without relying solely on animation completion.
+  useEffect(() => {
+    if (!isCinematicActive && !isTransitionOverlayVisible) return;
+    const timer = setTimeout(() => {
+      transitionInProgressRef.current = false;
+      transitionOverlayOpacity.stopAnimation(); screenOpacity.stopAnimation(); screenScale.stopAnimation(); chromeOpacity.stopAnimation();
+      transitionOverlayOpacity.setValue(0); screenOpacity.setValue(1); screenScale.setValue(1); chromeOpacity.setValue(1);
+      setIsCinematicActive(false); setIsTransitionOverlayVisible(false);
+    }, isTransitionOverlayVisible ? 2000 : 5000);
+    return () => clearTimeout(timer);
+  }, [isCinematicActive, isTransitionOverlayVisible, transitionOverlayOpacity, screenOpacity, screenScale, chromeOpacity]);
   const finishOpening = useCallback(() => setIsOpening(false), []);
   const completeOpeningSequence = useCallback(() => setIsOpeningSequenceDone(true), []);
   const markKitchenReady = useCallback(() => setCanRevealKitchen(true), []);

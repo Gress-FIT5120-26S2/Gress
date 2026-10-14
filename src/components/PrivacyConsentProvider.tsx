@@ -6,6 +6,7 @@ import { useI18n } from '../i18n';
 import { privacyCopy, privacyUrl } from '../privacyCopy';
 import { AI_CONSENT_VERSION, registerAiConsentHandler } from '../services/aiConsentBridge';
 import { requestApi } from '../services/apiClient';
+import { requestCancelled, waitForRequest } from '../services/requestLifetime';
 
 // Arthur: NarIyirm
 // 中文：同一时间只显示一个授权弹窗，所有并发 AI 请求等待同一选择；关闭、失败或卸载均默认拒绝。
@@ -15,7 +16,7 @@ export function PrivacyConsentProvider({ children }: { children: ReactNode }) {
   const copy = privacyCopy(language);
   const [visible, setVisible] = useState(false);
   const [saving, setSaving] = useState(false);
-  const flight = useRef<Promise<boolean> | null>(null);
+  const flight = useRef<{ promise: Promise<boolean>; controller: AbortController; consumers: number } | null>(null);
   const resolve = useRef<((allowed: boolean) => void) | null>(null);
   const mounted = useRef(true);
   const finish = useCallback((allowed: boolean) => {
@@ -24,28 +25,43 @@ export function PrivacyConsentProvider({ children }: { children: ReactNode }) {
   }, []);
   useEffect(() => {
     mounted.current = true;
-    const unregister = registerAiConsentHandler(force => {
-      if (flight.current) return flight.current;
-      const pending = (async () => {
-        if (!force) {
-          const state = await requestApi<{ allowed: boolean; updatedAt: string | null }>('/api/privacy/ai-consent');
-          if (state.allowed) return true;
-          if (state.updatedAt) return false;
+    const unregister = registerAiConsentHandler((force, signal) => {
+      if (signal?.aborted) return Promise.reject(requestCancelled());
+      if (!flight.current) {
+        const pending = { promise: Promise.resolve(false), controller: new AbortController(), consumers: 0 };
+        pending.promise = (async () => {
+          if (!force) {
+            const state = await requestApi<{ allowed: boolean; updatedAt: string | null }>('/api/privacy/ai-consent', { signal: pending.controller.signal });
+            if (state.allowed) return true;
+            if (state.updatedAt) return false;
+          }
+          if (!mounted.current || pending.controller.signal.aborted) return false;
+          return new Promise<boolean>(done => { resolve.current = done; setVisible(true); });
+        })().catch(() => false).finally(() => { if (flight.current === pending) flight.current = null; });
+        flight.current = pending;
+      }
+      const pending = flight.current;
+      pending.consumers++;
+      // Arthur: NarIyirm
+      // 中文：每个调用者可独立退出；最后一个请求取消时关闭授权层，旧读取和旧保存不能影响新一轮授权。
+      // EN: Callers can leave independently; close consent when the last request cancels, isolating later prompts from old reads and saves.
+      return waitForRequest(pending.promise, signal).finally(() => {
+        pending.consumers--;
+        if (!pending.consumers && flight.current === pending) {
+          pending.controller.abort(); finish(false); flight.current = null;
         }
-        if (!mounted.current) return false;
-        return new Promise<boolean>(done => { resolve.current = done; setVisible(true); });
-      })().catch(() => false).finally(() => { if (flight.current === pending) flight.current = null; });
-      flight.current = pending;
-      return pending;
+      });
     });
-    return () => { mounted.current = false; unregister(); finish(false); };
+    return () => { mounted.current = false; unregister(); flight.current?.controller.abort(); finish(false); };
   }, [finish]);
   const save = async (allowed: boolean) => {
+    if (saving) return;
+    const pending = flight.current;
     setSaving(true);
     try {
-      await requestApi('/api/privacy/ai-consent', { method: 'PUT', body: JSON.stringify({ allowed, version: AI_CONSENT_VERSION }) });
-      finish(allowed);
-    } catch { if (mounted.current) { setSaving(false); Alert.alert(copy.failure, copy.failureBody); } }
+      await requestApi('/api/privacy/ai-consent', { method: 'PUT', signal: pending?.controller.signal, body: JSON.stringify({ allowed, version: AI_CONSENT_VERSION }) });
+      if (flight.current === pending) finish(allowed);
+    } catch { if (mounted.current && flight.current === pending) { setSaving(false); Alert.alert(copy.failure, copy.failureBody); } }
   };
   return <>{children}<Modal animationType="slide" visible={visible} onRequestClose={() => { if (!saving) finish(false); }}>
     <SafeAreaView style={styles.root}>

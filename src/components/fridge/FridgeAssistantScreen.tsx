@@ -1,4 +1,5 @@
 import { AppModal as Modal } from '../RetainedTab';
+import { useRequestSession } from '../useRequestSession';
 import { Ionicons } from '@expo/vector-icons';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Image } from 'expo-image';
@@ -102,6 +103,7 @@ export function FridgeAssistantScreen({
   visible,
 }: FridgeAssistantScreenProps) {
   const { language, t } = useI18n();
+  const { start } = useRequestSession(visible);
   const insets = useSafeAreaInsets();
   const copy = t.fridge.assistant;
   const [conversation, setConversation] = useState<ConversationTurn[]>([]);
@@ -212,6 +214,7 @@ export function FridgeAssistantScreen({
   const askQuestion = useCallback(async (rawQuestion: string, existingTurnId?: string) => {
     const question = rawQuestion.trim();
     if (!question || busyRef.current) return;
+    const signal = start();
     const sessionGeneration = sessionGenerationRef.current;
 
     const id = existingTurnId ?? `assistant-turn-${nextTurnId.current += 1}`;
@@ -238,8 +241,8 @@ export function FridgeAssistantScreen({
         conversationUid: conversationUidRef.current,
         language,
         message: question,
-      });
-      if (sessionGeneration !== sessionGenerationRef.current) return;
+      }, signal);
+      if (signal.aborted || sessionGeneration !== sessionGenerationRef.current) return;
       conversationUidRef.current = response.conversationUid;
       if (fridgeUid) void AsyncStorage.setItem(activeConversationKey(fridgeUid), response.conversationUid).catch(() => undefined);
       setConversation((current) => updateTurn(current, id, {
@@ -257,7 +260,7 @@ export function FridgeAssistantScreen({
         scrollToLatest();
       }
     }
-  }, [fridgeUid, language, scrollToLatest]);
+  }, [fridgeUid, language, scrollToLatest, start]);
 
   const submitDraft = useCallback(() => {
     void askQuestion(draft);

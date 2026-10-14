@@ -8,7 +8,7 @@ import { TabModal as Modal } from '../RetainedTab';
 // Also doubles as the cart row EDIT form: tapping a cart item reopens this same
 // sheet pre-filled with its current name/quantity/unit (initialValues), with the
 // title/button copy swapped to "edit" instead of "add".
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -76,6 +76,11 @@ export function ShoppingManualEntry({
   // EN: Re-seed only on the closed→open edge, not on every initialValues reference change,
   //     or typing gets reset mid-keystroke.
   const justOpened = useRef(false);
+  // Arthur: NarIyirm
+  // 中文：已发送的写入可完成，但旧响应不能关闭后来重新打开的购物表单。
+  // EN: Submitted writes may finish, but old responses must not close a later shopping form session.
+  const session = useRef(0);
+  useLayoutEffect(() => () => { session.current++; }, [visible]);
   useEffect(() => {
     if (visible && !justOpened.current) {
       setName(initialValues?.name ?? '');
@@ -112,6 +117,8 @@ export function ShoppingManualEntry({
   // 中文：跟服务端 cart.js 的护栏对齐，先本地拦一次给出即时提示。
   // EN: Mirrors server-side cart.js guardrails, catching bad input locally with an immediate message.
   const handleSubmit = async () => {
+    const currentSession = session.current;
+    if (saving) return;
     const trimmed = name.trim();
     if (!trimmed) {
       setErrorMessage(copy.errors.nameRequired);
@@ -135,8 +142,9 @@ export function ShoppingManualEntry({
     setSaving(true);
     try {
       await onSubmit({ name: trimmed, quantity: qty, unit });
-      onClose();
+      if (currentSession === session.current) onClose();
     } catch (err) {
+      if (currentSession !== session.current) return;
       setSaving(false);
       const code = getApiErrorCode(err);
       setErrorMessage(

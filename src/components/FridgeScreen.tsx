@@ -544,10 +544,11 @@ export function FridgeScreen({
   // Arthur: NarIyirm
   // 中文：识别相机成功后在此补查 food preset，并把模型结果转换为 RecognitionResultReview 或共用手动表单的初值。
   // EN: After camera recognition, this enriches the model result with a food preset and builds either RecognitionResultReview or shared manual-form values.
-  const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult, photoUri: string) => {
+  const handlePhotoRecognised = useCallback(async (result: PhotoRecognitionResult, photoUri: string, signal?: AbortSignal) => {
     if (result.food === 'unknown' || result.freshness === 'unknown') return;
     const foodName = t.fridge.photoRecognition.foodNames[result.food];
-    const { suggestion } = await getFoodPresetSuggestion(result.food);
+    const { suggestion } = await getFoodPresetSuggestion(result.food, signal);
+    if (signal?.aborted) return;
 
     if (!suggestion) {
       // Arthur: NarIyirm
@@ -575,16 +576,16 @@ export function FridgeScreen({
     setIsRecognitionCameraVisible(false);
   }, [t.fridge.photoRecognition.foodNames]);
 
-  const handleBarcodeProduct = useCallback(async (product: BarcodeProduct) => {
+  const handleBarcodeProduct = useCallback(async (product: BarcodeProduct, signal?: AbortSignal) => {
     let suggestion = null;
     let enrichmentSource: BarcodeDraft['enrichmentSource'] = null;
     try {
-      const presetResult = await getFoodPresetSuggestion(product.name);
+      const presetResult = await getFoodPresetSuggestion(product.name, signal);
       suggestion = presetResult.suggestion;
       if (suggestion) {
         enrichmentSource = 'preset';
       } else {
-        const generatedResult = await generateFoodPreset(product.name);
+        const generatedResult = await generateFoodPreset(product.name, signal);
         suggestion = generatedResult.suggestion;
         enrichmentSource = generatedResult.generated ? 'ai' : 'preset';
       }
@@ -594,6 +595,10 @@ export function FridgeScreen({
       // EN: AI enrichment failure must not replace a successful barcode lookup; users can still complete inventory fields in the shared form.
       suggestion = null;
     }
+    // Arthur: NarIyirm
+    // 中文：取消相机也取消预设补全，不能把迟到的商品核对层覆盖到已返回的冰箱页。
+    // EN: Canceling the camera also cancels enrichment; a late product review must not cover the fridge after returning.
+    if (signal?.aborted) return;
     setBarcodeDraft({ enrichmentSource, initialValues: buildBarcodeInitialValues(product, suggestion), product, suggestion });
     setIsRecognitionCameraVisible(false);
   }, []);

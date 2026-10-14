@@ -1,4 +1,5 @@
-import { TabModal as Modal } from '../RetainedTab';
+import { useTabActive, TabModal as Modal } from '../RetainedTab';
+import { useRequestSession } from '../useRequestSession';
 import { Ionicons } from '@expo/vector-icons';
 import { BlurView } from 'expo-blur';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
@@ -125,6 +126,8 @@ export function InventoryEntryFlow({
   visible,
 }: InventoryEntryFlowProps) {
   const { t, language } = useI18n();
+  const tabActive = useTabActive();
+  const { start, cancel } = useRequestSession(visible && tabActive);
   const insets = useSafeAreaInsets();
   const copy = t.fridge.manualEntry;
   const [reduceMotion, setReduceMotion] = useState(false);
@@ -162,6 +165,11 @@ export function InventoryEntryFlow({
   const [confirmationReasons, setConfirmationReasons] = useState<string[]>([]);
   const latestNameRef = useRef('');
   const wasVisible = useRef(false);
+  // Arthur: NarIyirm
+  // 中文：已提交的写入仍可完成，旧会话的成功或失败不能覆盖重新打开的草稿。
+  // EN: Submitted writes may finish, but an old session's success or failure cannot overwrite a reopened draft.
+  const session = useRef(0);
+  useLayoutEffect(() => () => { session.current++; }, [visible]);
   const [sessionInitialValues, setSessionInitialValues] = useState(initialValues);
   const unitLabel = copy.units[unit];
 
@@ -223,6 +231,7 @@ export function InventoryEntryFlow({
   }, []);
 
   const handleNameChange = useCallback((value: string) => {
+    cancel();
     setName(value);
     latestNameRef.current = value;
     setNameError(null);
@@ -232,11 +241,12 @@ export function InventoryEntryFlow({
     setSuggestionLookupFinished(false);
     setSuggestionGenerating(false);
     setSuggestionGenerationError(false);
-  }, []);
+  }, [cancel]);
 
   useEffect(() => {
     const query = name.trim();
-    if (!visible || !query) {
+    if (!visible || !tabActive || !query) {
+      setSuggestionGenerating(false);
       setSuggestion(null);
       setSuggestionApplied(false);
       setSuggestionLoading(false);
@@ -245,13 +255,14 @@ export function InventoryEntryFlow({
     }
 
     let active = true;
+    const controller = new AbortController();
     const lookupTimer = setTimeout(() => {
       // Arthur: NarIyirm
       // 中文：输入停顿后才查询 Express，并忽略过期响应，避免快速输入时较早的名称覆盖最新建议。
       // EN: Query Express only after typing pauses and ignore stale responses so an earlier name cannot overwrite the latest suggestion.
       setSuggestionLoading(true);
       setSuggestionLookupFinished(false);
-      void getFoodPresetSuggestion(query)
+      void getFoodPresetSuggestion(query, controller.signal)
         .then(({ suggestion: nextSuggestion }) => {
           if (!active) return;
           setSuggestion(nextSuggestion ? {
@@ -278,18 +289,20 @@ export function InventoryEntryFlow({
 
     return () => {
       active = false;
+      controller.abort();
       clearTimeout(lookupTimer);
     };
-  }, [name, visible]);
+  }, [name, visible, tabActive]);
 
   const generateStorageAdvice = useCallback(async () => {
     const query = name.trim();
     if (!query) return;
+    const signal = start();
     setSuggestionGenerating(true);
     setSuggestionGenerationError(false);
     try {
-      const { suggestion: generatedSuggestion } = await generateFoodPreset(query);
-      if (latestNameRef.current.trim() !== query) return;
+      const { suggestion: generatedSuggestion } = await generateFoodPreset(query, signal);
+      if (signal.aborted || latestNameRef.current.trim() !== query) return;
       // Arthur: NarIyirm
       // 中文：生成接口已经完成别名去重、图标标准化和 preset 缓存；这里只把可编辑结果带回当前表单。
       // EN: The generation endpoint already deduplicates aliases, normalises the icon, and caches the preset; this only brings its editable result into the current form.
@@ -305,11 +318,11 @@ export function InventoryEntryFlow({
       setSuggestionApplied(false);
       setSuggestionLookupFinished(true);
     } catch {
-      if (latestNameRef.current.trim() === query) setSuggestionGenerationError(true);
+      if (!signal.aborted && latestNameRef.current.trim() === query) setSuggestionGenerationError(true);
     } finally {
-      if (latestNameRef.current.trim() === query) setSuggestionGenerating(false);
+      if (!signal.aborted && latestNameRef.current.trim() === query) setSuggestionGenerating(false);
     }
-  }, [name]);
+  }, [name, start]);
 
   // Arthur: NarIyirm
   // 中文：只把 food preset 的储存区、分类和参考天数复制到本地表单；用户仍可修改，数据库此时没有写入。
@@ -353,16 +366,18 @@ export function InventoryEntryFlow({
   }, []);
 
   const submitInventory = useCallback(async (submission: InventoryEntrySubmission) => {
+    const current = session.current;
     setIsSaving(true);
     try {
       await onSubmit(submission);
-      onClose();
+      if (current === session.current) onClose();
     } catch (error) {
+      if (current !== session.current) return;
       const detail = error instanceof Error ? error.message : copy.validation.save;
       console.error('Inventory save failed:', detail);
       setSaveError(detail);
     } finally {
-      setIsSaving(false);
+      if (current === session.current) setIsSaving(false);
     }
   }, [copy.validation.save, onClose, onSubmit]);
 
@@ -515,7 +530,7 @@ export function InventoryEntryFlow({
                 ))}
               </ScrollView>
 
-              <WasteProfileSection enabled={visible && Number(quantity) > 0} initialName={sessionInitialValues?.name} initialUnit={sessionInitialValues?.unit} initialProfile={sessionInitialValues?.wasteProfile} name={name} unit={unit} onChange={updateWasteProfile} />
+              <WasteProfileSection enabled={visible && tabActive && Number(quantity) > 0} initialName={sessionInitialValues?.name} initialUnit={sessionInitialValues?.unit} initialProfile={sessionInitialValues?.wasteProfile} name={name} unit={unit} onChange={updateWasteProfile} />
 
               <View style={styles.sectionDivider} />
               <FieldHeading icon="snow-outline" label={copy.storageLabel} tone="#168ACB" tint="#E8F6FD" />

@@ -984,3 +984,9 @@ Learn 的个人 gateway 跨普通 Tab 切换复用，应用从后台恢复或缓
 分类生成图标路径同事务写入 `erasure_asset_queue`；立即尝试通过 Supabase Storage API 删除，成功才移除队列，失败保留待重试。Vercel 每天 03:30 UTC 调用 `/api/internal/erasure-assets`，独立服务端 CRON_SECRET 鉴权，公开／设备请求不得触发管理员存储清理。当前 cron 是否已部署须见 App Store 准备验证记录，不能仅凭配置文件视为已运行。
 
 四张新表均启用 RLS，anon/authenticated 无读写权限；恢复链与指纹写入仅由 SECURITY DEFINER trigger/RPC，队列只给 service_role SELECT/DELETE，删除 RPC 仅给 service_role EXECUTE。公开政策与元数据不承诺食品安全判定，不承诺第三方已处理数据／备份即时清除。
+
+### 客户端请求与返回可靠性（2026-10-14）
+
+通用 HTTP 客户端新增有界网络等待与调用方取消，覆盖凭证、上传和响应体；普通请求默认 30 秒，AI 请求默认 90 秒，领域已有更短期限仍保留。AI 授权选择不消耗通用网络截止时间；每个调用者可独立取消，最后一个等待者退出时关闭授权层并使迟到读取/保存失效。相机、条码、预设补全、包装与图标请求沿用同一取消信号，退出后不得继续推进旧 UI。iOS 原生弹窗交接等待关闭事件，卸载丢失事件有有界回退。
+
+此轮只改变客户端等待与呈现生命周期，不改变 Express、schema、RPC 或 payload 合同，不自动重试业务写入。取消或超时不保证已收到的服务器写入回滚；仍通过原权威列表、历史或学习请求键/游标恢复真实结果。验证范围与真机待验收项见 `docs/verification/2026-10-14-interaction-freeze.md`。

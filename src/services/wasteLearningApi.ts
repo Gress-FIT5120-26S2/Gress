@@ -8,19 +8,16 @@ export type WasteProfileSuggestion = { profile: WasteComponent[]; needsConfirmat
 // Arthur: NarIyirm
 // 中文：录入阶段的 AI 请求设超时，网络卡住时仍能切换到人工材质选择或备用图标。
 // EN: Bound entry-time AI requests so stalled networks still permit manual materials and fallback artwork.
-async function requestEntryAi<T>(path: string, body: unknown, timeout: number) {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeout);
-  try { return await requestApi<T>(path, { method: 'POST', body: JSON.stringify(body), signal: controller.signal }); }
-  finally { clearTimeout(timer); }
+async function requestEntryAi<T>(path: string, body: unknown, timeoutMs: number, signal?: AbortSignal) {
+  return requestApi<T>(path, { method: 'POST', body: JSON.stringify(body), timeoutMs, signal });
 }
 
-export function suggestWasteProfile(name: string, unit: string) {
-  return requestEntryAi<WasteProfileSuggestion>('/api/waste-learning/profile', { name, unit }, 35_000);
+export function suggestWasteProfile(name: string, unit: string, signal?: AbortSignal) {
+  return requestEntryAi<WasteProfileSuggestion>('/api/waste-learning/profile', { name, unit }, 35_000, signal);
 }
 
-export function prepareWasteMaterials(profile: WasteComponent[]) {
-  return requestEntryAi<{ assets: Partial<Record<WasteMaterial, string | null>> }>('/api/waste-learning/materials/prepare', { profile }, 55_000);
+export function prepareWasteMaterials(profile: WasteComponent[], signal?: AbortSignal) {
+  return requestEntryAi<{ assets: Partial<Record<WasteMaterial, string | null>> }>('/api/waste-learning/materials/prepare', { profile }, 55_000, signal);
 }
 
 export type WasteOpportunity = {

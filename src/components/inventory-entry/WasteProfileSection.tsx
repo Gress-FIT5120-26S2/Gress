@@ -43,8 +43,9 @@ export function WasteProfileSection({ name, unit, enabled, initialProfile, initi
       setPreparing(initialProfile.length > 0); setProfile(initialProfile); setLoading(false); return;
     }
     setLoading(true);
+    const controller = new AbortController();
     const timer = setTimeout(() => {
-      void suggestWasteProfile(name.trim(), unit).then((result) => {
+      void suggestWasteProfile(name.trim(), unit, controller.signal).then((result) => {
         if (current !== revision.current) return;
         setSuggested(result.profile);
         setFallback(Boolean(result.fallback));
@@ -54,7 +55,7 @@ export function WasteProfileSection({ name, unit, enabled, initialProfile, initi
         if (current === revision.current) { setFallback(true); setEditing(true); }
       }).finally(() => { if (current === revision.current) setLoading(false); });
     }, 900);
-    return () => { clearTimeout(timer); revision.current++; };
+    return () => { clearTimeout(timer); revision.current++; controller.abort(); };
   }, [enabled, initialName, initialProfile, initialUnit, name, unit]);
 
   // Arthur: NarIyirm
@@ -62,15 +63,16 @@ export function WasteProfileSection({ name, unit, enabled, initialProfile, initi
   // EN: Prepare shared icons only for selected materials; failures permit a stable fallback and consumption never calls generation.
   useEffect(() => {
     let active = true;
-    if (!profile?.length) { setPreparing(false); return; }
+    if (!enabled || !profile?.length) { setPreparing(false); return; }
+    const controller = new AbortController();
     setPreparing(true);
     const timer = setTimeout(() => {
-      void prepareWasteMaterials(profile).then((result) => { if (active) setAssets(result.assets); })
+      void prepareWasteMaterials(profile, controller.signal).then((result) => { if (active) setAssets(result.assets); })
         .catch(() => { if (active) setFallback(true); })
         .finally(() => { if (active) setPreparing(false); });
     }, 400);
-    return () => { active = false; clearTimeout(timer); };
-  }, [profile]);
+    return () => { active = false; clearTimeout(timer); controller.abort(); };
+  }, [enabled, profile]);
 
   useEffect(() => { onChange(profile, profile !== null && !loading && !preparing); }, [loading, onChange, preparing, profile]);
 

@@ -134,10 +134,11 @@ export function getInventorySnapshot(): Promise<InventorySnapshot> {
   return requestApi<InventorySnapshot>('/api/inventory');
 }
 
-export function createInventoryCategory(name: string): Promise<{ category: InventoryCategory }> {
+export function createInventoryCategory(name: string, signal?: AbortSignal): Promise<{ category: InventoryCategory }> {
   return requestApi<{ category: InventoryCategory }>('/api/inventory/categories', {
     body: JSON.stringify({ name }),
     method: 'POST',
+    signal,
   });
 }
 
@@ -164,19 +165,21 @@ export function getInventoryBatchDetail(batchUid: string): Promise<{ batch: Inve
 // Arthur: NarIyirm
 // 中文：录入表单用食材名称查询全局参考值；Express 匹配 food_presets 的标准名或别名，但不会自动写库存。
 // EN: The entry form looks up global guidance by food name; Express matches food_presets names or aliases without writing inventory.
-export function getFoodPresetSuggestion(query: string): Promise<{ suggestion: FoodPresetSuggestion | null }> {
+export function getFoodPresetSuggestion(query: string, signal?: AbortSignal): Promise<{ suggestion: FoodPresetSuggestion | null }> {
   return requestApi<{ suggestion: FoodPresetSuggestion | null }>(
     `/api/food-presets/suggestion?q=${encodeURIComponent(query)}`,
+    { signal },
   );
 }
 
 // Arthur: NarIyirm
 // 中文：预设查询未命中后，由用户触发的一键生成或条码扫描流程调用此接口；服务端负责 Gemini、Cloudflare、去背景和全局 preset 缓存。
 // EN: After a preset miss, an explicit one-tap generation or barcode scan flow calls this endpoint; the server owns Gemini, Cloudflare, background removal, and global preset caching.
-export function generateFoodPreset(query: string): Promise<{ generated: boolean; suggestion: FoodPresetSuggestion }> {
+export function generateFoodPreset(query: string, signal?: AbortSignal): Promise<{ generated: boolean; suggestion: FoodPresetSuggestion }> {
   return requestApi<{ generated: boolean; suggestion: FoodPresetSuggestion }>('/api/food-presets/generate', {
     body: JSON.stringify({ name: query }),
     method: 'POST',
+    signal,
   });
 }
 

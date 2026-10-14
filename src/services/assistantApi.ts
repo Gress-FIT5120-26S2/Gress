@@ -114,10 +114,11 @@ export function sendAssistantMessage(input: {
   conversationUid?: string | null;
   language: AssistantLanguage;
   message: string;
-}) {
+}, signal?: AbortSignal) {
   return requestApi<AssistantMessageResponse>('/api/assistant/messages', {
     body: JSON.stringify(input),
     method: 'POST',
+    signal,
   });
 }
 
