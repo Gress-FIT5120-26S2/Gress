@@ -1,6 +1,7 @@
 import { AppModal as Modal } from '../RetainedTab';
 import { Ionicons } from '@expo/vector-icons';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useRequestSession } from '../useRequestSession';
 import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { createInventoryCategory, type InventoryCategory } from '../../services/inventoryApi';
 
@@ -13,19 +14,23 @@ export function CreateCategoryModal({ copy, onClose, onCreated, visible }: { cop
   const [name, setName] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { start, cancel } = useRequestSession(visible);
+  const close = () => { cancel(); setIsCreating(false); onClose(); };
+  useEffect(() => { if (visible) { setIsCreating(false); setError(null); } }, [visible]);
   const create = async () => {
     const trimmedName = name.trim();
     if (!trimmedName || isCreating) return;
+    const signal = start();
     setIsCreating(true); setError(null);
-    try { const { category } = await createInventoryCategory(trimmedName); onCreated(category); setName(''); }
-    catch { setError(copy.error); }
-    finally { setIsCreating(false); }
+    try { const { category } = await createInventoryCategory(trimmedName, signal); if (!signal.aborted) { onCreated(category); setName(''); } }
+    catch { if (!signal.aborted) setError(copy.error); }
+    finally { if (!signal.aborted) setIsCreating(false); }
   };
-  return <Modal animationType="fade" onRequestClose={onClose} transparent visible={visible}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}><View style={styles.card}>
-    <View style={styles.header}><View style={styles.icon}><Ionicons color="#F58220" name="folder-open-outline" size={25} /></View><View style={styles.heading}><Text style={styles.title}>{copy.title}</Text><Text style={styles.example}>{copy.example}</Text></View><Pressable accessibilityLabel={copy.close} accessibilityRole="button" onPress={onClose} style={styles.close}><Ionicons color="#607169" name="close" size={22} /></Pressable></View>
+  return <Modal animationType="fade" onRequestClose={close} transparent visible={visible}><KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={styles.backdrop}><View style={styles.card}>
+    <View style={styles.header}><View style={styles.icon}><Ionicons color="#F58220" name="folder-open-outline" size={25} /></View><View style={styles.heading}><Text style={styles.title}>{copy.title}</Text><Text style={styles.example}>{copy.example}</Text></View><Pressable accessibilityLabel={copy.close} accessibilityRole="button" onPress={close} style={styles.close}><Ionicons color="#607169" name="close" size={22} /></Pressable></View>
     <Text style={styles.label}>{copy.nameLabel}</Text><TextInput editable={!isCreating} maxLength={24} onChangeText={(value) => { setName(value); setError(null); }} placeholder={copy.placeholder} placeholderTextColor="#71817A" style={styles.input} value={name} />
     <View style={styles.aiRow}>{isCreating ? <ActivityIndicator color="#147E8C" size="small" /> : <Ionicons color="#147E8C" name="sparkles-outline" size={18} />}<Text style={styles.aiText}>{isCreating ? copy.creating : copy.aiHint}</Text></View>{error ? <Text accessibilityLiveRegion="polite" style={styles.error}>{error}</Text> : null}
-    <View style={styles.actions}><Pressable accessibilityRole="button" disabled={isCreating} onPress={onClose} style={styles.cancel}><Text style={styles.cancelText}>{copy.cancel}</Text></Pressable><Pressable accessibilityRole="button" disabled={!name.trim() || isCreating} onPress={() => { void create(); }} style={[styles.create, (!name.trim() || isCreating) && styles.disabled]}>{isCreating ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.createText}>{copy.create}</Text><Ionicons color="#FFFFFF" name="sparkles-outline" size={17} /></>}</Pressable></View>
+    <View style={styles.actions}><Pressable accessibilityRole="button" onPress={close} style={styles.cancel}><Text style={styles.cancelText}>{copy.cancel}</Text></Pressable><Pressable accessibilityRole="button" disabled={!name.trim() || isCreating} onPress={() => { void create(); }} style={[styles.create, (!name.trim() || isCreating) && styles.disabled]}>{isCreating ? <ActivityIndicator color="#FFFFFF" /> : <><Text style={styles.createText}>{copy.create}</Text><Ionicons color="#FFFFFF" name="sparkles-outline" size={17} /></>}</Pressable></View>
   </View></KeyboardAvoidingView></Modal>;
 }
 

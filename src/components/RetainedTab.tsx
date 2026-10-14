@@ -1,6 +1,7 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { Keyboard, Modal as NativeModal, Platform, StyleSheet, View, type ModalProps, type StyleProp, type ViewStyle } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { afterModalDismissals, beginModalDismissal } from './modalDismissal';
 
 const TabActiveContext = createContext(true);
 export const useTabActive = () => useContext(TabActiveContext);
@@ -34,8 +35,30 @@ export function RetainedTab({ active, preload = false, children, style }: {
 // Arthur: NarIyirm
 // 中文：原生弹窗有独立视图根，统一在内部测量安全区；这里只提供尺寸，不自动加 padding，避免已有安全区布局重复留白。
 // EN: Native modals have separate view roots, so measure safe areas inside every modal; provide metrics without padding to avoid doubling existing safe-area layouts.
-export function AppModal({ children, ...props }: ModalProps) {
-  return <NativeModal {...props}><SafeAreaProvider>{children}</SafeAreaProvider></NativeModal>;
+export function AppModal({ children, visible = true, onDismiss, ...props }: ModalProps) {
+  const [presented, setPresented] = useState(Platform.OS !== 'ios' && visible);
+  const nativeVisible = useRef(false);
+  const dismissal = useRef<(() => void) | null>(null);
+  // Arthur: NarIyirm
+  // 中文：弹窗打开可排队、关闭必须即时；布局清理也覆盖条件卸载，防止新层抢在旧层原生关闭之前出现。
+  // EN: Queue presentation but close immediately; layout cleanup covers conditional unmounts before another modal can present.
+  useLayoutEffect(() => {
+    if (Platform.OS !== 'ios') { setPresented(visible); return; }
+    if (!visible) { setPresented(false); return; }
+    return afterModalDismissals(() => { nativeVisible.current = true; setPresented(true); });
+  }, [visible]);
+  useLayoutEffect(() => () => {
+    if (Platform.OS === 'ios' && nativeVisible.current) {
+      nativeVisible.current = false;
+      dismissal.current = beginModalDismissal();
+    }
+  }, [visible]);
+  const dismissed = () => {
+    dismissal.current?.();
+    dismissal.current = null;
+    onDismiss?.();
+  };
+  return <NativeModal {...props} visible={presented && visible} onDismiss={dismissed}><SafeAreaProvider>{children}</SafeAreaProvider></NativeModal>;
 }
 
 // Arthur: NarIyirm

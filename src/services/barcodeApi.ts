@@ -24,6 +24,6 @@ export type BarcodeLookupResult = {
 // Arthur: NarIyirm
 // 中文：扫描页只消费 KitchMemo 的稳定商品结构，Open Food Facts 的版本和字段差异由 Express 隔离。
 // EN: The scanner consumes only KitchMemo's stable product shape while Express isolates Open Food Facts version and field differences.
-export function lookupBarcodeProduct(barcode: string): Promise<BarcodeLookupResult> {
-  return requestApi<BarcodeLookupResult>(`/api/barcode-products/${encodeURIComponent(barcode)}`);
+export function lookupBarcodeProduct(barcode: string, signal?: AbortSignal): Promise<BarcodeLookupResult> {
+  return requestApi<BarcodeLookupResult>(`/api/barcode-products/${encodeURIComponent(barcode)}`, { signal });
 }

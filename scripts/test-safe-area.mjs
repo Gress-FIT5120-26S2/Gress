@@ -11,6 +11,8 @@ const require = createRequire(import.meta.url);
 const source = await readFile(new URL('../src/components/RetainedTab.tsx', import.meta.url), 'utf8');
 const output = ts.transpileModule(source, { compilerOptions: { jsx: ts.JsxEmit.ReactJSX, module: ts.ModuleKind.CommonJS } }).outputText;
 const module = { exports: {} };
+const dismissalModule = { exports: {} };
+new Function('module', 'exports', ts.transpileModule(await readFile(new URL('../src/components/modalDismissal.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(dismissalModule, dismissalModule.exports);
 // Arthur: NarIyirm
 // 中文：运行真实弹窗包装与 Tab 门控，只替换原生视图；验证独立安全区容器而非模拟 iPhone 测量。
 // EN: Run the real modal wrapper and tab gate with native views replaced; verify the separate safe-area root without pretending to measure an iPhone.
@@ -18,6 +20,7 @@ const dependencies = {
   react: React, 'react/jsx-runtime': require('react/jsx-runtime'),
   'react-native': { Modal: 'NativeModal', View: 'View', Keyboard: { dismiss() {} }, Platform: { OS: 'ios' }, StyleSheet: { create: value => value, absoluteFill: {} } },
   'react-native-safe-area-context': { SafeAreaProvider: 'SafeAreaProvider' },
+  './modalDismissal': dismissalModule.exports,
 };
 new Function('require', 'module', 'exports', output)(name => {
   assert.ok(name in dependencies, `Unexpected dependency ${name}`);
@@ -27,7 +30,12 @@ const { AppModal, TabModal, RetainedTab } = module.exports;
 async function render(element, check) {
   let renderer;
   await act(async () => { renderer = create(element); });
-  try { await check(renderer); } finally { await act(async () => { renderer.unmount(); }); }
+  await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
+  try { await check(renderer); } finally {
+    const dismiss = renderer.root.findAllByType('NativeModal').map(modal => modal.props.onDismiss);
+    await act(async () => { renderer.unmount(); });
+    await act(async () => { dismiss.forEach(callback => callback?.()); });
+  }
 }
 
 await test('Every native modal measures its own safe area without reusing window metrics or adding padding', async () => {
@@ -53,7 +61,9 @@ await test('Tab modals remain hidden on inactive retained pages and reopen with 
     assert.equal(renderer.root.findByType('NativeModal').props.visible, true);
     await act(async () => { renderer.update(tree(false)); });
     assert.equal(renderer.root.findByType('NativeModal').props.visible, false);
+    await act(async () => { renderer.root.findByType('NativeModal').props.onDismiss(); });
     await act(async () => { renderer.update(tree(true)); });
+    await act(async () => { await new Promise(resolve => setTimeout(resolve, 5)); });
     assert.equal(renderer.root.findByType('NativeModal').props.visible, true);
     assert.equal(renderer.root.findByType('Content'), child);
     assert.equal(mounts, 1);

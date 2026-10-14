@@ -9,6 +9,8 @@ import ts from 'typescript';
 globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const require = createRequire(import.meta.url);
 const noop = () => {};
+const sessionModule = { exports: {} };
+new Function('require', 'module', 'exports', ts.transpileModule(await readFile(new URL('../src/components/useRequestSession.ts', import.meta.url), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS } }).outputText)(() => React, sessionModule, sessionModule.exports);
 
 // Arthur: NarIyirm
 // 中文：执行真实结账与录入组件的 React 状态和 effect，只替换原生视图、网络与包装子视图；不触碰设备或库存。
@@ -51,7 +53,7 @@ async function loadModule(path, extra = {}) {
     react: React, 'react/jsx-runtime': require('react/jsx-runtime'), 'react-native': native,
     'react-native-safe-area-context': { useSafeAreaInsets: () => ({ top: topSafeArea, bottom: 34, left: 0, right: 0 }) },
     '@expo/vector-icons': { Ionicons: 'Ionicons' }, 'expo-blur': { BlurView: 'BlurView' },
-    '../RetainedTab': { TabModal: 'Modal' }, '../../i18n': { useI18n: () => ({ t, language: 'en' }) },
+    '../RetainedTab': { TabModal: 'Modal', useTabActive: () => true }, '../useRequestSession': sessionModule.exports, '../../i18n': { useI18n: () => ({ t, language: 'en' }) },
     '../../services/inventoryApi': inventoryApi, '../../services/wasteLearningApi': wasteApi,
     './ReminderSettingsSection': { ReminderSettingsSection: 'ReminderSettingsSection' },
     './StorageSuggestionCard': { StorageSuggestionCard: 'StorageSuggestionCard' },
@@ -207,4 +209,23 @@ await test('A failed save preserves the full draft, including disabled expiry, f
     assert.equal(saved[0].expiresAt, null);
     assert.equal(saved[0].expiryWarningDays, null);
   } finally { rejectSave = false; await dispose(renderer); }
+});
+
+await test('A late save from a closed form cannot close or replace the reopened inventory draft', async () => {
+  let complete, closes = 0;
+  const pending = new Promise(resolve => { complete = resolve; });
+  const first = { ...propsForEntry({ name: 'Milk', quantity: '2', price: '5', expiryDate: '2099-12-31' }), onSubmit: () => pending, onClose: () => { closes++; } };
+  let renderer;
+  await act(async () => { renderer = create(React.createElement(entry.InventoryEntryFlow, first)); });
+  try {
+    await press(renderer.root, copy.save);
+    await press(renderer.root, copy.confirmation.continue);
+    await act(async () => { renderer.update(React.createElement(entry.InventoryEntryFlow, { ...first, visible: false })); });
+    await act(async () => { renderer.update(React.createElement(entry.InventoryEntryFlow, { ...first, initialValues: { name: 'Egg', quantity: '6', price: '4' } })); });
+    await act(async () => { complete(); });
+    assert.equal(closes, 0);
+    assert.equal(input(renderer.root, copy.name.label).props.value, 'Egg');
+    assert.equal(input(renderer.root, copy.quantity.label).props.value, '6');
+    assert.equal(button(renderer.root, copy.save).props.disabled, false);
+  } finally { await dispose(renderer); }
 });

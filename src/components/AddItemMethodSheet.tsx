@@ -67,6 +67,10 @@ export function AddItemMethodSheet({ copy, onClose, onSelect, visible }: AddItem
   const gestureStartRef = useRef(collapsedHeight);
   const heightRef = useRef(collapsedHeight);
   const pendingMethodRef = useRef<AddItemMethod | null>(null);
+  const onSelectRef = useRef(onSelect);
+  onSelectRef.current = onSelect;
+  const selectionFrame = useRef<number | null>(null);
+  useEffect(() => () => { if (selectionFrame.current !== null) cancelAnimationFrame(selectionFrame.current); }, []);
 
   useEffect(() => {
     let mounted = true;
@@ -168,6 +172,19 @@ export function AddItemMethodSheet({ copy, onClose, onSelect, visible }: AddItem
       };
     }
 
+    // Arthur: NarIyirm
+    // 中文：关闭后必须卸载透明遮罩；动画被系统中断也会释放，父级重渲染不因 onSelect 引用变化重启动画。
+    // EN: Release the transparent scrim even if the system interrupts exit; parent callback changes must not restart dismissal.
+    let closed = false;
+    const finishExit = () => {
+      if (closed) return;
+      closed = true;
+      setRendered(false);
+      const pendingMethod = pendingMethodRef.current;
+      pendingMethodRef.current = null;
+      if (pendingMethod) selectionFrame.current = requestAnimationFrame(() => onSelectRef.current(pendingMethod));
+    };
+    const exitDeadline = setTimeout(finishExit, reduceMotion ? 200 : 320);
     Animated.parallel([
       Animated.timing(backdropOpacity, {
         toValue: 0,
@@ -187,27 +204,17 @@ export function AddItemMethodSheet({ copy, onClose, onSelect, visible }: AddItem
         easing: EASE_SHEET,
         useNativeDriver: true,
       }),
-    ]).start(({ finished }) => {
-      if (!finished) return;
-      setRendered(false);
-      const pendingMethod = pendingMethodRef.current;
-      pendingMethodRef.current = null;
-
-      if (pendingMethod) {
-        // Arthur: NarIyirm
-        // 中文：下一种录入模式必须等当前原生 Modal 卸载后一帧再打开，避免透明旧层继续拦截触摸。
-        // EN: Open the next entry mode one frame after this native Modal unmounts so an invisible old layer cannot intercept touches.
-        requestAnimationFrame(() => onSelect(pendingMethod));
-      }
-    });
+    ]).start(({ finished }) => { if (finished) finishExit(); });
 
     return () => {
+      clearTimeout(exitDeadline);
+      closed = true;
       backdropOpacity.stopAnimation();
       sheetHeight.stopAnimation();
       sheetOpacity.stopAnimation();
       sheetTranslateY.stopAnimation();
     };
-  }, [backdropOpacity, collapsedHeight, expandedHeight, onSelect, reduceMotion, rendered, sheetHeight, sheetOpacity, sheetTranslateY, visible]);
+  }, [backdropOpacity, collapsedHeight, expandedHeight, reduceMotion, rendered, sheetHeight, sheetOpacity, sheetTranslateY, visible]);
 
   // Arthur: NarIyirm
   // 中文：拖动时固定弹窗底边并改变可见高度，四周间距和底部圆角因此不会被推出屏幕。

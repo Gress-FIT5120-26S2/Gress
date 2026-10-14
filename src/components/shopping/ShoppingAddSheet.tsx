@@ -5,7 +5,7 @@
 // reuses FridgeScreen's camera + review pieces, but "continue" opens
 // ShoppingManualEntry pre-filled (not the full InventoryEntryFlow, and not a
 // direct add) so the user confirms quantity/unit before it lands in the cart.
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState } from 'react';
 import { AddItemMethodSheet, type AddItemMethod } from '../AddItemMethodSheet';
 import { PhotoRecognitionCamera } from '../inventory-entry/PhotoRecognitionCamera';
 import { BarcodeResultReview, buildBarcodeInitialValues, type BarcodeDraft } from '../inventory-entry/BarcodeResultReview';
@@ -63,7 +63,8 @@ export function ShoppingAddSheet({
     }
   };
 
-  const handleRecognised = async (result: PhotoRecognitionResult) => {
+  const handleRecognised = async (result: PhotoRecognitionResult, _photoUri: string, signal?: AbortSignal) => {
+    if (signal?.aborted) return;
     setCameraVisible(false);
     if (result.food === 'unknown') return;
     const name = FOOD_LABEL[result.food] ?? result.food;
@@ -76,39 +77,33 @@ export function ShoppingAddSheet({
 
   // 中文：复用 FridgeScreen 的预设/AI 补全逻辑，得到品类和参考单位。
   // EN: Reuses FridgeScreen's preset/AI enrichment to derive category and unit.
-  const handleBarcodeProduct = async (product: BarcodeProduct) => {
+  const handleBarcodeProduct = async (product: BarcodeProduct, signal?: AbortSignal) => {
     let suggestion = null;
     let enrichmentSource: BarcodeDraft['enrichmentSource'] = null;
     try {
-      const presetResult = await getFoodPresetSuggestion(product.name);
+      const presetResult = await getFoodPresetSuggestion(product.name, signal);
       suggestion = presetResult.suggestion;
       if (suggestion) {
         enrichmentSource = 'preset';
       } else {
-        const generatedResult = await generateFoodPreset(product.name);
+        const generatedResult = await generateFoodPreset(product.name, signal);
         suggestion = generatedResult.suggestion;
         enrichmentSource = generatedResult.generated ? 'ai' : 'preset';
       }
     } catch {
       suggestion = null;
     }
+    // Arthur: NarIyirm
+    // 中文：购物识别退出后不再打开旧核对层；与冰箱共用相机请求的取消信号。
+    // EN: Reuse the camera's cancellation signal so leaving shopping recognition cannot open a stale review.
+    if (signal?.aborted) return;
     setBarcodeDraft({ enrichmentSource, initialValues: buildBarcodeInitialValues(product, suggestion), product, suggestion });
     setCameraVisible(false);
   };
 
-  // 中文：AddItemMethodSheet 会等自己的关闭动画真正播完（Animated.timing 的 finished 回调）
-  //       才调用 onSelect，就是为了不让一个原生 Modal 在另一个还没关完时就开始打开——
-  //       两个 <Modal> 在同一帧内一开一关，在 iOS 上会崩溃。BarcodeResultReview 没有这层
-  //       保护，onContinue 是直接从按钮点击同步触发的，所以这里手动补一个延迟，等它关闭
-  //       动画播完再打开下一个 Modal。
-  // EN: AddItemMethodSheet waits for its own close animation to actually finish (the
-  //     Animated.timing "finished" callback) before calling onSelect, specifically so one
-  //     native Modal never starts presenting while another is still dismissing -- two <Modal>s
-  //     transitioning in the same frame crashes on iOS. BarcodeResultReview has no such
-  //     protection; onContinue fires synchronously from the button press. This adds the same
-  //     kind of delay by hand, waiting for its close animation before opening the next Modal.
-  const pendingManualTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => () => { if (pendingManualTimer.current) clearTimeout(pendingManualTimer.current); }, []);
+  // Arthur: NarIyirm
+  // 中文：表单状态直接交接，公共弹窗层等待真实关闭完成；不再用可能晚于用户取消的固定计时器。
+  // EN: Hand off form state directly while the shared modal layer waits for native dismissal; avoid a timer that can fire after cancellation.
   const handleBarcodeContinue = (draft: BarcodeDraft) => {
     setBarcodeDraft(null);
     const values = {
@@ -116,11 +111,8 @@ export function ShoppingAddSheet({
       quantity: Number(draft.initialValues.quantity) || 1,
       unit: draft.initialValues.unit ?? 'item',
     };
-    if (pendingManualTimer.current) clearTimeout(pendingManualTimer.current);
-    pendingManualTimer.current = setTimeout(() => {
-      setManualInitialValues(values);
-      setManualVisible(true);
-    }, 350);
+    setManualInitialValues(values);
+    setManualVisible(true);
   };
 
   return (

@@ -315,9 +315,11 @@ export function InventoryItemDetailSheet({
     let wasteOpportunity: WasteOpportunity | null = null;
     try {
       // Arthur: NarIyirm
-      // 中文：关闭动画立即跟随手指离场，同时并行保存数量；两者都完成后才卸载弹窗，避免网络延迟让拖拽在松手处停住。
-      // EN: The sheet leaves with the finger while quantity persistence runs in parallel; it unmounts only after both finish so network latency never freezes the release point.
-      const closingAnimation = animateClosed(releaseVelocity);
+      // 中文：数量写入未完成时保持抽屉可见，避免滑出屏幕后透明原生窗口继续拦截冰箱触摸。
+      // EN: Keep the sheet visible during quantity writes so an offscreen native window cannot keep intercepting fridge touches.
+      const quantityChanged = batch && draftQuantity !== batch.remainingQuantity;
+      if (quantityChanged) animateToDetent(previewOffset);
+      const closingAnimation = quantityChanged ? null : animateClosed(releaseVelocity);
       if (batch && draftQuantity !== batch.remainingQuantity) {
         // Arthur: NarIyirm
         // 中文：拖动期间只更新本地草稿；关闭前一次性提交并携带版本号，避免每一帧都请求后端或覆盖共享成员的新修改。
@@ -335,7 +337,7 @@ export function InventoryItemDetailSheet({
         // EN: Once the quantity mutation succeeds, let the sheet close while full-list reconciliation runs in the background so refresh latency cannot lock the close action.
         void Promise.resolve(onChanged()).catch(() => undefined);
       }
-      await closingAnimation;
+      await (closingAnimation ?? animateClosed(releaseVelocity));
       finishClose();
       if (wasteOpportunity) onWasteOpportunity(wasteOpportunity);
     } catch {
@@ -610,7 +612,7 @@ export function InventoryItemDetailSheet({
             </View>
             {!isEditing ? (
               <Pressable accessibilityRole="button" disabled={isClosing} onPress={() => void requestClose()} style={({ pressed }) => [styles.closeButton, pressed && styles.pressed]}>
-                <Text style={styles.closeText}>{copy.close}</Text>
+                {isClosing ? <ActivityIndicator color="#1599D2" /> : <Text style={styles.closeText}>{copy.close}</Text>}
               </Pressable>
             ) : null}
           </View>
@@ -749,7 +751,7 @@ export function InventoryItemDetailSheet({
               <Ionicons name="pencil" size={20} color="#FFFFFF" />
               <Text style={styles.editButtonText}>{copy.edit}</Text>
             </Pressable>
-            <Pressable accessibilityLabel={copy.remove} accessibilityRole="button" onPress={() => setShowRemoveConfirm(true)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
+            <Pressable accessibilityLabel={copy.remove} accessibilityRole="button" disabled={isClosing} onPress={() => setShowRemoveConfirm(true)} style={({ pressed }) => [styles.removeButton, pressed && styles.pressed]}>
               <Ionicons name="trash-outline" size={24} color="#F2384A" />
             </Pressable>
           </View>

@@ -1,5 +1,6 @@
 import { getDeviceCredential, getDeviceId } from './deviceId';
 import { askAiConsent, needsAiConsent } from './aiConsentBridge';
+import { requestCancelled, waitForRequest } from './requestLifetime';
 
 const apiUrl = process.env.EXPO_PUBLIC_API_URL;
 
@@ -57,43 +58,57 @@ export function getApiErrorCode(error: unknown) {
 // Arthur: NarIyirm
 // 中文：所有业务 service 最终汇入此函数；上游见 inventoryApi/sharingApi 等，下游是 EXPO_PUBLIC_API_URL 指向的 Express。
 // EN: Every domain service converges here; upstream callers live in inventoryApi/sharingApi and downstream is the Express server at EXPO_PUBLIC_API_URL.
-export async function requestApi<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function requestApi<T>(path: string, init: RequestInit & { timeoutMs?: number } = {}): Promise<T> {
   // Arthur: NarIyirm
   // 中文：所有前端业务请求都通过同一入口携带 Device-ID 访问 Express，避免各业务模块重复处理环境地址、请求头和错误。
   // EN: All frontend domain requests use one Express client with Device-ID so modules do not duplicate environment, header, and error handling.
   if (!apiUrl) throw new Error('EXPO_PUBLIC_API_URL is not configured');
+  if (init.signal?.aborted) throw requestCancelled();
   if (apiRequestsSuspended && path !== '/api/privacy/device-data') throw new ApiRequestError('identity_erased', 401);
   if (needsAiConsent(path, init.method)) {
-    if (!await askAiConsent()) throw new ApiRequestError('ai_consent_required', 403, 'AI permission is required. Manage it in Profile → Privacy.');
+    if (!await askAiConsent(false, init.signal)) throw new ApiRequestError('ai_consent_required', 403, 'AI permission is required. Manage it in Profile → Privacy.');
   }
-  if (init.signal?.aborted) throw new Error('Request cancelled');
+  if (init.signal?.aborted) throw requestCancelled();
   if (apiRequestsSuspended && path !== '/api/privacy/device-data') throw new ApiRequestError('identity_erased', 401);
 
+  // Arthur: NarIyirm
+  // 中文：授权选择不计入网络超时；凭证、上传及响应体读取共享截止时间，取消保留 AbortError，不自动重发写请求。
+  // EN: Consent choice is outside the network deadline; credentials, upload and response body share it, preserving AbortError without retrying writes.
+  const { timeoutMs = needsAiConsent(path, init.method) ? 90_000 : 30_000, signal: callerSignal, ...fetchInit } = init;
+  const controller = new AbortController();
+  const abort = () => controller.abort();
+  callerSignal?.addEventListener('abort', abort, { once: true });
+  let timedOut = false;
+  const timer = setTimeout(() => { timedOut = true; controller.abort(); }, timeoutMs);
   changeApiActivity(1);
   try {
 
-    const [deviceId, deviceCredential] = await Promise.all([getDeviceId(), getDeviceCredential()]);
+    const [deviceId, deviceCredential] = await waitForRequest(Promise.all([getDeviceId(), getDeviceCredential()]), controller.signal);
+    if (controller.signal.aborted) throw requestCancelled();
   // Arthur: NarIyirm
   // 中文：上传照片时让 fetch 自动设置 multipart boundary；其余请求体仍使用 JSON，可恢复错误交给页面展示而不是触发红色开发错误屏。
   // EN: Let fetch set multipart boundaries for photo uploads, keep JSON for other bodies, and leave recoverable errors to the screen instead of a red dev overlay.
     const isFormData = typeof FormData !== 'undefined' && init.body instanceof FormData;
     let response: Response;
     try {
-      response = await fetch(`${apiUrl}${path}`, {
-        ...init,
+      response = await waitForRequest(fetch(`${apiUrl}${path}`, {
+        ...fetchInit,
+        signal: controller.signal,
         headers: {
           'Device-ID': deviceId,
           'Device-Credential': deviceCredential,
           ...(init.body && !isFormData ? { 'Content-Type': 'application/json' } : {}),
           ...init.headers,
         },
-      });
+      }), controller.signal);
     } catch (error) {
+      if (controller.signal.aborted) throw requestCancelled();
       const detail = error instanceof Error ? error.message : 'network error';
       if (__DEV__) console.warn(`API request did not reach ${apiUrl}${path}: ${detail}`);
       throw new Error(`Cannot reach ${apiUrl}. Check that Express is running and Windows Firewall allows TCP ${new URL(apiUrl).port || '80'}.`);
     }
-    const body = await response.json().catch(() => null) as T | ApiError | null;
+    const body = await waitForRequest(response.json().catch(() => null), controller.signal) as T | ApiError | null;
+    if (controller.signal.aborted) throw requestCancelled();
 
     if (!response.ok) {
       const apiError = body as ApiError | null;
@@ -111,7 +126,12 @@ export async function requestApi<T>(path: string, init: RequestInit = {}): Promi
 
     if (response.status === 204) return undefined as T;
     return body as T;
+  } catch (error) {
+    if (timedOut) throw new ApiRequestError('request_timeout', 0, 'Request timed out. Check your connection and try again.');
+    throw error;
   } finally {
+    clearTimeout(timer);
+    callerSignal?.removeEventListener('abort', abort);
     changeApiActivity(-1);
   }
 }

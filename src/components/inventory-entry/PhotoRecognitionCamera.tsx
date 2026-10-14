@@ -19,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { recogniseFoodPhoto, type PhotoRecognitionResult } from '../../services/recognitionApi';
 import { lookupBarcodeProduct, type BarcodeProduct } from '../../services/barcodeApi';
 import { getApiErrorCode } from '../../services/apiClient';
+import { useRequestSession } from '../useRequestSession';
 
 type RecognitionStage = 'camera' | 'recognising' | 'barcodeLookup' | 'barcodeNotFound' | 'barcodeInvalid' | 'barcodeRateLimited' | 'unknown' | 'error';
 type CaptureMode = 'photo' | 'barcode';
@@ -26,9 +27,9 @@ type CaptureMode = 'photo' | 'barcode';
 type PhotoRecognitionCameraProps = {
   onClose: () => void;
   onManualFallback: () => void;
-  onRecognised: (result: PhotoRecognitionResult, photoUri: string) => void | Promise<void>;
+  onRecognised: (result: PhotoRecognitionResult, photoUri: string, signal?: AbortSignal) => void | Promise<void>;
   barcodeEnabled?: boolean;
-  onBarcodeProduct?: (product: BarcodeProduct) => void | Promise<void>;
+  onBarcodeProduct?: (product: BarcodeProduct, signal?: AbortSignal) => void | Promise<void>;
   visible: boolean;
 };
 
@@ -46,6 +47,9 @@ export function PhotoRecognitionCamera({
   visible,
 }: PhotoRecognitionCameraProps) {
   const tabActive = useTabActive();
+  const { start, cancel } = useRequestSession(visible && tabActive);
+  const close = useCallback(() => { cancel(); onClose(); }, [cancel, onClose]);
+  const manualFallback = useCallback(() => { cancel(); onManualFallback(); }, [cancel, onManualFallback]);
   const { t } = useI18n();
   const insets = useSafeAreaInsets();
   const copy = t.fridge.photoRecognition;
@@ -63,7 +67,7 @@ export function PhotoRecognitionCamera({
   const [scannedBarcode, setScannedBarcode] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!visible) return;
+    if (!visible || !tabActive) return;
     setStage('camera');
     setCapturedUri(null);
     setCameraReady(false);
@@ -71,12 +75,13 @@ export function PhotoRecognitionCamera({
     setMode('photo');
     setScannedBarcode(null);
     barcodeScanLockedRef.current = false;
-  }, [visible]);
+  }, [visible, tabActive]);
 
   // Arthur: NarIyirm
   // 中文：相机和相册统一汇入此函数；先压缩/规范化缓存文件，再调用 recogniseFoodPhoto，失败保留手动录入退路。
   // EN: Camera and gallery converge here; the cached file is normalized before recogniseFoodPhoto, with manual entry retained as the failure fallback.
-  const recogniseUri = useCallback(async (sourceUri: string, sourceWidth?: number) => {
+  const recogniseUri = useCallback(async (sourceUri: string, sourceWidth: number | undefined, signal: AbortSignal) => {
+    if (signal.aborted) return;
     try {
       setStage('recognising');
 
@@ -87,61 +92,69 @@ export function PhotoRecognitionCamera({
       if (sourceWidth && sourceWidth > 1600) context.resize({ height: null, width: 1600 });
       const rendered = await context.renderAsync();
       const normalized = await rendered.saveAsync({ compress: 0.82, format: SaveFormat.JPEG });
+      if (signal.aborted) return;
       setCapturedUri(normalized.uri);
 
-      const result = await recogniseFoodPhoto(normalized.uri);
+      const result = await recogniseFoodPhoto(normalized.uri, signal);
+      if (signal.aborted) return;
       if (result.food === 'unknown' || result.freshness === 'unknown') {
         setStage('unknown');
         return;
       }
-      await onRecognised(result, normalized.uri);
+      await onRecognised(result, normalized.uri, signal);
     } catch {
-      setStage('error');
+      if (!signal.aborted) setStage('error');
     }
   }, [onRecognised]);
 
   const capture = useCallback(async () => {
     if (!cameraReady || stage !== 'camera') return;
+    const signal = start();
+    setStage('recognising');
     try {
       const photo = await cameraRef.current?.takePictureAsync({ quality: 0.9 });
+      if (signal.aborted) return;
       if (!photo?.uri) throw new Error('camera_capture_failed');
       setCapturedUri(photo.uri);
-      await recogniseUri(photo.uri, photo.width);
+      await recogniseUri(photo.uri, photo.width, signal);
     } catch {
-      setStage('error');
+      if (!signal.aborted) setStage('error');
     }
-  }, [cameraReady, recogniseUri, stage]);
+  }, [cameraReady, recogniseUri, stage, start]);
 
   const choosePhoto = useCallback(async () => {
+    const signal = start();
     try {
       const selection = await ImagePicker.launchImageLibraryAsync({
         allowsMultipleSelection: false,
         mediaTypes: ['images'],
         quality: 1,
       });
-      if (selection.canceled || !selection.assets[0]?.uri) return;
+      if (signal.aborted || selection.canceled || !selection.assets[0]?.uri) return;
       const asset = selection.assets[0];
       setCapturedUri(asset.uri);
-      await recogniseUri(asset.uri, asset.width);
+      await recogniseUri(asset.uri, asset.width, signal);
     } catch {
-      setStage('error');
+      if (!signal.aborted) setStage('error');
     }
-  }, [recogniseUri]);
+  }, [recogniseUri, start]);
 
   const retry = useCallback(() => {
+    cancel();
     barcodeScanLockedRef.current = false;
     setCapturedUri(null);
     setStage('camera');
     setShowSupportedFoods(false);
-  }, []);
+  }, [cancel]);
 
   const selectMode = useCallback((nextMode: CaptureMode) => {
+    cancel();
     barcodeScanLockedRef.current = false;
     setMode(nextMode);
     setCapturedUri(null);
     setScannedBarcode(null);
     setStage('camera');
-  }, []);
+  }, [cancel]);
 
   // Arthur: NarIyirm
   // 中文：原生扫描回调先锁定本次条码并显示查询状态，再通过 Express 获取清洗后的商品资料，避免连续帧重复请求。
@@ -152,21 +165,24 @@ export function PhotoRecognitionCamera({
     // 中文：ref 在同一渲染帧内同步上锁，避免相机连续回调在 React stage 更新前并发发送相同条码请求。
     // EN: This ref locks synchronously within the current render frame so repeated camera callbacks cannot race ahead of the React stage update.
     barcodeScanLockedRef.current = true;
+    const signal = start();
     const barcode = data.trim();
     setScannedBarcode(barcode);
     setStage('barcodeLookup');
     try {
-      const result = await lookupBarcodeProduct(barcode);
+      const result = await lookupBarcodeProduct(barcode, signal);
+      if (signal.aborted) return;
       if (!result.found || !result.product) {
         setStage('barcodeNotFound');
         return;
       }
-      await onBarcodeProduct(result.product);
+      await onBarcodeProduct(result.product, signal);
     } catch (error) {
+      if (signal.aborted) return;
       const errorCode = getApiErrorCode(error);
       setStage(errorCode === 'invalid_barcode' ? 'barcodeInvalid' : errorCode === 'rate_limited' ? 'barcodeRateLimited' : 'error');
     }
-  }, [mode, onBarcodeProduct, stage]);
+  }, [mode, onBarcodeProduct, stage, start]);
 
   const cycleFlash = useCallback(() => {
     setFlash((current) => FLASH_SEQUENCE[(FLASH_SEQUENCE.indexOf(current) + 1) % FLASH_SEQUENCE.length]);
@@ -185,14 +201,14 @@ export function PhotoRecognitionCamera({
   return (
     <Modal
       animationType="fade"
-      onRequestClose={onClose}
+      onRequestClose={close}
       presentationStyle="overFullScreen"
       statusBarTranslucent
       visible={visible}
     >
       <View style={styles.root}>
         <StatusBar barStyle="light-content" translucent backgroundColor="transparent" />
-        {isCameraAvailable && (stage === 'camera' || stage === 'barcodeLookup') ? (
+        {visible && tabActive && isCameraAvailable && (stage === 'camera' || stage === 'barcodeLookup') ? (
           <CameraView
             active={tabActive && visible && stage === 'camera'}
             barcodeScannerSettings={mode === 'barcode' ? { barcodeTypes: ['ean13', 'ean8', 'upc_a', 'upc_e'] } : undefined}
@@ -215,7 +231,7 @@ export function PhotoRecognitionCamera({
             accessibilityLabel={copy.close}
             accessibilityRole="button"
             hitSlop={8}
-            onPress={onClose}
+            onPress={close}
             style={({ pressed }) => [styles.roundButton, pressed ? styles.pressed : null]}
           >
             <Ionicons color="#FFFFFF" name="close" size={23} />
@@ -250,7 +266,7 @@ export function PhotoRecognitionCamera({
             <Pressable accessibilityRole="button" onPress={() => { void choosePhoto(); }} style={styles.textButton}>
               <Text style={styles.textButtonText}>{copy.choosePhotos}</Text>
             </Pressable>
-            <Pressable accessibilityRole="button" onPress={onManualFallback} style={styles.textButton}>
+            <Pressable accessibilityRole="button" onPress={manualFallback} style={styles.textButton}>
               <Text style={styles.textButtonText}>{copy.useManual}</Text>
             </Pressable>
           </View>
@@ -319,7 +335,7 @@ export function PhotoRecognitionCamera({
               </Pressable>
             </View> : (
               <View style={styles.barcodeBottomBar}>
-                <Pressable accessibilityRole="button" onPress={onManualFallback} style={({ pressed }) => [styles.manualBarcodeButton, pressed ? styles.pressed : null]}>
+                <Pressable accessibilityRole="button" onPress={manualFallback} style={({ pressed }) => [styles.manualBarcodeButton, pressed ? styles.pressed : null]}>
                   <Ionicons color="#FFFFFF" name="create-outline" size={18} />
                   <Text style={styles.dockLabel}>{copy.useManualShort}</Text>
                 </Pressable>
@@ -378,7 +394,7 @@ export function PhotoRecognitionCamera({
                 <Text style={styles.quietButtonText}>{barcodeCopy.tryPhotoRecognition}</Text>
               </Pressable> : null}
               <View style={styles.quietDivider} />
-              <Pressable accessibilityRole="button" onPress={onManualFallback} style={styles.quietButton}>
+              <Pressable accessibilityRole="button" onPress={manualFallback} style={styles.quietButton}>
                 <Ionicons color="#315C51" name="create-outline" size={18} />
                 <Text style={styles.quietButtonText}>{copy.useManualShort}</Text>
               </Pressable>

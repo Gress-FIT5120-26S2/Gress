@@ -53,6 +53,7 @@
     "typescript": "~6.0.3"
   },
   "scripts": {
+    "interaction-lifecycle:test": "node scripts/test-request-lifecycle.mjs",
     "learning-feedback:test": "node scripts/test-learning-feedback.mjs",
     "safe-area:test": "node scripts/test-safe-area.mjs",
     "inventory-entry:test": "node scripts/test-inventory-entry.mjs",
